@@ -1,0 +1,141 @@
+use std::{
+    fmt,
+    sync::{Arc, RwLock},
+};
+
+use super::*;
+
+pub struct Event<T>(Arc<RwLock<EventIntern<T>>>);
+
+impl<T> Clone for Event<T> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> Default for Event<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> EventInterface<T> for Event<T> {
+    type Listener = EventListener<T>;
+
+    #[inline]
+    fn new() -> Self {
+        Self(Arc::new(RwLock::new(EventIntern::new())))
+    }
+
+    #[inline]
+    fn push(&self, event: T) {
+        (*self.0.write().unwrap()).events.push(event);
+    }
+
+    #[inline]
+    fn listen(&self) -> EventListener<T> {
+        EventListener::new(self.clone())
+    }
+
+    #[inline]
+    fn listener_len(&self) -> usize {
+        self.0.read().unwrap().listeners.len()
+    }
+
+    #[inline]
+    fn event_len(&self) -> usize {
+        self.0.read().unwrap().events.len()
+    }
+}
+
+/// You should wrap this inside of an Rc or Arc if you want
+/// multiple references to the same listener
+pub struct EventListener<T>(ListenerKey, Event<T>);
+
+impl<T> fmt::Debug for EventListener<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EventListener({:?}, _Event)", self.0)
+    }
+}
+
+impl<T> Drop for EventListener<T> {
+    fn drop(&mut self) {
+        if let Ok(ref mut inner) = (self.1).0.write() {
+            inner.remove_listener(self.0);
+        }
+    }
+}
+
+impl<T> EventListener<T> {
+    fn new(event: Event<T>) -> Self {
+        let id = event.0.write().unwrap().create_listener();
+        EventListener(id, event)
+    }
+}
+
+impl<T> EventListen<T> for EventListener<T> {
+    #[inline]
+    fn with<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&[T]) -> R,
+    {
+        (self.1).0.write().unwrap().pull_with(self.0, f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::mem::drop;
+
+    #[test]
+    fn test_event_listener() {
+        let event = Event::new();
+
+        event.push(0i32);
+
+        let listener = event.listen();
+
+        event.push(1i32);
+        event.push(2i32);
+        event.push(3i32);
+
+        assert_eq!(listener.peek(), &[1, 2, 3]);
+
+        drop(listener);
+    }
+
+    #[test]
+    fn test_event_cleanup() {
+        let event = Event::new();
+
+        let listener_1 = event.listen();
+
+        event.push(10i32);
+
+        assert_eq!(event.event_len(), 1);
+
+        let listener_2 = event.listen();
+
+        event.push(20i32);
+
+        assert_eq!(listener_1.peek(), &[10i32, 20i32]);
+        assert_eq!(listener_2.peek(), &[20i32]);
+        assert_eq!(listener_2.peek(), &[]);
+        assert_eq!(listener_2.peek(), &[]);
+
+        assert_eq!(event.event_len(), 0);
+
+        for _i in 0..10 {
+            event.push(30i32);
+        }
+
+        assert_eq!(listener_2.peek(), &[30i32; 10]);
+
+        drop(listener_1);
+
+        assert_eq!(event.event_len(), 0);
+    }
+}
