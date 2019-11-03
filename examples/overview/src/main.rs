@@ -11,12 +11,6 @@ use reclutch::{
     widget::{Event, EventListener, Widget},
 };
 
-fn update_children<E>(children: &mut [&mut dyn Widget<E>], global: &mut Event<E>) {
-    for child in children {
-        child.update(global);
-    }
-}
-
 #[derive(Clone)]
 enum WindowEvent {
     Click(Point),
@@ -46,12 +40,12 @@ impl Counter {
     }
 }
 
-impl Widget<WindowEvent> for Counter {
-    fn children(&self) -> Vec<&dyn Widget<WindowEvent>> {
+impl Widget for Counter {
+    fn children(&self) -> Vec<&dyn Widget> {
         vec![&self.button]
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget<WindowEvent>> {
+    fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
         vec![&mut self.button]
     }
 
@@ -59,7 +53,7 @@ impl Widget<WindowEvent> for Counter {
         Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0))
     }
 
-    fn update(&mut self, global: &mut Event<WindowEvent>) {
+    fn update(&mut self) {
         for event in self.global_listener.peek() {
             match event {
                 WindowEvent::Click(ref pt) => {
@@ -68,7 +62,9 @@ impl Widget<WindowEvent> for Counter {
             }
         }
 
-        update_children(&mut self.children_mut(), global);
+        for child in self.children_mut() {
+            child.update();
+        }
 
         for _event in self.button_press_listener.peek() {
             self.count += 1;
@@ -109,18 +105,18 @@ impl Button {
     }
 }
 
-impl Widget<WindowEvent> for Button {
+impl Widget for Button {
     fn bounds(&self) -> Rect {
         Rect::new(Point::new(10.0, 10.0), Size::new(50.0, 20.0))
     }
 
-    fn update(&mut self, _global: &mut Event<WindowEvent>) {
+    fn update(&mut self) {
         for event in self.global_listener.peek() {
             match event {
                 WindowEvent::Click(pt) => {
                     if self.bounds().contains(pt) {
                         self.press_event.push(pt);
-                        println!("Button clciked at: {:?}", pt);
+                        println!("Button clicked at: {:?}", pt);
                     }
                 }
             }
@@ -160,14 +156,14 @@ fn main() {
 
     let mut counter = Counter::new(&mut window);
 
-    counter.update(&mut window);
+    counter.update();
 
     window.push(WindowEvent::Click(Point::new(-23.0, 14.0)));
 
-    counter.update(&mut window);
+    counter.update();
 
     window.push(WindowEvent::Click(Point::new(20.0, 11.0)));
     window.push(WindowEvent::Click(Point::new(11.0, 11.0)));
 
-    counter.update(&mut window);
+    counter.update();
 }

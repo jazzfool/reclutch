@@ -5,18 +5,18 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub trait Widget<E> {
-    fn children(&self) -> Vec<&dyn Widget<E>> {
+pub trait Widget {
+    fn children(&self) -> Vec<&dyn Widget> {
         Vec::new()
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget<E>> {
+    fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
         Vec::new()
     }
 
     fn bounds(&self) -> Rect;
 
-    fn update(&mut self, _global: &mut Event<E>) {}
+    fn update(&mut self) {}
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay);
 }
