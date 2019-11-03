@@ -8,7 +8,8 @@ use reclutch::{
         GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size, StyleColor,
         TextDisplayItem,
     },
-    widget::{Event, EventListener, Widget},
+    event::{Event, EventListener},
+    widget::Widget,
 };
 
 enum WindowEvent {
