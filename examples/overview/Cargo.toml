@@ -1,0 +1,15 @@
+[package]
+name = "overview-example"
+version = "0.1.0"
+authors = ["kepler0 <saveuselon@gmail.com>"]
+edition = "2018"
+workspace = "../.."
+
+[[bin]]
+name = "overview-example"
+path = "src/main.rs"
+
+[dependencies]
+winit = "0.20.0-alpha3"
+raw-window-handle = "0.3.0"
+reclutch = { path = "../../" }
