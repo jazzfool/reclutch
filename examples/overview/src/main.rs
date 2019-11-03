@@ -11,7 +11,6 @@ use reclutch::{
     widget::{Event, EventListener, Widget},
 };
 
-#[derive(Clone)]
 enum WindowEvent {
     Click(Point),
 }
@@ -54,22 +53,27 @@ impl Widget for Counter {
     }
 
     fn update(&mut self) {
-        for event in self.global_listener.peek() {
-            match event {
-                WindowEvent::Click(ref pt) => {
-                    println!("Counter clicked at: {:?}", pt);
+        self.global_listener.with(|events| {
+            for event in events {
+                match event {
+                    WindowEvent::Click(ref pt) => {
+                        println!("Counter clicked at: {:?}", pt);
+                    }
                 }
             }
-        }
+        });
 
         for child in self.children_mut() {
             child.update();
         }
 
-        for _event in self.button_press_listener.peek() {
-            self.count += 1;
-            println!("Counter increased: {}.", self.count);
-        }
+        let count = &mut self.count;
+        self.button_press_listener.with(|events| {
+            for _event in events {
+                *count += 1;
+                println!("Counter increased: {}.", count);
+            }
+        });
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
@@ -111,16 +115,20 @@ impl Widget for Button {
     }
 
     fn update(&mut self) {
-        for event in self.global_listener.peek() {
-            match event {
-                WindowEvent::Click(pt) => {
-                    if self.bounds().contains(pt) {
-                        self.press_event.push(pt);
-                        println!("Button clicked at: {:?}", pt);
+        let bounds = self.bounds();
+        let press_event = &mut self.press_event;
+        self.global_listener.with(|events| {
+            for event in events {
+                match event {
+                    WindowEvent::Click(pt) => {
+                        if bounds.contains(*pt) {
+                            press_event.push(*pt);
+                            println!("Button clicked at: {:?}", pt);
+                        }
                     }
                 }
             }
-        }
+        })
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {

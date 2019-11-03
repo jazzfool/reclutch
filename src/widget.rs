@@ -22,8 +22,8 @@ pub trait Widget {
 }
 
 struct EventIntern<T> {
-    listeners: hash_map::HashMap<u64, usize>,
-    next_listener_id: u64,
+    listeners: hash_map::HashMap<usize, usize>,
+    next_listener_id: usize,
     events: Vec<T>,
 }
 
@@ -46,16 +46,21 @@ impl<T> EventIntern<T> {
     }
 }
 
-#[derive(Clone)]
 pub struct Event<T>(Arc<Mutex<EventIntern<T>>>);
 
-impl<T: Clone> Default for Event<T> {
+impl<T> Clone for Event<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T> Default for Event<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Clone> Event<T> {
+impl<T> Event<T> {
     /// Creates a new event
     pub fn new() -> Self {
         Self(Arc::new(Mutex::new(EventIntern {
@@ -95,7 +100,7 @@ impl<T: Clone> Event<T> {
 
 /// You should wrap this inside of an Rc or Arc if you want
 /// multiple references to the same listener
-pub struct EventListener<T>(u64, Event<T>);
+pub struct EventListener<T>(usize, Event<T>);
 
 impl<T> fmt::Debug for EventListener<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -112,10 +117,7 @@ impl<T> Drop for EventListener<T> {
     }
 }
 
-impl<T> EventListener<T>
-where
-    T: Clone,
-{
+impl<T> EventListener<T> {
     fn new(event: Event<T>) -> Self {
         let id = {
             let mut inner = event.0.lock().unwrap();
@@ -128,8 +130,18 @@ where
         EventListener(id, event)
     }
 
-    /// Returns a list of new events since last `peek`
-    pub fn peek(&self) -> Vec<T> {
+    /// Applies a function to the list of new events since last `peek`
+    /// without cloning T
+    ///
+    /// This function is faster than calling peek() and iterating over the result.
+    ///
+    /// It holds a lock on the event while called, which means that recursive
+    /// calls of `with` or calls to `Event` methods aren't allowed and
+    /// will deadlock or panic.
+    pub fn with<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&[T]) -> R,
+    {
         let mut inner = (self.1).0.lock().unwrap();
         let maxidx = inner.events.len();
         let idx = if let hash_map::Entry::Occupied(mut entry) = inner.listeners.entry(self.0) {
@@ -137,7 +149,15 @@ where
         } else {
             unreachable!();
         };
-        inner.events[idx..].to_vec()
+        f(&inner.events[idx..])
+    }
+
+    /// Returns a list of new events since last `peek`
+    pub fn peek(&self) -> Vec<T>
+    where
+        T: Clone,
+    {
+        self.with(<[T]>::to_vec)
     }
 }
 
