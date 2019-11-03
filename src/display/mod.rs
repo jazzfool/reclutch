@@ -15,9 +15,9 @@ pub trait GraphicsDisplay {
         &mut self,
         commands: &[DisplayCommand],
     ) -> Result<CommandGroupHandle, failure::Error>;
-    fn get_command_group(&self, handle: &CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
-    fn modify_command_group(&mut self, handle: &CommandGroupHandle, commands: &[DisplayCommand]);
-    fn remove_command_group(&mut self, handle: &CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
+    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
+    fn modify_command_group(&mut self, handle: CommandGroupHandle, commands: &[DisplayCommand]);
+    fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
 
     fn before_exit(&mut self);
 
@@ -31,12 +31,10 @@ pub fn ok_or_push(
 ) {
     match handle {
         Some(ref handle) => {
-            display.modify_command_group(handle, commands);
+            display.modify_command_group(*handle, commands);
         }
         None => {
-            if let Ok(h) = display.push_command_group(commands) {
-                *handle = Some(h);
-            }
+            *handle = display.push_command_group(commands).ok();
         }
     }
 }
