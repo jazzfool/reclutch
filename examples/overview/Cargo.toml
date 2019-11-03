@@ -10,6 +10,4 @@ name = "overview-example"
 path = "src/main.rs"
 
 [dependencies]
-winit = "0.20.0-alpha3"
-raw-window-handle = "0.3.0"
 reclutch = { path = "../../" }
