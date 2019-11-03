@@ -17,6 +17,7 @@ fn update_children<E>(children: &mut [&mut dyn Widget<E>], global: &mut Event<E>
     }
 }
 
+#[derive(Clone)]
 enum WindowEvent {
     Click(Point),
 }
@@ -32,7 +33,7 @@ struct Counter {
 
 impl Counter {
     pub fn new(global: &mut Event<WindowEvent>) -> Self {
-        let mut button = Button::new(global);
+        let button = Button::new(global);
         let button_press_listener = button.press_event.new_listener();
 
         Self {
@@ -59,7 +60,7 @@ impl Widget<WindowEvent> for Counter {
     }
 
     fn update(&mut self, global: &mut Event<WindowEvent>) {
-        for event in global.peek(self.global_listener) {
+        for event in self.global_listener.peek() {
             match event {
                 WindowEvent::Click(ref pt) => {
                     println!("Counter clicked at: {:?}", pt);
@@ -69,7 +70,7 @@ impl Widget<WindowEvent> for Counter {
 
         update_children(&mut self.children_mut(), global);
 
-        for _event in self.button.press_event.peek(self.button_press_listener) {
+        for _event in self.button_press_listener.peek() {
             self.count += 1;
             println!("Counter increased: {}.", self.count);
         }
@@ -113,13 +114,13 @@ impl Widget<WindowEvent> for Button {
         Rect::new(Point::new(10.0, 10.0), Size::new(50.0, 20.0))
     }
 
-    fn update(&mut self, global: &mut Event<WindowEvent>) {
-        for event in global.peek(self.global_listener) {
+    fn update(&mut self, _global: &mut Event<WindowEvent>) {
+        for event in self.global_listener.peek() {
             match event {
                 WindowEvent::Click(pt) => {
-                    if self.bounds().contains(*pt) {
-                        self.press_event.push(*pt);
-                        println!("Button clciked at: {:?}", *pt);
+                    if self.bounds().contains(pt) {
+                        self.press_event.push(pt);
+                        println!("Button clciked at: {:?}", pt);
                     }
                 }
             }
