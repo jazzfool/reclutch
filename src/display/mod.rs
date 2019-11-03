@@ -15,9 +15,9 @@ pub trait GraphicsDisplay {
         &mut self,
         commands: &[DisplayCommand],
     ) -> Result<CommandGroupHandle, failure::Error>;
-    fn get_command_group(&self, handle: &CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
-    fn modify_command_group(&mut self, handle: &CommandGroupHandle, commands: &[DisplayCommand]);
-    fn remove_command_group(&mut self, handle: &CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
+    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
+    fn modify_command_group(&mut self, handle: CommandGroupHandle, commands: &[DisplayCommand]);
+    fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
 
     fn before_exit(&mut self);
 
@@ -31,12 +31,10 @@ pub fn ok_or_push(
 ) {
     match handle {
         Some(ref handle) => {
-            display.modify_command_group(handle, commands);
+            display.modify_command_group(*handle, commands);
         }
         None => {
-            if let Ok(h) = display.push_command_group(commands) {
-                *handle = Some(h);
-            }
+            *handle = display.push_command_group(commands).ok();
         }
     }
 }
@@ -193,7 +191,7 @@ impl FontInfo {
         names.append(
             &mut fallbacks
                 .iter()
-                .map(|s| font_kit::family_name::FamilyName::Title(s.to_string()))
+                .map(|&s| font_kit::family_name::FamilyName::Title(s.to_string()))
                 .collect::<Vec<_>>(),
         );
 
@@ -248,31 +246,29 @@ pub enum DisplayCommand {
 
 impl DisplayCommand {
     pub fn bounds(&self) -> Result<Option<Rect>, failure::Error> {
-        Ok(match self {
-            DisplayCommand::Item(item) => Some(item.bounds()?),
-            _ => None,
+        Ok(if let DisplayCommand::Item(item) = self {
+            Some(item.bounds()?)
+        } else {
+            None
         })
     }
 }
 
 pub fn display_list_bounds(display_list: &[DisplayCommand]) -> Result<Rect, failure::Error> {
-    let mut rect: Option<Rect> = None;
-
-    for disp in display_list.iter() {
-        match disp {
-            DisplayCommand::Item(item) => match rect {
-                Some(rc) => {
-                    rect = Some(rc.union(&item.bounds()?));
-                }
-                None => {
-                    rect = Some(item.bounds()?);
-                }
-            },
-            _ => (),
-        };
-    }
-
-    Ok(rect.unwrap_or_default())
+    Ok(display_list
+        .iter()
+        .filter_map(|disp| {
+            if let DisplayCommand::Item(item) = disp {
+                Some(item.bounds())
+            } else {
+                None
+            }
+        })
+        .try_fold::<Option<Rect>, _, Result<_, failure::Error>>(None, |rect, bounds| {
+            let bounds = bounds?;
+            Ok(Some(rect.map_or(bounds, |rc| rc.union(&bounds))))
+        })?
+        .unwrap_or_default())
 }
 
 #[derive(Debug, Clone)]

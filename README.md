@@ -29,11 +29,11 @@ impl Button {
     }
 }
 
-impl Widget<WindowEvent> for Button {
+impl Widget for Button {
     pub fn bounds(&self) -> Rect { /* --snip-- */ }
 
-    pub fn update(&mut self, global: &mut Event<WindowEvent>) {
-        for event in global.peek(self.global_listener) {
+    pub fn update(&mut self) {
+        for event in self.global_listener.peek() {
             match event {
                 WindowEvent::OnClick(_) => self.button_press.push(()),
                 _ => (),
@@ -56,7 +56,7 @@ struct ExampleWidget {
     child: AnotherWidget,
 }
 
-impl Widget<()> for ExampleWidget {
+impl Widget for ExampleWidget {
     // --snip--
 
     fn children(&self) -> Vec<&dyn Widget<()>> {
@@ -94,7 +94,7 @@ struct VisualWidget {
     command_group: Option<CommandGroupHandle>,
 }
 
-impl Widget<()> for VisualWidget {
+impl Widget for VisualWidget {
     // --snip--
 
     // Draws a nice red rectangle.
@@ -140,11 +140,11 @@ event.push(2);
 event.cleanup(); // this doesn't do anything; our listener hasn't seen these events so they aren't cleaned up.
 
 // here is how listeners respond to events.
-for num in event.peek(listener) {
+for num in listener.peek() {
     print!("{} ", num);
 } // prints: "1 2 "
 
 event.cleanup(); // this removes the "1" and "2" events we pushed because all the listeners have seen them.
 
-event.remove_listener(listener); // another memory optimization function. you should do this if you're not using a listener so it doesn't hold back cleanup.
+std::mem::drop(listener); // you should do this if you're not using a listener so it doesn't hold back cleanup.
 ```
