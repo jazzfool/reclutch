@@ -8,8 +8,8 @@ use {
     reclutch::{
         display::{
             ok_or_push, Color, CommandGroupHandle, DisplayCommand, DisplayItem, FontInfo,
-            GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint,
-            Point, Rect, Size, StyleColor, TextDisplayItem,
+            GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size,
+            StyleColor, TextDisplayItem,
         },
         event::{Event, EventListener},
         widget::Widget,

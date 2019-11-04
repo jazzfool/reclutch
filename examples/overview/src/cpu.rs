@@ -2,12 +2,12 @@ use {
     pixels::{Pixels, PixelsBuilder, SurfaceTexture},
     raqote::{DrawOptions, DrawTarget},
     reclutch::display::{
-        CommandGroupHandle, DisplayCommand, DisplayItem, GraphicsDisplay,
-        GraphicsDisplayItem, GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect,
+        CommandGroupHandle, DisplayCommand, DisplayItem, GraphicsDisplay, GraphicsDisplayItem,
+        GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect,
     },
     std::collections::HashMap,
     winit::{
-        event_loop::{EventLoop},
+        event_loop::EventLoop,
         window::{Window, WindowBuilder},
     },
 };
