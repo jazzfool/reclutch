@@ -11,7 +11,6 @@ repository = "http://github.com/jazzfool/reclutch"
 
 [features]
 default = ["event"]
-gpu = ["wgpu", "nalgebra", "lyon", "raw-window-handle"]
 event = ["reclutch_event"]
 
 [dependencies]
@@ -20,10 +19,6 @@ euclid = "0.20.3"
 failure = "0.1.6"
 font-kit = "0.4.0"
 palette = "0.4.1"
-wgpu = { version = "0.4.0", optional = true }
-nalgebra = { version = "0.19.0", optional = true }
-lyon = { version = "0.14.1", optional = true }
-raw-window-handle = { version = "0.3.0", optional = true }
 
 [dev-dependencies]
 raqote = "0.7.4"
