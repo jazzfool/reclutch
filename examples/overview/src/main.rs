@@ -8,7 +8,7 @@ use {
     reclutch::{
         display::{
             ok_or_push, Color, CommandGroupHandle, DisplayCommand, DisplayItem, FontInfo,
-            GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint, GraphicsDisplayStroke,
+            GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint,
             Point, Rect, Size, StyleColor, TextDisplayItem,
         },
         event::{Event, EventListener},
@@ -31,6 +31,7 @@ struct Counter {
     button: Button,
     button_press_listener: EventListener<Point>,
     command_group: Option<CommandGroupHandle>,
+    font: FontInfo,
 }
 
 impl Counter {
@@ -43,6 +44,7 @@ impl Counter {
             button,
             button_press_listener,
             command_group: None,
+            font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
         }
     }
 }
@@ -80,7 +82,7 @@ impl Widget for Counter {
             display,
             &[DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
                 text: format!("Count: {}", self.count),
-                font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
+                font: self.font.clone(),
                 size: 23.0,
                 bottom_left: bounds.origin.add_size(&Size::new(10.0, 22.0)),
                 color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
@@ -99,6 +101,7 @@ struct Button {
     hover: bool,
     global_listener: EventListener<GlobalEvent>,
     command_group: Option<CommandGroupHandle>,
+    font: FontInfo,
 }
 
 impl Button {
@@ -108,6 +111,7 @@ impl Button {
             hover: false,
             global_listener: global.new_listener(),
             command_group: None,
+            font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
         }
     }
 }
@@ -158,8 +162,7 @@ impl Widget for Button {
                 })),
                 DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
                     text: "Count Up".to_owned(),
-                    font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"])
-                        .unwrap(),
+                    font: self.font.clone(),
                     size: 22.0,
                     bottom_left: bounds
                         .origin
@@ -172,7 +175,7 @@ impl Widget for Button {
 }
 
 fn main() -> Result<(), failure::Error> {
-    let mut window_size = (500u32, 500u32);
+    let window_size = (500u32, 500u32);
 
     let event_loop = EventLoop::new();
 
@@ -228,6 +231,4 @@ fn main() -> Result<(), failure::Error> {
 
         window_q.cleanup();
     });
-
-    Ok(())
 }

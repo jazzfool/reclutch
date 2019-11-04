@@ -1,14 +1,13 @@
 use {
     pixels::{Pixels, PixelsBuilder, SurfaceTexture},
-    raqote::{DrawOptions, DrawTarget, PathBuilder, SolidSource, Source},
+    raqote::{DrawOptions, DrawTarget},
     reclutch::display::{
-        Color, CommandGroupHandle, DisplayCommand, DisplayItem, FontInfo, GraphicsDisplay,
-        GraphicsDisplayItem, GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect, Size,
-        StyleColor, TextDisplayItem,
+        CommandGroupHandle, DisplayCommand, DisplayItem, GraphicsDisplay,
+        GraphicsDisplayItem, GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect,
     },
     std::collections::HashMap,
     winit::{
-        event_loop::{ControlFlow, EventLoop},
+        event_loop::{EventLoop},
         window::{Window, WindowBuilder},
     },
 };
