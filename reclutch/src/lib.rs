@@ -9,6 +9,7 @@ pub use reclutch_event as event;
 pub mod prelude {
     pub use crate::event::EventInterface as _;
     pub use crate::event::EventListen as _;
+    pub use crate::event::GenericEventInterface as _;
 }
 
 use crate::display::{GraphicsDisplay, Rect};

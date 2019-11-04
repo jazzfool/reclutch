@@ -1,10 +1,9 @@
-use std::{
-    fmt,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
-use super::*;
+use crate::{intern::EventIntern, traits::private::EventListen as _};
+use crate::*;
 
+#[derive(Debug)]
 pub struct Event<T>(Arc<RwLock<EventIntern<T>>>);
 
 impl<T> Clone for Event<T> {
@@ -17,7 +16,27 @@ impl<T> Clone for Event<T> {
 impl<T> Default for Event<T> {
     #[inline]
     fn default() -> Self {
-        Self::new()
+        Self(Arc::new(RwLock::new(EventIntern::new())))
+    }
+}
+
+impl<T> private::EventInterface<T> for Event<T> {
+    #[inline]
+    fn with_inner<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&EventIntern<T>) -> R,
+    {
+        let inner = self.0.read().unwrap();
+        f(&inner)
+    }
+
+    #[inline]
+    fn with_inner_mut<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut EventIntern<T>) -> R,
+    {
+        let mut inner = self.0.write().unwrap();
+        f(&mut inner)
     }
 }
 
@@ -25,46 +44,29 @@ impl<T> EventInterface<T> for Event<T> {
     type Listener = EventListener<T>;
 
     #[inline]
-    fn new() -> Self {
-        Self(Arc::new(RwLock::new(EventIntern::new())))
-    }
-
-    #[inline]
-    fn push(&self, event: T) {
-        (*self.0.write().unwrap()).events.push(event);
-    }
-
-    #[inline]
     fn listen(&self) -> EventListener<T> {
         EventListener::new(self.clone())
-    }
-
-    #[inline]
-    fn listener_len(&self) -> usize {
-        self.0.read().unwrap().listeners.len()
-    }
-
-    #[inline]
-    fn event_len(&self) -> usize {
-        self.0.read().unwrap().events.len()
     }
 }
 
 /// You should wrap this inside of an Rc or Arc if you want
 /// multiple references to the same listener
+#[derive(Debug)]
 pub struct EventListener<T>(ListenerKey, Event<T>);
 
-impl<T> fmt::Debug for EventListener<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "EventListener({:?}, _Event)", self.0)
+impl<T> private::EventListen<T> for EventListener<T> {
+    fn with_inner_mut<F, R>(&self, f: F) -> Option<R>
+    where
+        F: FnOnce(crate::intern::ListenerKey, &mut EventIntern<T>) -> R
+    {
+        let mut inner = (self.1).0.write().ok()?;
+        Some(f(self.0, &mut inner))
     }
 }
 
 impl<T> Drop for EventListener<T> {
     fn drop(&mut self) {
-        if let Ok(ref mut inner) = (self.1).0.write() {
-            inner.remove_listener(self.0);
-        }
+        let _ = self.with_inner_mut(|key, ev| ev.remove_listener(key));
     }
 }
 
@@ -72,16 +74,6 @@ impl<T> EventListener<T> {
     fn new(event: Event<T>) -> Self {
         let id = event.0.write().unwrap().create_listener();
         EventListener(id, event)
-    }
-}
-
-impl<T> EventListen<T> for EventListener<T> {
-    #[inline]
-    fn with<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&[T]) -> R,
-    {
-        (self.1).0.write().unwrap().pull_with(self.0, f)
     }
 }
 

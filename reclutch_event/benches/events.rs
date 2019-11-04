@@ -44,9 +44,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             assert_eq!(event.event_len(), 0);
 
-            for _i in 0..10 {
-                event.push(30i32);
-            }
+            event.extend([30i32; 10].iter().copied());
 
             assert_eq!(listener_2.peek(), &[30i32; 10]);
 
