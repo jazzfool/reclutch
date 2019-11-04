@@ -40,7 +40,17 @@ pub fn ok_or_push(
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct CommandGroupHandle(pub(crate) u64);
+pub struct CommandGroupHandle(u64);
+
+impl CommandGroupHandle {
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+
+    pub fn id(&self) -> u64 {
+        self.0
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineCap {
@@ -181,8 +191,8 @@ impl TextDisplayItem {
 
 #[derive(Debug, Clone)]
 pub struct FontInfo {
-    name: String,
-    font: font_kit::font::Font,
+    pub name: String,
+    pub font: font_kit::font::Font,
 }
 
 impl FontInfo {

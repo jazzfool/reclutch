@@ -5,6 +5,7 @@
 ## Gain control of your UI again
 
 ## Features:
+
 - Barebones (i.e. no widget toolkit or graphics backend provided).
 - Retained-mode rendering.
 - Object-oriented widgets in idiomatic Rust.
@@ -13,7 +14,9 @@
 Currently there is no default graphics backend, but there is a GPU implementation planned some day.
 
 ## Example
+
 All rendering details have been excluded for simplicity.
+
 ```rust
 struct Button {
     pub button_press: Event<()>,
@@ -41,14 +44,18 @@ impl Widget for Button {
         }
     }
 
-    pub fn draw(&mut self, display: &mut dyn GraphicsDisplay) { /* --snip */ }
+    pub fn draw(&mut self, display: &mut dyn GraphicsDisplay) { /* --snip-- */ }
 }
-
 ```
 
 The classic counter example can be found in examples/overview.
 
+---
+
+<img align="right" src=".media/screen.png" width="300px"/>
+
 ## Children
+
 Children are stored manually by the implementing widget type.
 
 ```rust
@@ -87,6 +94,7 @@ fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
 Perhaps there's room for some macro magic here.
 
 ## Rendering
+
 Rendering is done through "command groups". It's designed in a way that both a retained-mode renderer (e.g. WebRender) and an immediate-mode renderer (Direct2D, Skia, Cairo) can be implemented.
 
 ```rust
@@ -115,6 +123,7 @@ impl Widget for VisualWidget {
 ```
 
 ## Callbacks
+
 There are no closures when it comes to callbacks, as it would be too much work to have it fit in safe Rust (and it definitely wouldn't be ergonomic to use).
 
 Instead, Reclutch uses a simple event queue with listener primitives.
@@ -126,6 +135,7 @@ Further, it's not a "standalone" event system, it only works in a widget environ
 The memory cleanup system resembles an extremely simple garbage collector.
 
 Here's an example of it's usage outside a widget (with manual updating);
+
 ```rust
 let mut event: Event<i32> = Event::new();
 

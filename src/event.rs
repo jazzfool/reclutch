@@ -65,7 +65,7 @@ impl<T> Event<T> {
 
     /// Removes all events that have been already seen by all listeners.
     ///
-    /// Call this ocassionally to free up memory
+    /// Call this occasionally to free up memory
     pub fn cleanup(&mut self) {
         (*self.0.lock().unwrap()).cleanup();
     }
@@ -75,7 +75,7 @@ impl<T> Event<T> {
         self.0.lock().unwrap().listeners.len()
     }
 
-    /// Returns the number of even
+    /// Returns the number of events
     pub fn event_len(&self) -> usize {
         self.0.lock().unwrap().events.len()
     }
