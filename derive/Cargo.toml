@@ -5,7 +5,7 @@ authors = ["jazzfool <saveuselon@gmail.com>"]
 edition = "2018"
 license = "MIT"
 description = "Utility to make implementing Widget children easier"
-homepage = "http://github.com/jazzfool/reclutch/tree/master/reclutch_derive"
+homepage = "http://github.com/jazzfool/reclutch/tree/master/derive"
 repository = "http://github.com/jazzfool/reclutch"
 
 [lib]

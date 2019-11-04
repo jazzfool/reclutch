@@ -15,10 +15,8 @@ extern crate reclutch_derive;
 pub use reclutch_derive::*;
 
 pub mod prelude {
-    pub use crate::event::EventInterface as _;
-    pub use crate::event::EventListen as _;
-    pub use crate::event::GenericEventInterface as _;
     pub use crate::WidgetChildren as _;
+    pub use reclutch_event::prelude::*;
 }
 
 use crate::display::{GraphicsDisplay, Rect};
@@ -50,7 +48,7 @@ mod tests {
         use crate as reclutch;
         use reclutch::display::Point;
 
-        #[derive(Widget)]
+        #[derive(WidgetChildren)]
         struct ExampleChild(i8);
 
         impl Widget for ExampleChild {
@@ -60,10 +58,10 @@ mod tests {
             fn draw(&mut self, _: &mut dyn GraphicsDisplay) {}
         }
 
-        #[derive(Widget)]
+        #[derive(WidgetChildren)]
         struct Unnamed(#[widget_child] ExampleChild, #[widget_child] ExampleChild);
 
-        #[derive(Widget)]
+        #[derive(WidgetChildren)]
         struct Named {
             #[widget_child]
             a: ExampleChild,

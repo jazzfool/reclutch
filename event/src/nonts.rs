@@ -1,30 +1,31 @@
+use crate::{
+    traits::private::{Listen as _, QueueInterface as _},
+    *,
+};
 use std::{cell::RefCell, rc::Rc};
 
-use crate::*;
-use crate::{intern::EventIntern, traits::private::EventListen as _};
-
 #[derive(Debug)]
-pub struct Event<T>(Rc<RefCell<EventIntern<T>>>);
+pub struct Queue<T>(Rc<RefCell<RawEventQueue<T>>>);
 
-impl<T> Clone for Event<T> {
+impl<T> Clone for Queue<T> {
     #[inline]
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-impl<T> Default for Event<T> {
+impl<T> Default for Queue<T> {
     #[inline]
     fn default() -> Self {
-        Self(Rc::new(RefCell::new(EventIntern::new())))
+        Self(Rc::new(RefCell::new(RawEventQueue::new())))
     }
 }
 
-impl<T> private::EventInterface<T> for Event<T> {
+impl<T> private::QueueInterface<T> for Queue<T> {
     #[inline]
     fn with_inner<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&EventIntern<T>) -> R,
+        F: FnOnce(&RawEventQueue<T>) -> R,
     {
         let inner = self.0.borrow();
         f(&inner)
@@ -33,47 +34,73 @@ impl<T> private::EventInterface<T> for Event<T> {
     #[inline]
     fn with_inner_mut<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&mut EventIntern<T>) -> R,
+        F: FnOnce(&mut RawEventQueue<T>) -> R,
     {
         let mut inner = self.0.borrow_mut();
         f(&mut inner)
     }
 }
 
-impl<T> EventInterface<T> for Event<T> {
-    type Listener = EventListener<T>;
+impl<T> GenericQueueInterface<T> for Queue<T> {
+    #[inline]
+    fn push(&self, event: T) -> bool {
+        self.with_inner_mut(|inner| inner.push(event))
+    }
 
     #[inline]
-    fn listen(&self) -> EventListener<T> {
-        EventListener::new(self.clone())
+    fn extend<I>(&self, events: I) -> bool
+    where
+        I: IntoIterator<Item = T>,
+    {
+        crate::traits::private::extend(self, events)
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.with_inner(|inner| inner.events.is_empty())
     }
 }
 
-/// You should wrap this inside of an Rc if you want
-/// multiple references to the same listener
-#[derive(Debug)]
-pub struct EventListener<T>(ListenerKey, Event<T>);
+impl<T> QueueInterface<T> for Queue<T> {
+    type Listener = Listener<T>;
 
-impl<T> private::EventListen<T> for EventListener<T> {
+    #[inline]
+    fn listen(&self) -> Listener<T> {
+        Listener::new(self.clone())
+    }
+}
+
+impl<T> Queue<T> {
+    #[cfg(test)]
+    #[inline]
+    fn event_len(&self) -> usize {
+        self.with_inner(|inner| inner.events.len())
+    }
+}
+
+#[derive(Debug)]
+pub struct Listener<T>(ListenerKey, Queue<T>);
+
+impl<T> private::Listen<T> for Listener<T> {
     fn with_inner_mut<F, R>(&self, f: F) -> Option<R>
     where
-        F: FnOnce(crate::intern::ListenerKey, &mut EventIntern<T>) -> R,
+        F: FnOnce(crate::intern::ListenerKey, &mut RawEventQueue<T>) -> R,
     {
         let mut inner = (self.1).0.borrow_mut();
         Some(f(self.0, &mut inner))
     }
 }
 
-impl<T> Drop for EventListener<T> {
+impl<T> Drop for Listener<T> {
     fn drop(&mut self) {
         let _ = self.with_inner_mut(|key, ev| ev.remove_listener(key));
     }
 }
 
-impl<T> EventListener<T> {
-    fn new(event: Event<T>) -> Self {
+impl<T> Listener<T> {
+    fn new(event: Queue<T>) -> Self {
         let id = event.0.borrow_mut().create_listener();
-        EventListener(id, event)
+        Listener(id, event)
     }
 }
 
@@ -84,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_event_listener() {
-        let event = Event::new();
+        let event = Queue::new();
 
         event.push(0i32);
 
@@ -101,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_event_cleanup() {
-        let event = Event::new();
+        let event = Queue::new();
 
         let listener_1 = event.listen();
 

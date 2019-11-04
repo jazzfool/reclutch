@@ -1,13 +1,13 @@
 pub(crate) type ListenerKey = slotmap::DefaultKey;
 
+/// Non-thread-safe, non-reference-counted API
 #[derive(Debug)]
-#[doc(hidden)]
-pub struct EventIntern<T> {
+pub struct Queue<T> {
     pub(crate) listeners: slotmap::SlotMap<ListenerKey, usize>,
     pub(crate) events: Vec<T>,
 }
 
-impl<T> Default for EventIntern<T> {
+impl<T> Default for Queue<T> {
     fn default() -> Self {
         Self {
             listeners: Default::default(),
@@ -16,7 +16,7 @@ impl<T> Default for EventIntern<T> {
     }
 }
 
-impl<T> EventIntern<T> {
+impl<T> Queue<T> {
     /// Create a new event queue
     pub fn new() -> Self {
         Default::default()
@@ -34,6 +34,14 @@ impl<T> EventIntern<T> {
         }
 
         self.events.drain(0..min_idx);
+    }
+
+    pub fn push(&mut self, x: T) -> bool {
+        if self.listeners.is_empty() {
+            return false;
+        }
+        self.events.push(x);
+        true
     }
 
     /// Creates a subscription
@@ -70,14 +78,74 @@ impl<T> EventIntern<T> {
         }
         ret
     }
+
+    #[cfg(test)]
+    #[inline]
+    pub(crate) fn event_len(&self) -> usize {
+        self.events.len()
+    }
 }
 
-impl<A> std::iter::Extend<A> for EventIntern<A> {
+impl<A> std::iter::Extend<A> for Queue<A> {
     #[inline]
     fn extend<T>(&mut self, iter: T)
     where
-        T: std::iter::IntoIterator<Item = A>,
+        T: IntoIterator<Item = A>,
     {
         self.events.extend(iter)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Queue;
+
+    #[test]
+    fn test_event_listener() {
+        let mut event = Queue::new();
+
+        event.push(0i32);
+
+        let listener = event.create_listener();
+
+        event.push(1i32);
+        event.push(2i32);
+        event.push(3i32);
+
+        event.pull_with(listener, |x| assert_eq!(x, &[1, 2, 3]));
+
+        event.remove_listener(listener);
+    }
+
+    #[test]
+    fn test_event_cleanup() {
+        let mut event = Queue::new();
+
+        let listener_1 = event.create_listener();
+
+        event.push(10i32);
+
+        assert_eq!(event.event_len(), 1);
+
+        let listener_2 = event.create_listener();
+
+        event.push(20i32);
+
+        event.pull_with(listener_1, |x| assert_eq!(x, &[10i32, 20i32]));
+        event.pull_with(listener_2, |x| assert_eq!(x, &[20i32]));
+        event.pull_with(listener_2, |x| assert_eq!(x, &[]));
+        event.pull_with(listener_2, |x| assert_eq!(x, &[]));
+
+        assert_eq!(event.event_len(), 0);
+
+        for _i in 0..10 {
+            event.push(30i32);
+        }
+
+        event.pull_with(listener_2, |x| assert_eq!(x, &[30i32; 10]));
+
+        event.remove_listener(listener_1);
+
+        assert_eq!(event.event_len(), 0);
     }
 }

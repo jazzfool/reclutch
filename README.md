@@ -6,7 +6,9 @@
 
 [![Build Status](https://travis-ci.com/jazzfool/reclutch.svg?branch=master)](https://travis-ci.com/jazzfool/reclutch)
 
-## Features:
+* [Events and event queues](event/README.md)
+
+## Features
 
 - Barebones (i.e. no widget toolkit or layout library provided).
 - Retained-mode rendering.
@@ -20,16 +22,16 @@ There is an (optional) OpenGL Skia implementation for the renderer.
 All rendering details have been excluded for simplicity.
 
 ```rust
-#[derive(Widget)]
+#[derive(WidgetChildren)]
 struct Button {
-    pub button_press: RcEvent<()>,
+    pub button_press: RcEventQueue<()>,
     global_listener: RcEventListener<WindowEvent>,
 }
 
 impl Button {
-    pub fn new(global: &mut Event<WindowEvent>) -> Self {
+    pub fn new(global: &mut RcEventQueue<WindowEvent>) -> Self {
         Button {
-            button_press: RcEvent::new(),
+            button_press: RcEventQueue::new(),
             global_listener: global.listen(),
         }
     }
@@ -62,7 +64,7 @@ The classic counter example can be found in examples/overview.
 Children are stored manually by the implementing widget type.
 
 ```rust
-#[derive(Widget)]
+#[derive(WidgetChildren)]
 struct ExampleWidget {
     #[widget_child]
     child: AnotherWidget,
@@ -96,7 +98,7 @@ fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
 }
 ```
 
-**Note:** `Widget` requires that `WidgetChildren` be implemented, and `#[derive(Widget)]` implements `WidgetChildren`, not `Widget`.
+**Note:** `Widget` requires that `WidgetChildren` is implemented.
 
 The derive functionality is a feature, enabled by default.
 
@@ -127,43 +129,4 @@ impl Widget for VisualWidget {
 
     // --snip--
 }
-```
-
-## Callbacks
-
-There are no closures when it comes to callbacks, as it would be too much work to have it fit in safe Rust (and it definitely wouldn't be ergonomic to use).
-
-Instead, Reclutch uses a simple event queue with listener primitives.
-
-Essentially, the event has a list of all events emitted, stored as a vector, and a list of all listeners, stored as a map. The key of the map is what the listener-facing API stores.
-The value of the map is simply an index. This index keeps track of the last time the event queue was peeked for a specific listener.
-This also allows for simple cleanup of event data not needed (i.e. event data seen by all the listeners); the cleanup function looks for the lowest listener index and removes everything before it.
-Further, it's not a "standalone" event system, it only works in a widget environment (or any environment with persistent updates).
-The memory cleanup system resembles an extremely simple garbage collector.
-
-Thanks to zserik, the events have been made more ergonomic to use and now use the RAII pattern to automatically cleanup when listeners go out of scope. The event system is still a work-in-progress and we're looking to find the right balance between performance and ease-of-use.
-
-Here's an example of it's usage outside a widget (with manual updating);
-
-```rust
-let mut event: RcEvent<i32> = RcEvent::new();
-
-event.push(10); // no listeners, so this event won't be received by anyone.
-event.cleanup(); // this removes that "10" we just pushed, because it's not needed by any listeners (because there are no listeners).
-
-let listener = event.listen();
-
-event.push(1);
-event.push(2);
-
-event.cleanup(); // this doesn't do anything; our listener hasn't seen these events so they aren't cleaned up.
-
-// here is how listeners respond to events.
-for num in listener.peek() {
-    print!("{} ", num);
-} // prints: "1 2 "
-
-event.cleanup(); // this removes the "1" and "2" events we pushed because all the listeners have seen them.
-
-std::mem::drop(listener); // explicitly called to illustrate cleanup; this removes the listener and therefore doesn't hold back the cleanup process.
 ```

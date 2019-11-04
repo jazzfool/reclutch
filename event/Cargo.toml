@@ -5,14 +5,21 @@ authors = ["jazzfool <saveuselon@gmail.com>", "Erik Zscheile <erik.zscheile@gmai
 edition = "2018"
 license = "MIT"
 description = "Thread-safe and non-thread-safe Event abstractions"
-homepage = "http://github.com/jazzfool/reclutch/tree/master/reclutch_event"
+homepage = "http://github.com/jazzfool/reclutch/tree/master/event"
 repository = "http://github.com/jazzfool/reclutch"
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
+crossbeam-channel = { version = "0.4.0", optional = true }
 slotmap = "0.4.0"
+# keep this in sync with the version listed in reclutch/Cargo.toml
+winit = { version = "0.20.0-alpha4", optional = true }
 
 [dev-dependencies]
 criterion = "0.3.0"
+crossbeam-utils = "0.7.0"
 
 [[bench]]
 name = "events"

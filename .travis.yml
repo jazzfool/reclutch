@@ -1,9 +1,12 @@
 language: rust
+cache: cargo
 rust:
-    - stable
-    - beta
-    - nightly
+  - stable
+  - beta
+  - nightly
 jobs:
   allow_failures:
     - rust: nightly
   fast_finish: true
+script:
+  - bash .scripts/build.sh

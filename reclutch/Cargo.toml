@@ -13,8 +13,8 @@ default = ["reclutch_derive"]
 skia = ["skia-safe", "gl", "indexmap"]
 
 [dependencies]
-reclutch_event = { path = "../reclutch_event" }
-reclutch_derive = { path = "../reclutch_derive", optional = true }
+reclutch_event = { path = "../event" }
+reclutch_derive = { path = "../derive", optional = true }
 euclid = "0.20.3"
 failure = "0.1.6"
 font-kit = "0.4.0"

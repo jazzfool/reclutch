@@ -6,12 +6,15 @@
 #[path = "../cpu.rs"]
 mod cpu;
 
+#[macro_use]
+extern crate reclutch_derive;
+
 use reclutch::{
     display::{
         Color, CommandGroup, DisplayCommand, DisplayItem, FontInfo, GraphicsDisplay,
         GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size, StyleColor, TextDisplayItem,
     },
-    event::{RcEvent, RcEventListener},
+    event::{RcEventListener, RcEventQueue},
     prelude::*,
     Widget,
 };
@@ -37,7 +40,7 @@ enum GlobalEvent {
     MouseMove(Point),
 }
 
-#[derive(Widget)]
+#[derive(WidgetChildren)]
 struct Counter {
     count: i32,
 
@@ -52,7 +55,7 @@ struct Counter {
 }
 
 impl Counter {
-    pub fn new(global: &mut RcEvent<GlobalEvent>) -> Self {
+    pub fn new(global: &mut RcEventQueue<GlobalEvent>) -> Self {
         let button_increase = Button::new(String::from("Count Up"), Point::new(10.0, 40.0), global);
         let button_decrease =
             Button::new(String::from("Count Down"), Point::new(10.0, 100.0), global);
@@ -115,9 +118,9 @@ impl Widget for Counter {
     }
 }
 
-#[derive(Widget)]
+#[derive(WidgetChildren)]
 struct Button {
-    pub press_event: RcEvent<Point>,
+    pub press_event: RcEventQueue<Point>,
 
     pub text: String,
     pub position: Point,
@@ -129,9 +132,9 @@ struct Button {
 }
 
 impl Button {
-    pub fn new(text: String, position: Point, global: &mut RcEvent<GlobalEvent>) -> Self {
+    pub fn new(text: String, position: Point, global: &mut RcEventQueue<GlobalEvent>) -> Self {
         Self {
-            press_event: RcEvent::new(),
+            press_event: RcEventQueue::new(),
             text,
             position,
             hover: false,
@@ -158,8 +161,7 @@ impl Widget for Button {
                     }
                 }
                 GlobalEvent::MouseMove(pt) => {
-                    let before = self.hover;
-                    self.hover = bounds.contains(pt);
+                    let before = std::mem::replace(&mut self.hover, bounds.contains(pt));
                     if self.hover != before {
                         self.command_group.repaint();
                     }
@@ -229,7 +231,7 @@ fn main() {
     .unwrap();
 
     // set up the UI
-    let mut window_q = RcEvent::new();
+    let mut window_q = RcEventQueue::new();
     let mut counter = Counter::new(&mut window_q);
     let mut cursor = Point::default();
 
@@ -295,7 +297,7 @@ fn main() {
     let mut display = cpu::CpuGraphicsDisplay::new(window_size, &event_loop).unwrap();
 
     // set up the UI
-    let mut window_q = RcEvent::new();
+    let mut window_q = RcEventQueue::new();
     let mut counter = Counter::new(&mut window_q);
     let mut cursor = Point::default();
 
