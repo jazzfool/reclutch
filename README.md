@@ -4,6 +4,8 @@
 
 ## Gain control of your UI again
 
+[![Build Status](https://travis-ci.com/jazzfool/reclutch.svg?branch=master)](https://travis-ci.com/jazzfool/reclutch)
+
 ## Features:
 
 - Barebones (i.e. no widget toolkit or graphics backend provided).
