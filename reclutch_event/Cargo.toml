@@ -1,0 +1,11 @@
+[package]
+name = "reclutch_event"
+version = "0.1.0"
+authors = ["jazzfool <saveuselon@gmail.com>", "Erik Zscheile <erik.zscheile@gmail.com>"]
+edition = "2018"
+description = "Thread-safe and non-thread-safe Event abstractions"
+homepage = "http://github.com/jazzfool/reclutch"
+repository = "http://github.com/jazzfool/reclutch"
+
+[lib]
+name = "reclutch_event"

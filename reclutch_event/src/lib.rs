@@ -122,8 +122,8 @@ impl<T> EventListener<T> {
     /// calls of `with` or calls to `Event` methods aren't allowed and
     /// will deadlock or panic.
     pub fn with<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&[T]) -> R,
+        where
+            F: FnOnce(&[T]) -> R,
     {
         let mut inner = (self.1).0.lock().unwrap();
         let maxidx = inner.events.len();
@@ -137,8 +137,8 @@ impl<T> EventListener<T> {
 
     /// Returns a list of new events since last `peek`
     pub fn peek(&self) -> Vec<T>
-    where
-        T: Clone,
+        where
+            T: Clone,
     {
         self.with(<[T]>::to_vec)
     }

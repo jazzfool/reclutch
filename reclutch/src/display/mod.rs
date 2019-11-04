@@ -1,5 +1,8 @@
 //! Generic high-level vector graphics interface
 
+#[cfg(feature = "gpu")]
+pub mod gpu;
+
 use palette::Srgba;
 
 pub type Point = euclid::Point2D<f32, euclid::UnknownUnit>;

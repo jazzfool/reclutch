@@ -1,0 +1,31 @@
+[package]
+name = "reclutch"
+version = "0.1.0"
+authors = ["jazzfool <saveuselon@gmail.com>"]
+edition = "2018"
+description = "Rust UI Core"
+homepage = "http://github.com/jazzfool/reclutch"
+repository = "http://github.com/jazzfool/reclutch"
+
+[lib]
+
+[features]
+default = ["event"]
+gpu = ["wgpu", "nalgebra", "lyon", "raw-window-handle"]
+event = ["reclutch_event"]
+
+[dependencies]
+reclutch_event = { path = "../reclutch_event", optional = true }
+euclid = "0.20.3"
+failure = "0.1.6"
+font-kit = "0.4.0"
+palette = "0.4.1"
+wgpu = { version = "0.4.0", optional = true }
+nalgebra = { version = "0.19.0", optional = true }
+lyon = { version = "0.14.1", optional = true }
+raw-window-handle = { version = "0.3.0", optional = true }
+
+[dev-dependencies]
+raqote = "0.7.4"
+pixels = { git = "https://github.com/parasyte/pixels" }
+winit = "0.20.0-alpha4"

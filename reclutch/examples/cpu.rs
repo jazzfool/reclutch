@@ -13,9 +13,10 @@ use {
 };
 
 pub struct CpuGraphicsDisplay {
+    #[allow(dead_code)]
     pub(crate) window: Window,
-    pub pixels: Pixels,
-    pub draw_target: DrawTarget,
+    pub(crate) pixels: Pixels,
+    pub(crate) draw_target: DrawTarget,
     cmds: HashMap<u64, Vec<DisplayCommand>>,
     next_command_group_handle: u64,
 }
@@ -320,3 +321,6 @@ fn convert_item(item: &GraphicsDisplayItem) -> raqote::Path {
         }
     }
 }
+
+#[allow(dead_code)]
+fn main() {}

@@ -2,7 +2,8 @@
 //
 // Be warned: this runs quite slow due to the rendering being CPU based.
 
-pub mod cpu;
+#[path = "../cpu.rs"]
+mod cpu;
 
 use {
     reclutch::{
@@ -11,7 +12,7 @@ use {
             GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size,
             StyleColor, TextDisplayItem,
         },
-        event::{Event, EventListener},
+        rc_event::{Event, EventListener},
         widget::Widget,
     },
     winit::{
@@ -20,6 +21,7 @@ use {
     },
 };
 
+#[derive(Debug, Clone, Copy)]
 enum GlobalEvent {
     Click(Point),
     MouseMove(Point),
@@ -29,7 +31,7 @@ struct Counter {
     count: i32,
 
     button: Button,
-    button_press_listener: EventListener<Point>,
+    button_press_listener: reclutch::rc_event::EventListener<Point>,
     command_group: Option<CommandGroupHandle>,
     font: FontInfo,
 }
@@ -49,12 +51,12 @@ impl Counter {
     }
 }
 
-impl Widget for Counter {
-    fn children(&self) -> Vec<&dyn Widget> {
+impl Widget<GlobalEvent> for Counter {
+    fn children(&self) -> Vec<&dyn Widget<GlobalEvent>> {
         vec![&self.button]
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
+    fn children_mut(&mut self) -> Vec<&mut dyn Widget<GlobalEvent>> {
         vec![&mut self.button]
     }
 
@@ -67,12 +69,9 @@ impl Widget for Counter {
             child.update();
         }
 
-        let count = &mut self.count;
-        self.button_press_listener.with(|events| {
-            for _event in events {
-                *count += 1;
-            }
-        });
+        for _event in self.button_press_listener.peek() {
+            self.count += 1;
+        }
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
@@ -116,31 +115,26 @@ impl Button {
     }
 }
 
-impl Widget for Button {
+impl Widget<GlobalEvent> for Button {
     fn bounds(&self) -> Rect {
         Rect::new(Point::new(10.0, 40.0), Size::new(150.0, 50.0))
     }
 
     fn update(&mut self) {
         let bounds = self.bounds();
-        let press_event = &mut self.press_event;
 
-        let hover = &mut self.hover;
-
-        self.global_listener.with(|events| {
-            for event in events {
-                match event {
-                    GlobalEvent::Click(pt) => {
-                        if bounds.contains(*pt) {
-                            press_event.push(*pt);
-                        }
-                    }
-                    GlobalEvent::MouseMove(pt) => {
-                        *hover = bounds.contains(*pt);
+        for event in self.global_listener.peek() {
+            match event {
+                GlobalEvent::Click(pt) => {
+                    if bounds.contains(pt) {
+                        self.press_event.push(pt);
                     }
                 }
+                GlobalEvent::MouseMove(pt) => {
+                    self.hover = bounds.contains(pt);
+                }
             }
-        })
+        }
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
