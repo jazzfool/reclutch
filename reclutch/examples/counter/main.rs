@@ -12,8 +12,9 @@ use {
             GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size,
             StyleColor, TextDisplayItem,
         },
-        rc_event::{Event, EventListener},
-        widget::Widget,
+        event::{RcEvent, RcEventListener},
+        prelude::*,
+        Widget,
     },
     winit::{
         event::{Event as WinitEvent, WindowEvent},
@@ -32,18 +33,18 @@ struct Counter {
 
     button_increase: ButtonIncrease,
     button_decrease: ButtonDecrease,
-    button_increase_press_listener: reclutch::rc_event::EventListener<Point>,
-    button_decrease_press_listener: reclutch::rc_event::EventListener<Point>,
+    button_increase_press_listener: RcEventListener<Point>,
+    button_decrease_press_listener: RcEventListener<Point>,
     command_group: Option<CommandGroupHandle>,
     font: FontInfo,
 }
 
 impl Counter {
-    pub fn new(global: &mut Event<GlobalEvent>) -> Self {
+    pub fn new(global: &mut RcEvent<GlobalEvent>) -> Self {
         let button_increase = ButtonIncrease::new(global);
         let button_decrease = ButtonDecrease::new(global);
-        let button_increase_press_listener = button_increase.press_event.new_listener();
-        let button_decrease_press_listener = button_decrease.press_event.new_listener();
+        let button_increase_press_listener = button_increase.press_event.listen();
+        let button_decrease_press_listener = button_decrease.press_event.listen();
 
         Self {
             count: 0,
@@ -57,12 +58,12 @@ impl Counter {
     }
 }
 
-impl Widget<GlobalEvent> for Counter {
-    fn children(&self) -> Vec<&dyn Widget<GlobalEvent>> {
+impl Widget for Counter {
+    fn children(&self) -> Vec<&dyn Widget> {
         vec![&self.button_increase, &self.button_decrease]
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget<GlobalEvent>> {
+    fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
         vec![&mut self.button_increase, &mut self.button_decrease]
     }
 
@@ -104,27 +105,27 @@ impl Widget<GlobalEvent> for Counter {
 }
 
 struct ButtonIncrease {
-    pub press_event: Event<Point>,
+    pub press_event: RcEvent<Point>,
 
     hover: bool,
-    global_listener: EventListener<GlobalEvent>,
+    global_listener: RcEventListener<GlobalEvent>,
     command_group: Option<CommandGroupHandle>,
     font: FontInfo,
 }
 
 impl ButtonIncrease {
-    pub fn new(global: &mut Event<GlobalEvent>) -> Self {
+    pub fn new(global: &mut RcEvent<GlobalEvent>) -> Self {
         Self {
-            press_event: Event::new(),
+            press_event: RcEvent::new(),
             hover: false,
-            global_listener: global.new_listener(),
+            global_listener: global.listen(),
             command_group: None,
             font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
         }
     }
 }
 
-impl Widget<GlobalEvent> for ButtonIncrease {
+impl Widget for ButtonIncrease {
     fn bounds(&self) -> Rect {
         Rect::new(Point::new(10.0, 40.0), Size::new(150.0, 50.0))
     }
@@ -178,27 +179,27 @@ impl Widget<GlobalEvent> for ButtonIncrease {
 }
 
 struct ButtonDecrease {
-    pub press_event: Event<Point>,
+    pub press_event: RcEvent<Point>,
 
     hover: bool,
-    global_listener: EventListener<GlobalEvent>,
+    global_listener: RcEventListener<GlobalEvent>,
     command_group: Option<CommandGroupHandle>,
     font: FontInfo,
 }
 
 impl ButtonDecrease {
-    pub fn new(global: &mut Event<GlobalEvent>) -> Self {
+    pub fn new(global: &mut RcEvent<GlobalEvent>) -> Self {
         Self {
-            press_event: Event::new(),
+            press_event: RcEvent::new(),
             hover: false,
-            global_listener: global.new_listener(),
+            global_listener: global.listen(),
             command_group: None,
             font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
         }
     }
 }
 
-impl Widget<GlobalEvent> for ButtonDecrease {
+impl Widget for ButtonDecrease {
     fn bounds(&self) -> Rect {
         Rect::new(Point::new(10.0, 100.0), Size::new(150.0, 50.0))
     }
@@ -260,7 +261,7 @@ fn main() -> Result<(), failure::Error> {
     let mut display = cpu::CpuGraphicsDisplay::new(window_size, &event_loop)?;
 
     // set up the UI
-    let mut window_q = Event::new();
+    let mut window_q = RcEvent::new();
     let mut counter = Counter::new(&mut window_q);
     let mut cursor = Point::default();
 
@@ -306,7 +307,5 @@ fn main() -> Result<(), failure::Error> {
 
         counter.update();
         display.window.request_redraw();
-
-        window_q.cleanup();
     });
 }
