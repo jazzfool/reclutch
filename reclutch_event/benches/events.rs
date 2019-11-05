@@ -6,7 +6,7 @@ use reclutch_event::*;
 use std::mem::drop;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("event-listener", move |b| {
+    c.bench_function("event-listener-peek", move |b| {
         b.iter(|| {
             let event = RcEvent::new();
 
@@ -19,6 +19,24 @@ fn criterion_benchmark(c: &mut Criterion) {
             event.push(3i32);
 
             assert_eq!(listener.peek(), &[1, 2, 3]);
+        })
+    });
+
+    c.bench_function("event-listener-with", move |b| {
+        b.iter(|| {
+            let event = RcEvent::new();
+
+            event.push(0i32);
+
+            let listener = event.listen();
+
+            event.push(1i32);
+            event.push(2i32);
+            event.push(3i32);
+
+            listener.with(|events| {
+                assert_eq!(events, &[1i32, 2i32, 3i32]);
+            });
         })
     });
 
