@@ -30,21 +30,27 @@ enum GlobalEvent {
 struct Counter {
     count: i32,
 
-    button: Button,
-    button_press_listener: reclutch::rc_event::EventListener<Point>,
+    button_increase: ButtonIncrease,
+    button_decrease: ButtonDecrease,
+    button_increase_press_listener: reclutch::rc_event::EventListener<Point>,
+    button_decrease_press_listener: reclutch::rc_event::EventListener<Point>,
     command_group: Option<CommandGroupHandle>,
     font: FontInfo,
 }
 
 impl Counter {
     pub fn new(global: &mut Event<GlobalEvent>) -> Self {
-        let button = Button::new(global);
-        let button_press_listener = button.press_event.new_listener();
+        let button_increase = ButtonIncrease::new(global);
+        let button_decrease = ButtonDecrease::new(global);
+        let button_increase_press_listener = button_increase.press_event.new_listener();
+        let button_decrease_press_listener = button_decrease.press_event.new_listener();
 
         Self {
             count: 0,
-            button,
-            button_press_listener,
+            button_increase,
+            button_decrease,
+            button_increase_press_listener,
+            button_decrease_press_listener,
             command_group: None,
             font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
         }
@@ -53,11 +59,11 @@ impl Counter {
 
 impl Widget<GlobalEvent> for Counter {
     fn children(&self) -> Vec<&dyn Widget<GlobalEvent>> {
-        vec![&self.button]
+        vec![&self.button_increase, &self.button_decrease]
     }
 
     fn children_mut(&mut self) -> Vec<&mut dyn Widget<GlobalEvent>> {
-        vec![&mut self.button]
+        vec![&mut self.button_increase, &mut self.button_decrease]
     }
 
     fn bounds(&self) -> Rect {
@@ -69,8 +75,12 @@ impl Widget<GlobalEvent> for Counter {
             child.update();
         }
 
-        for _event in self.button_press_listener.peek() {
+        for _event in self.button_increase_press_listener.peek() {
             self.count += 1;
+        }
+
+        for _event in self.button_decrease_press_listener.peek() {
+            self.count -= 1;
         }
     }
 
@@ -87,14 +97,13 @@ impl Widget<GlobalEvent> for Counter {
                 color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
             }))],
         );
-
         for child in self.children_mut() {
             child.draw(display);
         }
     }
 }
 
-struct Button {
+struct ButtonIncrease {
     pub press_event: Event<Point>,
 
     hover: bool,
@@ -103,7 +112,7 @@ struct Button {
     font: FontInfo,
 }
 
-impl Button {
+impl ButtonIncrease {
     pub fn new(global: &mut Event<GlobalEvent>) -> Self {
         Self {
             press_event: Event::new(),
@@ -115,7 +124,7 @@ impl Button {
     }
 }
 
-impl Widget<GlobalEvent> for Button {
+impl Widget<GlobalEvent> for ButtonIncrease {
     fn bounds(&self) -> Rect {
         Rect::new(Point::new(10.0, 40.0), Size::new(150.0, 50.0))
     }
@@ -168,6 +177,81 @@ impl Widget<GlobalEvent> for Button {
     }
 }
 
+struct ButtonDecrease {
+    pub press_event: Event<Point>,
+
+    hover: bool,
+    global_listener: EventListener<GlobalEvent>,
+    command_group: Option<CommandGroupHandle>,
+    font: FontInfo,
+}
+
+impl ButtonDecrease {
+    pub fn new(global: &mut Event<GlobalEvent>) -> Self {
+        Self {
+            press_event: Event::new(),
+            hover: false,
+            global_listener: global.new_listener(),
+            command_group: None,
+            font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
+        }
+    }
+}
+
+impl Widget<GlobalEvent> for ButtonDecrease {
+    fn bounds(&self) -> Rect {
+        Rect::new(Point::new(10.0, 100.0), Size::new(150.0, 50.0))
+    }
+
+    fn update(&mut self) {
+        let bounds = self.bounds();
+
+        for event in self.global_listener.peek() {
+            match event {
+                GlobalEvent::Click(pt) => {
+                    if bounds.contains(pt) {
+                        self.press_event.push(pt);
+                    }
+                }
+                GlobalEvent::MouseMove(pt) => {
+                    self.hover = bounds.contains(pt);
+                }
+            }
+        }
+    }
+
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+        let bounds = self.bounds();
+        let color = if self.hover {
+            Color::new(0.25, 0.60, 0.70, 1.0)
+        } else {
+            Color::new(0.20, 0.55, 0.65, 1.0)
+        };
+
+        ok_or_push(
+            &mut self.command_group,
+            display,
+            &[
+                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::RoundRectangle {
+                    rect: bounds,
+                    radii: [10.0; 4],
+                    paint: GraphicsDisplayPaint::Fill(StyleColor::Color(color)),
+                })),
+                DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
+                    text: "Count Down".to_owned(),
+                    font: self.font.clone(),
+                    size: 22.0,
+                    bottom_left: bounds
+                        .origin
+                        .add_size(&Size::new(10.0, bounds.size.height / 2.0)),
+                    color: StyleColor::Color(Color::new(1.0, 1.0, 1.0, 1.0)),
+                })),
+            ],
+        );
+    }
+
+}
+
 fn main() -> Result<(), failure::Error> {
     let window_size = (500u32, 500u32);
 
@@ -202,11 +286,11 @@ fn main() -> Result<(), failure::Error> {
             }
             WinitEvent::WindowEvent {
                 event:
-                    WindowEvent::MouseInput {
-                        state: winit::event::ElementState::Pressed,
-                        button: winit::event::MouseButton::Left,
-                        ..
-                    },
+                WindowEvent::MouseInput {
+                    state: winit::event::ElementState::Pressed,
+                    button: winit::event::MouseButton::Left,
+                    ..
+                },
                 ..
             } => {
                 window_q.push(GlobalEvent::Click(cursor));
