@@ -21,15 +21,15 @@ All rendering details have been excluded for simplicity.
 
 ```rust
 struct Button {
-    pub button_press: Event<()>,
-    global_listener: EventListener<WindowEvent>,
+    pub button_press: RcEvent<()>,
+    global_listener: RcEventListener<WindowEvent>,
 }
 
 impl Button {
     pub fn new(global: &mut Event<WindowEvent>) -> Self {
         Button {
-            button_press: Event::new(),
-            global_listener: global.new_listener(),
+            button_press: RcEvent::new(),
+            global_listener: global.listen(),
         }
     }
 }
@@ -38,7 +38,7 @@ impl Widget<WindowEvent> for Button {
     pub fn bounds(&self) -> Rect { /* --snip-- */ }
 
     pub fn update(&mut self, global: &mut Event<WindowEvent>) {
-        for event in global.peek(self.global_listener) {
+        for event in self.global_listener.peek() {
             match event {
                 WindowEvent::OnClick(_) => self.button_press.push(()),
                 _ => (),
@@ -136,15 +136,17 @@ This also allows for simple cleanup of event data not needed (i.e. event data se
 Further, it's not a "standalone" event system, it only works in a widget environment (or any environment with persistent updates).
 The memory cleanup system resembles an extremely simple garbage collector.
 
+Thanks to zserik, the events have been made more ergonomic to use and now use the RAII pattern to automatically cleanup when listeners go out of scope. The event system is still a work-in-progress and we're looking to find the right balance between performance and ease-of-use.
+
 Here's an example of it's usage outside a widget (with manual updating);
 
 ```rust
-let mut event: Event<i32> = Event::new();
+let mut event: RcEvent<i32> = RcEvent::new();
 
 event.push(10); // no listeners, so this event won't be received by anyone.
 event.cleanup(); // this removes that "10" we just pushed, because it's not needed by any listeners (because there are no listeners).
 
-let listener = event.new_listener();
+let listener = event.listen();
 
 event.push(1);
 event.push(2);
@@ -152,11 +154,11 @@ event.push(2);
 event.cleanup(); // this doesn't do anything; our listener hasn't seen these events so they aren't cleaned up.
 
 // here is how listeners respond to events.
-for num in event.peek(listener) {
+for num in listener.peek() {
     print!("{} ", num);
 } // prints: "1 2 "
 
 event.cleanup(); // this removes the "1" and "2" events we pushed because all the listeners have seen them.
 
-event.remove_listener(listener); // you should do this if you're not using a listener so it doesn't hold back cleanup.
+std::mem::drop(listener); // explicitly called to illustrate cleanup; this removes the listener and therefore doesn't hold back the cleanup process.
 ```
