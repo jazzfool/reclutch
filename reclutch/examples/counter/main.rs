@@ -1,6 +1,6 @@
 // The classic counter GUI.
 //
-// Be warned: this runs quite slow due to the rendering being CPU based.
+// Be warned: this runs quite slow due to Raqote's current text rendering.
 
 #[path = "../cpu.rs"]
 mod cpu;
@@ -31,8 +31,8 @@ enum GlobalEvent {
 struct Counter {
     count: i32,
 
-    button_increase: ButtonIncrease,
-    button_decrease: ButtonDecrease,
+    button_increase: Button,
+    button_decrease: Button,
     button_increase_press_listener: RcEventListener<Point>,
     button_decrease_press_listener: RcEventListener<Point>,
     command_group: Option<CommandGroupHandle>,
@@ -41,8 +41,8 @@ struct Counter {
 
 impl Counter {
     pub fn new(global: &mut RcEvent<GlobalEvent>) -> Self {
-        let button_increase = ButtonIncrease::new(global);
-        let button_decrease = ButtonDecrease::new(global);
+        let button_increase = Button::new(String::from("Count Up"), Point::new(10.0, 40.0), global);
+        let button_decrease = Button::new(String::from("Count Down"), Point::new(10.0, 100.0), global);
         let button_increase_press_listener = button_increase.press_event.listen();
         let button_decrease_press_listener = button_decrease.press_event.listen();
 
@@ -104,8 +104,11 @@ impl Widget for Counter {
     }
 }
 
-struct ButtonIncrease {
+struct Button {
     pub press_event: RcEvent<Point>,
+
+    pub text: String,
+    pub position: Point,
 
     hover: bool,
     global_listener: RcEventListener<GlobalEvent>,
@@ -113,10 +116,12 @@ struct ButtonIncrease {
     font: FontInfo,
 }
 
-impl ButtonIncrease {
-    pub fn new(global: &mut RcEvent<GlobalEvent>) -> Self {
+impl Button {
+    pub fn new(text: String, position: Point, global: &mut RcEvent<GlobalEvent>) -> Self {
         Self {
             press_event: RcEvent::new(),
+            text,
+            position,
             hover: false,
             global_listener: global.listen(),
             command_group: None,
@@ -125,9 +130,9 @@ impl ButtonIncrease {
     }
 }
 
-impl Widget for ButtonIncrease {
+impl Widget for Button {
     fn bounds(&self) -> Rect {
-        Rect::new(Point::new(10.0, 40.0), Size::new(150.0, 50.0))
+        Rect::new(self.position, Size::new(150.0, 50.0))
     }
 
     fn update(&mut self) {
@@ -165,7 +170,7 @@ impl Widget for ButtonIncrease {
                     paint: GraphicsDisplayPaint::Fill(StyleColor::Color(color)),
                 })),
                 DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
-                    text: "Count Up".to_owned(),
+                    text: self.text.clone(),
                     font: self.font.clone(),
                     size: 22.0,
                     bottom_left: bounds
@@ -176,81 +181,6 @@ impl Widget for ButtonIncrease {
             ],
         );
     }
-}
-
-struct ButtonDecrease {
-    pub press_event: RcEvent<Point>,
-
-    hover: bool,
-    global_listener: RcEventListener<GlobalEvent>,
-    command_group: Option<CommandGroupHandle>,
-    font: FontInfo,
-}
-
-impl ButtonDecrease {
-    pub fn new(global: &mut RcEvent<GlobalEvent>) -> Self {
-        Self {
-            press_event: RcEvent::new(),
-            hover: false,
-            global_listener: global.listen(),
-            command_group: None,
-            font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
-        }
-    }
-}
-
-impl Widget for ButtonDecrease {
-    fn bounds(&self) -> Rect {
-        Rect::new(Point::new(10.0, 100.0), Size::new(150.0, 50.0))
-    }
-
-    fn update(&mut self) {
-        let bounds = self.bounds();
-
-        for event in self.global_listener.peek() {
-            match event {
-                GlobalEvent::Click(pt) => {
-                    if bounds.contains(pt) {
-                        self.press_event.push(pt);
-                    }
-                }
-                GlobalEvent::MouseMove(pt) => {
-                    self.hover = bounds.contains(pt);
-                }
-            }
-        }
-    }
-
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
-        let bounds = self.bounds();
-        let color = if self.hover {
-            Color::new(0.25, 0.60, 0.70, 1.0)
-        } else {
-            Color::new(0.20, 0.55, 0.65, 1.0)
-        };
-
-        ok_or_push(
-            &mut self.command_group,
-            display,
-            &[
-                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::RoundRectangle {
-                    rect: bounds,
-                    radii: [10.0; 4],
-                    paint: GraphicsDisplayPaint::Fill(StyleColor::Color(color)),
-                })),
-                DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
-                    text: "Count Down".to_owned(),
-                    font: self.font.clone(),
-                    size: 22.0,
-                    bottom_left: bounds
-                        .origin
-                        .add_size(&Size::new(10.0, bounds.size.height / 2.0)),
-                    color: StyleColor::Color(Color::new(1.0, 1.0, 1.0, 1.0)),
-                })),
-            ],
-        );
-    }
-
 }
 
 fn main() -> Result<(), failure::Error> {
