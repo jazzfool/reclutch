@@ -40,3 +40,42 @@ pub trait Widget: WidgetChildren {
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_widget_derive() {
+        use crate as reclutch;
+        use reclutch::display::Point;
+
+        #[derive(Widget)]
+        struct ExampleChild(i8);
+
+        impl Widget for ExampleChild {
+            fn bounds(&self) -> Rect { Rect::new(Point::new(self.0 as _, 0.0), Default::default()) }
+            fn draw(&mut self, _: &mut dyn GraphicsDisplay) {}
+        }
+
+        #[derive(Widget)]
+        struct Unnamed(#[widget_child] ExampleChild, #[widget_child] ExampleChild);
+
+        #[derive(Widget)]
+        struct Named {
+            #[widget_child]
+            a: ExampleChild,
+            #[widget_child]
+            b: ExampleChild,
+        };
+
+        let mut unnamed = Unnamed(ExampleChild(0), ExampleChild(1));
+        let mut named = Named { a: ExampleChild(2), b: ExampleChild(3) };
+
+        assert_eq!(unnamed.children()[0].bounds().origin.x, 0.0);
+        assert_eq!(unnamed.children_mut()[1].bounds().origin.x, 1.0);
+
+        assert_eq!(named.children_mut()[0].bounds().origin.x, 2.0);
+        assert_eq!(named.children()[1].bounds().origin.x, 3.0);
+    }
+}
