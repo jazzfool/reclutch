@@ -2,4 +2,5 @@
 members = [
     "reclutch",
     "reclutch_event",
+    "reclutch_derive",
 ]

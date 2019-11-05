@@ -20,6 +20,7 @@ Currently there is no default graphics backend, but there is a GPU implementatio
 All rendering details have been excluded for simplicity.
 
 ```rust
+#[derive(Widget)]
 struct Button {
     pub button_press: RcEvent<()>,
     global_listener: RcEventListener<WindowEvent>,
@@ -34,10 +35,10 @@ impl Button {
     }
 }
 
-impl Widget<WindowEvent> for Button {
+impl Widget for Button {
     pub fn bounds(&self) -> Rect { /* --snip-- */ }
 
-    pub fn update(&mut self, global: &mut Event<WindowEvent>) {
+    pub fn update(&mut self) {
         for event in self.global_listener.peek() {
             match event {
                 WindowEvent::OnClick(_) => self.button_press.push(()),
@@ -61,22 +62,24 @@ The classic counter example can be found in examples/overview.
 Children are stored manually by the implementing widget type.
 
 ```rust
+#[derive(Widget)]
 struct ExampleWidget {
+    #[widget_child]
     child: AnotherWidget,
 }
+```
 
-impl Widget<()> for ExampleWidget {
-    // --snip--
+Which expands to...
 
-    fn children(&self) -> Vec<&dyn Widget<()>> {
+```rust
+impl reclutch::WidgetChildren for ExampleWidget {
+    fn children(&self) -> Vec<&dyn Widget> {
         vec![&self.child]
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget<()>> {
+    fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
         vec![&mut self.child]
     }
-
-    // --snip--
 }
 ```
 
@@ -93,7 +96,9 @@ fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
 }
 ```
 
-Perhaps there's room for some macro magic here.
+**Note:** `Widget` requires that `WidgetChildren` be implemented, and `#[derive(Widget)]` implements `WidgetChildren`, not `Widget`.
+
+The derive functionality is a feature, enabled by default.
 
 ## Rendering
 
@@ -104,7 +109,7 @@ struct VisualWidget {
     command_group: Option<CommandGroupHandle>,
 }
 
-impl Widget<WindowEvent> for VisualWidget {
+impl Widget for VisualWidget {
     // --snip--
 
     // Draws a nice red rectangle.

@@ -8,8 +8,12 @@ description = "Rust UI Core"
 homepage = "http://github.com/jazzfool/reclutch"
 repository = "http://github.com/jazzfool/reclutch"
 
+[features]
+default = ["reclutch_derive"]
+
 [dependencies]
 reclutch_event = { path = "../reclutch_event" }
+reclutch_derive = { path = "../reclutch_derive", optional = true }
 euclid = "0.20.3"
 failure = "0.1.6"
 font-kit = "0.4.0"

@@ -1,0 +1,16 @@
+[package]
+name = "reclutch_derive"
+version = "0.0.0"
+authors = ["jazzfool <saveuselon@gmail.com>"]
+edition = "2018"
+license = "MIT"
+description = "Utility to make implementing Widget children easier"
+homepage = "http://github.com/jazzfool/reclutch/tree/master/reclutch_derive"
+repository = "http://github.com/jazzfool/reclutch"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "1.0.7"
+quote = "1.0.2"

@@ -28,10 +28,13 @@ enum GlobalEvent {
     MouseMove(Point),
 }
 
+#[derive(Widget)]
 struct Counter {
     count: i32,
 
+    #[widget_child]
     button_increase: Button,
+    #[widget_child]
     button_decrease: Button,
     button_increase_press_listener: RcEventListener<Point>,
     button_decrease_press_listener: RcEventListener<Point>,
@@ -60,14 +63,6 @@ impl Counter {
 }
 
 impl Widget for Counter {
-    fn children(&self) -> Vec<&dyn Widget> {
-        vec![&self.button_increase, &self.button_decrease]
-    }
-
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
-        vec![&mut self.button_increase, &mut self.button_decrease]
-    }
-
     fn bounds(&self) -> Rect {
         Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0))
     }
@@ -105,6 +100,7 @@ impl Widget for Counter {
     }
 }
 
+#[derive(Widget)]
 struct Button {
     pub press_event: RcEvent<Point>,
 
