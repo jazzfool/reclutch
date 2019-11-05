@@ -42,7 +42,8 @@ struct Counter {
 impl Counter {
     pub fn new(global: &mut RcEvent<GlobalEvent>) -> Self {
         let button_increase = Button::new(String::from("Count Up"), Point::new(10.0, 40.0), global);
-        let button_decrease = Button::new(String::from("Count Down"), Point::new(10.0, 100.0), global);
+        let button_decrease =
+            Button::new(String::from("Count Down"), Point::new(10.0, 100.0), global);
         let button_increase_press_listener = button_increase.press_event.listen();
         let button_decrease_press_listener = button_decrease.press_event.listen();
 
@@ -217,11 +218,11 @@ fn main() -> Result<(), failure::Error> {
             }
             WinitEvent::WindowEvent {
                 event:
-                WindowEvent::MouseInput {
-                    state: winit::event::ElementState::Pressed,
-                    button: winit::event::MouseButton::Left,
-                    ..
-                },
+                    WindowEvent::MouseInput {
+                        state: winit::event::ElementState::Pressed,
+                        button: winit::event::MouseButton::Left,
+                        ..
+                    },
                 ..
             } => {
                 window_q.push(GlobalEvent::Click(cursor));

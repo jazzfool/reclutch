@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 
-use crate::{intern::EventIntern, traits::private::EventListen as _};
 use crate::*;
+use crate::{intern::EventIntern, traits::private::EventListen as _};
 
 #[derive(Debug)]
 pub struct Event<T>(Arc<RwLock<EventIntern<T>>>);
@@ -57,7 +57,7 @@ pub struct EventListener<T>(ListenerKey, Event<T>);
 impl<T> private::EventListen<T> for EventListener<T> {
     fn with_inner_mut<F, R>(&self, f: F) -> Option<R>
     where
-        F: FnOnce(crate::intern::ListenerKey, &mut EventIntern<T>) -> R
+        F: FnOnce(crate::intern::ListenerKey, &mut EventIntern<T>) -> R,
     {
         let mut inner = (self.1).0.write().ok()?;
         Some(f(self.0, &mut inner))

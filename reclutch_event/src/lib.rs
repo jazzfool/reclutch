@@ -11,7 +11,7 @@ pub mod ts;
 pub(crate) use crate::intern::ListenerKey;
 pub use crate::{
     nonts::{Event as RcEvent, EventListener as RcEventListener},
-    traits::*,
     traits::private,
+    traits::*,
     ts::{Event as ArcEvent, EventListener as ArcEventListener},
 };
