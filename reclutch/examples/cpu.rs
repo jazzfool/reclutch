@@ -54,9 +54,10 @@ impl CpuGraphicsDisplay {
 }
 
 impl GraphicsDisplay for CpuGraphicsDisplay {
-    fn resize(&mut self, size: (u32, u32)) {
+    fn resize(&mut self, size: (u32, u32)) -> Result<(), failure::Error> {
         self.pixels.resize(size.0, size.1);
         self.draw_target = DrawTarget::new(size.0 as i32, size.1 as i32);
+        Ok(())
     }
 
     fn push_command_group(

@@ -8,7 +8,7 @@ mod cpu;
 
 use reclutch::{
     display::{
-        self, Color, CommandGroup, DisplayCommand, DisplayItem, FontInfo, GraphicsDisplay,
+        Color, CommandGroup, DisplayCommand, DisplayItem, FontInfo, GraphicsDisplay,
         GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size, StyleColor, TextDisplayItem,
     },
     event::{RcEvent, RcEventListener},
@@ -17,12 +17,14 @@ use reclutch::{
 };
 
 #[cfg(feature = "skia")]
-use glutin::{
-    event::{Event as WinitEvent, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+use {
+    glutin::{
+        event::{Event as WinitEvent, WindowEvent},
+        event_loop::{ControlFlow, EventLoop},
+    },
+    reclutch::display,
 };
 
-use reclutch::display::skia::SkiaOpenGlFramebuffer;
 #[cfg(not(feature = "skia"))]
 use winit::{
     event::{Event as WinitEvent, WindowEvent},
@@ -218,12 +220,13 @@ fn main() {
 
     gl::load_with(|proc| context.get_proc_address(proc) as _);
 
-    let mut display =
-        display::skia::SkiaGraphicsDisplay::new_gl_framebuffer(&SkiaOpenGlFramebuffer {
+    let mut display = display::skia::SkiaGraphicsDisplay::new_gl_framebuffer(
+        &display::skia::SkiaOpenGlFramebuffer {
             framebuffer_id: 0,
             size: (window_size.0 as _, window_size.1 as _),
-        })
-        .unwrap();
+        },
+    )
+    .unwrap();
 
     // set up the UI
     let mut window_q = RcEvent::new();

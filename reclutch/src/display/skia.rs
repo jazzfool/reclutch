@@ -2,7 +2,6 @@
 
 use super::*;
 use skia_safe as sk;
-use std::collections::HashMap;
 
 /// Contains information about an existing OpenGL framebuffer.
 #[derive(Debug, Clone, Copy)]
