@@ -344,7 +344,7 @@ impl DisplayClip {
     pub fn bounds(&self) -> Rect {
         match self {
             DisplayClip::Rectangle { ref rect, .. }
-            | DisplayClip::RoundRectangle { ref rect, .. } => (*rect).clone(),
+            | DisplayClip::RoundRectangle { ref rect, .. } => (*rect),
             DisplayClip::Ellipse {
                 ref center,
                 ref radii,

@@ -1,6 +1,6 @@
 [workspace]
 members = [
+    "derive",
+    "event",
     "reclutch",
-    "reclutch_event",
-    "reclutch_derive",
 ]
