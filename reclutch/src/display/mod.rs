@@ -14,7 +14,7 @@ pub type Angle = euclid::Angle<f32>;
 /// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within `present`.
 pub trait GraphicsDisplay {
     /// Resizes the underlying surface.
-    fn resize(&mut self, size: (u32, u32));
+    fn resize(&mut self, size: (u32, u32)) -> Result<(), failure::Error>;
 
     /// Pushes a new command group to the scene, returning the handle which can be used to manipulate it later.
     fn push_command_group(
@@ -67,6 +67,42 @@ impl CommandGroupHandle {
     /// Returns the inner ID.
     pub fn id(&self) -> u64 {
         self.0
+    }
+}
+
+/// Helper wrapper around `CommandGroupHandle`.
+#[derive(Debug, Clone)]
+pub struct CommandGroup(Option<CommandGroupHandle>, bool);
+
+impl CommandGroup {
+    /// Creates a new, empty command group.
+    pub fn new() -> Self {
+        CommandGroup(None, true)
+    }
+
+    /// Pushes a list of commands if the repaint flag is set, and resets repaint flag if so.
+    pub fn push(&mut self, display: &mut dyn GraphicsDisplay, commands: &[DisplayCommand]) {
+        if self.1 {
+            self.1 = false;
+            match self.0 {
+                Some(ref handle) => {
+                    display.modify_command_group(*handle, commands);
+                }
+                None => {
+                    self.0 = display.push_command_group(commands).ok();
+                }
+            }
+        }
+    }
+
+    /// Sets the repaint flag so that next time `push` is called the commands will be pushed.
+    pub fn repaint(&mut self) {
+        self.1 = true;
+    }
+
+    /// Returns flag indicating whether next `push` will skip or not.
+    pub fn will_repaint(&self) -> bool {
+        self.1
     }
 }
 
@@ -282,19 +318,56 @@ impl DisplayItem {
     }
 }
 
+/// Clipping shapes.
+#[derive(Debug, Clone, Copy)]
+pub enum DisplayClip {
+    /// Rectangle clip.
+    Rectangle {
+        rect: Rect,
+        /// Set to true if `rect` isn't pixel-aligned.
+        antialias: bool,
+    },
+    RoundRectangle {
+        rect: Rect,
+        radii: [f32; 4],
+    },
+    Ellipse {
+        center: Point,
+        radii: Vector,
+    },
+}
+
+impl DisplayClip {
+    pub fn bounds(&self) -> Rect {
+        match self {
+            DisplayClip::Rectangle { ref rect, .. }
+            | DisplayClip::RoundRectangle { ref rect, .. } => (*rect).clone(),
+            DisplayClip::Ellipse {
+                ref center,
+                ref radii,
+            } => Rect::new(
+                (center.x - radii.x, center.y - radii.y).into(),
+                (radii.x * 2.0, radii.y * 2.0).into(),
+            ),
+        }
+    }
+}
+
 /// Describes all possible display commands.
 #[derive(Clone)]
 pub enum DisplayCommand {
     /// Display an item
     Item(DisplayItem),
     /// Applies a filter onto the frame with a mask.
-    BackdropFilter(GraphicsDisplayItem, Filter),
+    BackdropFilter(DisplayClip, Filter),
     /// Pushes a clip onto the draw state.
-    PushClip(GraphicsDisplayItem),
-    /// Removes a clip from the draw state.
-    PopClip,
+    /// To remove the clip, call this after a `Save` command, which once `Restore`'d, the clip will be removed.
+    Clip(DisplayClip),
     /// Saves the draw state (clip and transformations).
     Save,
+    /// Saves the draw state (clip and transformations) and begins drawing into a new layer.
+    /// The float value is the layer opacity.
+    SaveLayer(f32),
     /// Restores a last saved draw state.
     Restore,
     /// Adds translation to the transformation matrix.
@@ -303,6 +376,8 @@ pub enum DisplayCommand {
     Scale(Vector),
     /// Adds rotation to the transformation matrix.
     Rotate(Angle),
+    /// Fills the clipped region with a solid color.
+    Clear(Color),
 }
 
 impl DisplayCommand {
@@ -312,7 +387,7 @@ impl DisplayCommand {
         Ok(match self {
             DisplayCommand::Item(item) => Some(item.bounds()?),
             DisplayCommand::BackdropFilter(item, _) => Some(item.bounds()),
-            DisplayCommand::PushClip(clip) => Some(clip.bounds()),
+            DisplayCommand::Clip(clip) => Some(clip.bounds()),
             _ => None,
         })
     }
