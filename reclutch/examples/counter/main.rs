@@ -2,24 +2,31 @@
 //
 // Be warned: this runs quite slow due to Raqote's current text rendering.
 
+#[cfg(not(feature = "skia"))]
 #[path = "../cpu.rs"]
 mod cpu;
 
-use {
-    reclutch::{
-        display::{
-            ok_or_push, Color, CommandGroupHandle, DisplayCommand, DisplayItem, FontInfo,
-            GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size,
-            StyleColor, TextDisplayItem,
-        },
-        event::{RcEvent, RcEventListener},
-        prelude::*,
-        Widget,
+use reclutch::{
+    display::{
+        self, Color, CommandGroup, DisplayCommand, DisplayItem, FontInfo, GraphicsDisplay,
+        GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size, StyleColor, TextDisplayItem,
     },
-    winit::{
-        event::{Event as WinitEvent, WindowEvent},
-        event_loop::{ControlFlow, EventLoop},
-    },
+    event::{RcEvent, RcEventListener},
+    prelude::*,
+    Widget,
+};
+
+#[cfg(feature = "skia")]
+use glutin::{
+    event::{Event as WinitEvent, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+};
+
+use reclutch::display::skia::SkiaOpenGlFramebuffer;
+#[cfg(not(feature = "skia"))]
+use winit::{
+    event::{Event as WinitEvent, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -38,7 +45,7 @@ struct Counter {
     button_decrease: Button,
     button_increase_press_listener: RcEventListener<Point>,
     button_decrease_press_listener: RcEventListener<Point>,
-    command_group: Option<CommandGroupHandle>,
+    command_group: CommandGroup,
     font: FontInfo,
 }
 
@@ -56,7 +63,7 @@ impl Counter {
             button_decrease,
             button_increase_press_listener,
             button_decrease_press_listener,
-            command_group: None,
+            command_group: CommandGroup::new(),
             font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
         }
     }
@@ -74,26 +81,32 @@ impl Widget for Counter {
 
         for _event in self.button_increase_press_listener.peek() {
             self.count += 1;
+            self.command_group.repaint();
         }
 
         for _event in self.button_decrease_press_listener.peek() {
             self.count -= 1;
+            self.command_group.repaint();
         }
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
         let bounds = self.bounds();
-        ok_or_push(
-            &mut self.command_group,
+
+        self.command_group.push(
             display,
-            &[DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
-                text: format!("Count: {}", self.count),
-                font: self.font.clone(),
-                size: 23.0,
-                bottom_left: bounds.origin.add_size(&Size::new(10.0, 22.0)),
-                color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
-            }))],
+            &[
+                DisplayCommand::Clear(Color::new(1.0, 1.0, 1.0, 1.0)),
+                DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
+                    text: format!("Count: {}", self.count),
+                    font: self.font.clone(),
+                    size: 23.0,
+                    bottom_left: bounds.origin.add_size(&Size::new(10.0, 22.0)),
+                    color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
+                })),
+            ],
         );
+
         for child in self.children_mut() {
             child.draw(display);
         }
@@ -109,7 +122,7 @@ struct Button {
 
     hover: bool,
     global_listener: RcEventListener<GlobalEvent>,
-    command_group: Option<CommandGroupHandle>,
+    command_group: CommandGroup,
     font: FontInfo,
 }
 
@@ -121,7 +134,7 @@ impl Button {
             position,
             hover: false,
             global_listener: global.listen(),
-            command_group: None,
+            command_group: CommandGroup::new(),
             font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
         }
     }
@@ -143,7 +156,11 @@ impl Widget for Button {
                     }
                 }
                 GlobalEvent::MouseMove(pt) => {
+                    let before = self.hover;
                     self.hover = bounds.contains(pt);
+                    if self.hover != before {
+                        self.command_group.repaint();
+                    }
                 }
             }
         }
@@ -157,8 +174,7 @@ impl Widget for Button {
             Color::new(0.20, 0.55, 0.65, 1.0)
         };
 
-        ok_or_push(
-            &mut self.command_group,
+        self.command_group.push(
             display,
             &[
                 DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::RoundRectangle {
@@ -180,12 +196,100 @@ impl Widget for Button {
     }
 }
 
-fn main() -> Result<(), failure::Error> {
+#[cfg(feature = "skia")]
+fn main() {
     let window_size = (500u32, 500u32);
 
     let event_loop = EventLoop::new();
 
-    let mut display = cpu::CpuGraphicsDisplay::new(window_size, &event_loop)?;
+    let wb = glutin::window::WindowBuilder::new()
+        .with_title("Counter with Reclutch")
+        .with_inner_size(
+            glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
+                .to_logical(event_loop.primary_monitor().hidpi_factor()),
+        );
+
+    let context = glutin::ContextBuilder::new()
+        .with_vsync(true)
+        .build_windowed(wb, &event_loop)
+        .unwrap();
+
+    let context = unsafe { context.make_current().unwrap() };
+
+    gl::load_with(|proc| context.get_proc_address(proc) as _);
+
+    let mut display =
+        display::skia::SkiaGraphicsDisplay::new_gl_framebuffer(&SkiaOpenGlFramebuffer {
+            framebuffer_id: 0,
+            size: (window_size.0 as _, window_size.1 as _),
+        })
+        .unwrap();
+
+    // set up the UI
+    let mut window_q = RcEvent::new();
+    let mut counter = Counter::new(&mut window_q);
+    let mut cursor = Point::default();
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+
+        match event {
+            WinitEvent::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
+                counter.draw(&mut display);
+                display.present(None);
+                context.swap_buffers().unwrap();
+            }
+            WinitEvent::WindowEvent {
+                event: WindowEvent::CursorMoved { position, .. },
+                ..
+            } => {
+                let position = position.to_physical(context.window().hidpi_factor());
+                cursor = Point::new(position.x as _, position.y as _);
+
+                window_q.push(GlobalEvent::MouseMove(cursor));
+            }
+            WinitEvent::WindowEvent {
+                event:
+                    WindowEvent::MouseInput {
+                        state: winit::event::ElementState::Pressed,
+                        button: winit::event::MouseButton::Left,
+                        ..
+                    },
+                ..
+            } => {
+                window_q.push(GlobalEvent::Click(cursor));
+            }
+            WinitEvent::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
+                *control_flow = ControlFlow::Exit;
+            }
+            WinitEvent::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                let size = size.to_physical(context.window().hidpi_factor());
+                display.resize((size.width as _, size.height as _)).unwrap();
+            }
+            _ => (),
+        }
+
+        counter.update();
+        context.window().request_redraw();
+    });
+}
+
+#[cfg(not(feature = "skia"))]
+fn main() {
+    let window_size = (500u32, 500u32);
+
+    let event_loop = EventLoop::new();
+
+    let mut display = cpu::CpuGraphicsDisplay::new(window_size, &event_loop).unwrap();
 
     // set up the UI
     let mut window_q = RcEvent::new();
