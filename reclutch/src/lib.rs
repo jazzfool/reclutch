@@ -54,7 +54,9 @@ mod tests {
         struct ExampleChild(i8);
 
         impl Widget for ExampleChild {
-            fn bounds(&self) -> Rect { Rect::new(Point::new(self.0 as _, 0.0), Default::default()) }
+            fn bounds(&self) -> Rect {
+                Rect::new(Point::new(self.0 as _, 0.0), Default::default())
+            }
             fn draw(&mut self, _: &mut dyn GraphicsDisplay) {}
         }
 
@@ -70,7 +72,10 @@ mod tests {
         };
 
         let mut unnamed = Unnamed(ExampleChild(0), ExampleChild(1));
-        let mut named = Named { a: ExampleChild(2), b: ExampleChild(3) };
+        let mut named = Named {
+            a: ExampleChild(2),
+            b: ExampleChild(3),
+        };
 
         assert_eq!(unnamed.children()[0].bounds().origin.x, 0.0);
         assert_eq!(unnamed.children_mut()[1].bounds().origin.x, 1.0);

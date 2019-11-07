@@ -62,8 +62,9 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
         _ => (),
     };
 
-    let mut_children: Vec<_> = children.iter().map(|child| {
-        match child {
+    let mut_children: Vec<_> = children
+        .iter()
+        .map(|child| match child {
             StringOrInt::String(child) => {
                 let ident = quote::format_ident!("{}", child);
                 quote! {
@@ -71,15 +72,16 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
                 }
             }
             StringOrInt::Int(child) => {
-                let ident = syn::Index::from(*child );
+                let ident = syn::Index::from(*child);
                 quote! {
                     &mut self.#ident
                 }
             }
-        }
-    }).collect();
-    let children: Vec<_> = children.iter().map(|child| {
-        match child {
+        })
+        .collect();
+    let children: Vec<_> = children
+        .iter()
+        .map(|child| match child {
             StringOrInt::String(child) => {
                 let ident = quote::format_ident!("{}", child);
                 quote! {
@@ -92,8 +94,8 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
                     &self.#ident
                 }
             }
-        }
-    }).collect();
+        })
+        .collect();
 
     let tokens = quote! {
         impl reclutch::WidgetChildren for #name {
