@@ -24,6 +24,7 @@ pub fn cleanup<F, I>(
         *finalize = None;
     }
 
+    let mut any_active_out = finalize.is_some();
     *outs = std::mem::replace(outs, Vec::new())
         .into_iter()
         .enumerate()
@@ -33,18 +34,10 @@ pub fn cleanup<F, I>(
                 Some(&true) => i.1 = true,
                 _ => {}
             }
+            any_active_out |= !i.1;
             Some(i)
         })
         .collect();
 
-    !outs.is_empty()
-}
-
-#[derive(Debug, Default)]
-pub struct BlackHole<T>(std::marker::PhantomData<T>);
-
-impl<T> BlackHole<T> {
-    pub fn new() -> Self {
-        Self(std::marker::PhantomData)
-    }
+    any_active_out
 }

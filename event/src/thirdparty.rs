@@ -4,6 +4,13 @@
 
 use crate::traits::GenericQueueInterface;
 
+impl<T> GenericQueueInterface<T> for crate::BlackHole<T> {
+    #[inline]
+    fn push(&self, _event: T) -> bool {
+        false
+    }
+}
+
 impl<T> GenericQueueInterface<T> for std::sync::mpsc::Sender<T> {
     #[inline]
     fn push(&self, event: T) -> bool {
@@ -28,14 +35,6 @@ impl<T> GenericQueueInterface<T> for crossbeam_channel::Sender<T> {
     #[inline]
     fn is_empty(&self) -> bool {
         crossbeam_channel::Sender::is_empty(self)
-    }
-}
-
-#[cfg(feature = "crossbeam-channel")]
-impl<T> GenericQueueInterface<T> for crate::cascade::utils::BlackHole<T> {
-    #[inline]
-    fn push(&self, _event: T) -> bool {
-        false
     }
 }
 

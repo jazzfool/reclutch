@@ -40,6 +40,17 @@ pub mod dchans;
 /// using direct clones of T sent via std channels
 pub mod schans;
 
+/// An event queue which drops any incoming item
+/// and is always closed.
+#[derive(Debug, Default)]
+pub struct BlackHole<T>(std::marker::PhantomData<T>);
+
+impl<T> BlackHole<T> {
+    pub fn new() -> Self {
+        Self(std::marker::PhantomData)
+    }
+}
+
 pub(crate) use crate::intern::ListenerKey;
 
 pub use crate::{
@@ -54,5 +65,5 @@ pub use crate::{
 pub mod thirdparty;
 
 pub mod prelude {
-    pub use crate::traits::{GenericQueueInterface as _, Listen as _, QueueInterface as _};
+    pub use crate::traits::{GenericQueueInterface, Listen as EventListen, QueueInterface};
 }
