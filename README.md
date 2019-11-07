@@ -8,7 +8,7 @@
 
 ## Features:
 
-- Barebones (i.e. no widget toolkit or graphics backend provided).
+- Barebones (i.e. no widget toolkit or layout library provided).
 - Retained-mode rendering.
 - Object-oriented widgets in idiomatic Rust.
 - Renderer-agnostic.
