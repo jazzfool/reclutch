@@ -13,7 +13,7 @@
 - Object-oriented widgets in idiomatic Rust.
 - Renderer-agnostic.
 
-Currently there is no default graphics backend, but there is a GPU implementation planned some day.
+There is an (optional) OpenGL Skia implementation for the renderer.
 
 ## Example
 

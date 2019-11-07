@@ -1,5 +1,8 @@
 //! Generic high-level vector graphics interface
 
+#[cfg(feature = "skia")]
+pub mod skia;
+
 use palette::Srgba;
 
 pub type Point = euclid::Point2D<f32, euclid::UnknownUnit>;
