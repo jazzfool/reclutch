@@ -6,11 +6,10 @@
 
 [![Build Status](https://travis-ci.com/jazzfool/reclutch.svg?branch=master)](https://travis-ci.com/jazzfool/reclutch)
 
-* [Events and event queues](event/README.md)
-
 ## Features
 
 - Barebones (i.e. no widget toolkit or layout library provided).
+- [Events and event queues](event/README.md)
 - Retained-mode rendering.
 - Object-oriented widgets in idiomatic Rust.
 - Renderer-agnostic.
