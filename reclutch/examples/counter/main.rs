@@ -236,7 +236,7 @@ fn main() {
     let mut cursor = Point::default();
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
+        *control_flow = ControlFlow::Wait;
 
         match event {
             WinitEvent::WindowEvent {
@@ -280,7 +280,7 @@ fn main() {
                 let size = size.to_physical(context.window().hidpi_factor());
                 display.resize((size.width as _, size.height as _)).unwrap();
             }
-            _ => (),
+            _ => return,
         }
 
         counter.update();
@@ -302,7 +302,7 @@ fn main() {
     let mut cursor = Point::default();
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
+        *control_flow = ControlFlow::Wait;
 
         match event {
             WinitEvent::WindowEvent {
@@ -338,7 +338,7 @@ fn main() {
             } => {
                 *control_flow = ControlFlow::Exit;
             }
-            _ => (),
+            _ => return,
         }
 
         counter.update();
