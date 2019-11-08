@@ -20,6 +20,14 @@ pub trait GraphicsDisplay {
     /// Resizes the underlying surface.
     fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>>;
 
+    /// Creates a new resource for use in rendering.
+    fn new_resource(
+        &mut self,
+        descriptor: ResourceDescriptor,
+    ) -> Result<ResourceReference, error::ResourceError>;
+    /// Removes an existing resource.
+    fn remove_resource(&mut self, reference: ResourceReference);
+
     /// Pushes a new command group to the scene, returning the handle which can be used to manipulate it later.
     fn push_command_group(
         &mut self,
@@ -39,6 +47,30 @@ pub trait GraphicsDisplay {
 
     /// Displays the entire scene, optionally with a cull.
     fn present(&mut self, cull: Option<Rect>);
+}
+
+/// Contains information required to load a resource through [`new_resource`](GraphicsDisplay::new_resource).
+#[derive(Debug, Clone)]
+pub enum ResourceDescriptor {
+    ImageFile(std::path::PathBuf),
+    ImageData(Vec<u8>),
+}
+
+/// Contains a tagged ID to an existing resource, created through [`new_resource`](GraphicsDisplay::new_resource).
+///
+/// This is used to references resources in draw commands and to remove resources through [`remove_resource`](GraphicsDisplay::remove_resource).
+#[derive(Debug, Clone)]
+pub enum ResourceReference {
+    Image(u64),
+}
+
+impl ResourceReference {
+    /// Returns the inner ID of the resource reference.
+    pub fn id(&self) -> u64 {
+        match self {
+            ResourceReference::Image(id) => *id,
+        }
+    }
 }
 
 /// Pushes or modifies a command group, depending on whether `handle` contains a value or not.
@@ -191,6 +223,14 @@ pub enum GraphicsDisplayItem {
         /// Paint style of ellipse.
         paint: GraphicsDisplayPaint,
     },
+    Image {
+        /// Optional source sample rectangle.
+        src: Option<Rect>,
+        /// Destination output rectangle.
+        dst: Rect,
+        /// Reference to the image resource.
+        resource: ResourceReference,
+    },
 }
 
 impl GraphicsDisplayItem {
@@ -228,6 +268,7 @@ impl GraphicsDisplayItem {
                     }
                 }
             }
+            GraphicsDisplayItem::Image { dst, .. } => dst.clone(),
         }
     }
 }
