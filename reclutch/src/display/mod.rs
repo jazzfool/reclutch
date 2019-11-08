@@ -15,7 +15,7 @@ pub type Angle = euclid::Angle<f32>;
 /// A trait to process display commands.
 ///
 /// In a retained implementation, command groups are persistent in the underlying graphics API (e.g. vertex buffer objects in OpenGL).
-/// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within `present`.
+/// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](GraphicsDisplay::present).
 pub trait GraphicsDisplay {
     /// Resizes the underlying surface.
     fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>>;
@@ -42,7 +42,7 @@ pub trait GraphicsDisplay {
 }
 
 /// Pushes or modifies a command group, depending on whether `handle` contains a value or not.
-/// This means that if `handle` did not contain a value, `push_command_group` will be called and `handle` will be assigned to the returned handle.
+/// This means that if `handle` did not contain a value, [`push_command_group`](GraphicsDisplay::push_command_group) will be called and `handle` will be assigned to the returned handle.
 pub fn ok_or_push(
     handle: &mut Option<CommandGroupHandle>,
     display: &mut dyn GraphicsDisplay,
@@ -58,7 +58,7 @@ pub fn ok_or_push(
     }
 }
 
-/// Handle to a command group within a `GraphicsDisplay`.
+/// Handle to a command group within a [`GraphicsDisplay`](GraphicsDisplay).
 #[derive(Debug, Clone, Copy)]
 pub struct CommandGroupHandle(u64);
 
@@ -74,7 +74,7 @@ impl CommandGroupHandle {
     }
 }
 
-/// Helper wrapper around `CommandGroupHandle`.
+/// Helper wrapper around [`CommandGroupHandle`](CommandGroupHandle).
 #[derive(Debug, Clone)]
 pub struct CommandGroup(Option<CommandGroupHandle>, bool);
 
@@ -145,7 +145,7 @@ pub struct GraphicsDisplayStroke {
     pub end_cap: LineCap,
     /// Appearance of the corners of the stroke.
     pub join: LineJoin,
-    /// With regards to `LineJoin::Miter`, describes the maximum value of the miter length (the distance between the outer-most and inner-most part of the corner).
+    /// With regards to [`miter`](LineJoin::Miter), describes the maximum value of the miter length (the distance between the outer-most and inner-most part of the corner).
     pub miter_limit: f32,
 }
 
@@ -158,7 +158,7 @@ pub enum GraphicsDisplayPaint {
     Stroke(GraphicsDisplayStroke),
 }
 
-/// Describes all the possible graphical items (excluding text, see `TextDisplayItem`).
+/// Describes all the possible graphical items (excluding text, see [`TextDisplayItem`](TextDisplayItem)).
 #[derive(Clone)]
 pub enum GraphicsDisplayItem {
     Line {
@@ -272,6 +272,7 @@ impl TextDisplayItem {
 #[derive(Debug, Clone)]
 pub struct FontInfo {
     name: String,
+    /// Underlying font reference created by [`new`](FontInfo::new).
     pub font: font_kit::font::Font,
 }
 
@@ -326,7 +327,7 @@ pub enum DisplayClip {
     /// Rectangle clip.
     Rectangle {
         rect: Rect,
-        /// Set to true if `rect` isn't pixel-aligned.
+        /// Set to true if [`rect`](DisplayClip::Rectangle::rect) isn't pixel-aligned.
         antialias: bool,
     },
     RoundRectangle {
@@ -363,7 +364,7 @@ pub enum DisplayCommand {
     /// Applies a filter onto the frame with a mask.
     BackdropFilter(DisplayClip, Filter),
     /// Pushes a clip onto the draw state.
-    /// To remove the clip, call this after a `Save` command, which once `Restore`'d, the clip will be removed.
+    /// To remove the clip, call this after a [`save`](DisplayCommand::Save) command, which once [`restored`](DisplayCommand::Restore), the clip will be removed.
     Clip(DisplayClip),
     /// Saves the draw state (clip and transformations).
     Save,

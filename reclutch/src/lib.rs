@@ -22,6 +22,9 @@ pub mod prelude {
 
 use crate::display::{GraphicsDisplay, Rect};
 
+/// Interface to get children of a widget as an array of dynamic widgets.
+///
+/// Ideally, this wouldn't be implemented directly, but rather with `derive(WidgetChildren)`.
 pub trait WidgetChildren {
     fn children(&self) -> Vec<&dyn Widget> {
         Vec::new()
@@ -32,6 +35,7 @@ pub trait WidgetChildren {
     }
 }
 
+/// Simple widget trait with a render boundary and event updating.
 pub trait Widget: WidgetChildren {
     fn bounds(&self) -> Rect;
 
