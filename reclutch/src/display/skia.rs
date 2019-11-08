@@ -1,6 +1,7 @@
 //! Robust implementation of `reclutch::display::GraphicsDisplay` using Google's Skia.
 
 use super::*;
+use crate::error;
 use skia_safe as sk;
 
 /// Contains information about an existing OpenGL framebuffer.
@@ -36,7 +37,7 @@ impl SkiaGraphicsDisplay {
     /// Creates a new `reclutch::display::SkiaGraphicsDisplay` with the Skia OpenGL backend, drawing into an existing framebuffer.
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components.
-    pub fn new_gl_framebuffer(target: &SkiaOpenGlFramebuffer) -> Result<Self, failure::Error> {
+    pub fn new_gl_framebuffer(target: &SkiaOpenGlFramebuffer) -> Result<Self, error::SkiaError> {
         Ok(Self {
             surface: Self::new_gl_framebuffer_surface(target)?,
             surface_type: SurfaceType::OpenGlFramebuffer(*target),
@@ -48,7 +49,7 @@ impl SkiaGraphicsDisplay {
     /// Creates a new `reclutch::display::SkiaGraphicsDisplay` with the Skia OpenGL backend, drawing into an existing texture.
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components
-    pub fn new_gl_texture(target: &SkiaOpenGlTexture) -> Result<Self, failure::Error> {
+    pub fn new_gl_texture(target: &SkiaOpenGlTexture) -> Result<Self, error::SkiaError> {
         Ok(Self {
             surface: Self::new_gl_texture_surface(target)?,
             surface_type: SurfaceType::OpenGlTexture(*target),
@@ -66,7 +67,7 @@ impl SkiaGraphicsDisplay {
 
     fn new_gl_framebuffer_surface(
         target: &SkiaOpenGlFramebuffer,
-    ) -> Result<sk::Surface, failure::Error> {
+    ) -> Result<sk::Surface, error::SkiaError> {
         let mut context = Self::new_gl_context()?;
         let surface = {
             let info = sk::gpu::BackendRenderTarget::new_gl(
@@ -87,13 +88,13 @@ impl SkiaGraphicsDisplay {
                 sk::ColorSpace::new_srgb(),
                 None,
             )
-            .ok_or(SkiaError)?
+            .ok_or(error::SkiaError::InvalidTarget(String::from("framebuffer")))?
         };
 
         Ok(surface)
     }
 
-    fn new_gl_texture_surface(target: &SkiaOpenGlTexture) -> Result<sk::Surface, failure::Error> {
+    fn new_gl_texture_surface(target: &SkiaOpenGlTexture) -> Result<sk::Surface, error::SkiaError> {
         let mut context = Self::new_gl_context()?;
         let surface = {
             let info = unsafe {
@@ -117,20 +118,20 @@ impl SkiaGraphicsDisplay {
                 sk::ColorSpace::new_srgb(),
                 None,
             )
-            .ok_or(SkiaError)?
+            .ok_or(error::SkiaError::InvalidTarget(String::from("texture")))?
         };
 
         Ok(surface)
     }
 
-    fn new_gl_context() -> Result<sk::gpu::Context, failure::Error> {
+    fn new_gl_context() -> Result<sk::gpu::Context, error::SkiaError> {
         let interface = sk::gpu::gl::Interface::new_native();
-        Ok(sk::gpu::Context::new_gl(interface).ok_or(SkiaError)?)
+        sk::gpu::Context::new_gl(interface).ok_or(error::SkiaError::InvalidContext)
     }
 }
 
 impl GraphicsDisplay for SkiaGraphicsDisplay {
-    fn resize(&mut self, size: (u32, u32)) -> Result<(), failure::Error> {
+    fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>> {
         match self.surface_type {
             SurfaceType::OpenGlFramebuffer(ref mut target) => {
                 target.size = (size.0 as i32, size.1 as i32);
@@ -148,7 +149,7 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
     fn push_command_group(
         &mut self,
         commands: &[DisplayCommand],
-    ) -> Result<CommandGroupHandle, failure::Error> {
+    ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>> {
         let id = self.next_command_group_id;
         self.next_command_group_id += 1;
 
@@ -492,20 +493,5 @@ fn draw_command_group(surface: &mut sk::Surface, cmds: &[DisplayCommand]) {
                 surface.canvas().clear(convert_color(color).to_color());
             }
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct SkiaError;
-
-impl std::fmt::Display for SkiaError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "unknown Skia error occurred")
-    }
-}
-
-impl std::error::Error for SkiaError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        None
     }
 }

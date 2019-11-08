@@ -3,6 +3,7 @@
 #[cfg(feature = "skia")]
 pub mod skia;
 
+use crate::error;
 use palette::Srgba;
 
 pub type Point = euclid::Point2D<f32, euclid::UnknownUnit>;
@@ -17,13 +18,13 @@ pub type Angle = euclid::Angle<f32>;
 /// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within `present`.
 pub trait GraphicsDisplay {
     /// Resizes the underlying surface.
-    fn resize(&mut self, size: (u32, u32)) -> Result<(), failure::Error>;
+    fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Pushes a new command group to the scene, returning the handle which can be used to manipulate it later.
     fn push_command_group(
         &mut self,
         commands: &[DisplayCommand],
-    ) -> Result<CommandGroupHandle, failure::Error>;
+    ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
     /// Returns an existing command group by the handle returned from `push_command_group`.
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
     /// Overwrites an existing command group by the handle returned from `push_command_group`.
@@ -243,7 +244,7 @@ pub struct TextDisplayItem {
 
 impl TextDisplayItem {
     /// Returns the exact maximum boundaries for the text.
-    pub fn bounds(&self) -> Result<Rect, failure::Error> {
+    pub fn bounds(&self) -> Result<Rect, error::FontError> {
         let mut rect = Rect::new(self.bottom_left, Size::default());
 
         for c in self.text.chars() {
@@ -276,7 +277,7 @@ pub struct FontInfo {
 
 impl FontInfo {
     /// Creates a new font reference, matched to the font `name`, with optional `fallbacks`.
-    pub fn new(name: &str, fallbacks: &[&str]) -> Result<Self, failure::Error> {
+    pub fn new(name: &str, fallbacks: &[&str]) -> Result<Self, error::FontError> {
         let mut names = vec![font_kit::family_name::FamilyName::Title(name.to_string())];
         names.append(
             &mut fallbacks
@@ -286,10 +287,8 @@ impl FontInfo {
         );
 
         let font = font_kit::source::SystemSource::new()
-            .select_best_match(&names, &font_kit::properties::Properties::default())
-            .unwrap()
-            .load()
-            .unwrap();
+            .select_best_match(&names, &font_kit::properties::Properties::default())?
+            .load()?;
         Ok(Self {
             name: font.full_name(),
             font,
@@ -313,7 +312,7 @@ pub enum DisplayItem {
 
 impl DisplayItem {
     /// Returns maximum boundaries for the item.
-    pub fn bounds(&self) -> Result<Rect, failure::Error> {
+    pub fn bounds(&self) -> Result<Rect, error::FontError> {
         match self {
             DisplayItem::Graphics(item) => Ok(item.bounds()),
             DisplayItem::Text(text) => Ok(text.bounds()?),
@@ -386,7 +385,7 @@ pub enum DisplayCommand {
 impl DisplayCommand {
     /// Returns the maximum bounds.
     /// Somewhat unorthodox function, since most variants aren't directly graphically expressible.
-    pub fn bounds(&self) -> Result<Option<Rect>, failure::Error> {
+    pub fn bounds(&self) -> Result<Option<Rect>, error::FontError> {
         Ok(match self {
             DisplayCommand::Item(item) => Some(item.bounds()?),
             DisplayCommand::BackdropFilter(item, _) => Some(item.bounds()),
@@ -397,7 +396,7 @@ impl DisplayCommand {
 }
 
 /// Returns the total maximum for a list of display commands.
-pub fn display_list_bounds(display_list: &[DisplayCommand]) -> Result<Rect, failure::Error> {
+pub fn display_list_bounds(display_list: &[DisplayCommand]) -> Result<Rect, error::FontError> {
     Ok(display_list
         .iter()
         .filter_map(|disp| {
@@ -407,7 +406,7 @@ pub fn display_list_bounds(display_list: &[DisplayCommand]) -> Result<Rect, fail
                 None
             }
         })
-        .try_fold::<Option<Rect>, _, Result<_, failure::Error>>(None, |rect, bounds| {
+        .try_fold::<Option<Rect>, _, Result<_, error::FontError>>(None, |rect, bounds| {
             let bounds = bounds?;
             Ok(Some(rect.map_or(bounds, |rc| rc.union(&bounds))))
         })?

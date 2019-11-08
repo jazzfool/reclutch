@@ -6,11 +6,20 @@ use {
         GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect,
     },
     std::collections::HashMap,
+    thiserror::Error,
     winit::{
         event_loop::EventLoop,
         window::{Window, WindowBuilder},
     },
 };
+
+#[derive(Error, Debug)]
+pub enum DisplayCreationError {
+    #[error("{0}")]
+    OsError(#[from] winit::error::OsError),
+    #[error("{0}")]
+    BufferError(#[from] pixels::Error),
+}
 
 pub struct CpuGraphicsDisplay {
     #[allow(dead_code)]
@@ -22,7 +31,7 @@ pub struct CpuGraphicsDisplay {
 }
 
 impl CpuGraphicsDisplay {
-    pub fn new(size: (u32, u32), event_loop: &EventLoop<()>) -> Result<Self, failure::Error> {
+    pub fn new(size: (u32, u32), event_loop: &EventLoop<()>) -> Result<Self, DisplayCreationError> {
         let window = WindowBuilder::new()
             .with_title("Counter with Reclutch")
             .with_inner_size(
@@ -54,7 +63,7 @@ impl CpuGraphicsDisplay {
 }
 
 impl GraphicsDisplay for CpuGraphicsDisplay {
-    fn resize(&mut self, size: (u32, u32)) -> Result<(), failure::Error> {
+    fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>> {
         self.pixels.resize(size.0, size.1);
         self.draw_target = DrawTarget::new(size.0 as i32, size.1 as i32);
         Ok(())
@@ -63,7 +72,7 @@ impl GraphicsDisplay for CpuGraphicsDisplay {
     fn push_command_group(
         &mut self,
         commands: &[DisplayCommand],
-    ) -> Result<CommandGroupHandle, failure::Error> {
+    ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>> {
         let id = self.next_command_group_handle;
         self.next_command_group_handle += 1;
 

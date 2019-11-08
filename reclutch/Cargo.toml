@@ -16,7 +16,7 @@ skia = ["skia-safe", "gl", "indexmap"]
 reclutch_event = { path = "../event" }
 reclutch_derive = { path = "../derive", optional = true }
 euclid = "0.20.3"
-failure = "0.1.6"
+thiserror = "1.0.4"
 font-kit = "0.4.0"
 palette = "0.4.1"
 skia-safe = { version = "0.18.0", optional = true }

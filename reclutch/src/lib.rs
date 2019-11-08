@@ -1,4 +1,5 @@
 pub mod display;
+pub mod error;
 
 pub use euclid;
 pub use font_kit;
