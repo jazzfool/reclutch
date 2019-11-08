@@ -40,7 +40,7 @@ impl Button {
 impl Widget for Button {
     pub fn bounds(&self) -> Rect { /* --snip-- */ }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self, _aux: &mut ()) {
         for event in self.global_listener.peek() {
             match event {
                 WindowEvent::OnClick(_) => self.button_press.push(()),
@@ -128,5 +128,36 @@ impl Widget for VisualWidget {
     }
 
     // --snip--
+}
+```
+
+## Updating
+
+The `update` method on widgets is an opportunity for widgets to update layout, animations, etc. and more importantly handle events that have been emitted since the last `update`.
+
+Widgets have a generic type; `Aux`, which is by default simply `()` which allows for a global object to be passed around during updating. This is useful for things like updating a layout.
+
+Here's a simple example;
+
+```rust
+fn update(&mut self, aux: &mut Globals) {
+    if aux.layout.node_is_dirty(self.layout_node) {
+        self.bounds = aux.layout.get_node(self.layout_node);
+        self.command_group.repaint();
+    }
+
+    self.update_animations(aux.delta_time());
+
+    // propagation is done manually
+    for child in self.children_mut() {
+        child.update(aux);
+    }
+
+    // if your UI doesn't update constantly, then you must check child events *after* propagation,
+    // but if it does update constantly, then it's more of a micro-optimization, since any missed events
+    // will come back around next update.
+    for press_event in self.button_press_listener.peek() {
+        self.on_button_press(press_event);
+    }
 }
 ```

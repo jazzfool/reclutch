@@ -79,9 +79,9 @@ impl Widget for Counter {
         Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0))
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, aux: &mut ()) {
         for child in self.children_mut() {
-            child.update();
+            child.update(aux);
         }
 
         for _event in self.button_increase_press_listener.peek() {
@@ -150,7 +150,7 @@ impl Widget for Button {
         Rect::new(self.position, Size::new(150.0, 50.0))
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, _aux: &mut ()) {
         let bounds = self.bounds();
 
         for event in self.global_listener.peek() {
@@ -293,7 +293,7 @@ fn main() {
             _ => return,
         }
 
-        counter.update();
+        counter.update(&mut ());
         context.window().request_redraw();
     });
 }

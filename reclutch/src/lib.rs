@@ -35,11 +35,11 @@ pub trait WidgetChildren {
     }
 }
 
-/// Simple widget trait with a render boundary and event updating.
-pub trait Widget: WidgetChildren {
+/// Simple widget trait with a render boundary and event updating, with a generic auxiliary type.
+pub trait Widget<Aux = ()>: WidgetChildren {
     fn bounds(&self) -> Rect;
 
-    fn update(&mut self) {}
+    fn update(&mut self, _aux: &mut Aux) {}
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay);
 }
