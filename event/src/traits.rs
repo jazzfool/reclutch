@@ -15,7 +15,7 @@ mod private_ {
 pub mod private {
     use crate::RawEventQueue;
 
-    pub trait QueueInterface<T>: Default {
+    pub(crate) trait QueueInterface<T>: Default {
         fn with_inner<F, R>(&self, f: F) -> R
         where
             F: FnOnce(&RawEventQueue<T>) -> R;
@@ -47,6 +47,7 @@ pub mod private {
     }
 }
 
+/// Every supported event queue implements this trait
 pub trait GenericQueueInterface<T> {
     /// Pushes/emits an event
     fn push(&self, event: T) -> bool;
@@ -75,6 +76,7 @@ pub trait GenericQueueInterface<T> {
     }
 }
 
+/// Event queues with the ability to create new listeners implement this trait
 pub trait QueueInterface<T>: GenericQueueInterface<T> {
     type Listener: Listen<T>;
 
