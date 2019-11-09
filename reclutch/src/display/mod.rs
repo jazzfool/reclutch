@@ -6,10 +6,15 @@ pub mod skia;
 use crate::error;
 use palette::Srgba;
 
+/// Two-dimensional floating-point absolute point.
 pub type Point = euclid::Point2D<f32, euclid::UnknownUnit>;
+/// Two-dimensional floating-point relative vector.
 pub type Vector = euclid::Vector2D<f32, euclid::UnknownUnit>;
+/// Two-dimensional floating-point size.
 pub type Size = euclid::Size2D<f32, euclid::UnknownUnit>;
+/// Two-dimensional floating-point rectangle.
 pub type Rect = euclid::Rect<f32, euclid::UnknownUnit>;
+/// An angle in radians.
 pub type Angle = euclid::Angle<f32>;
 
 /// A trait to process display commands.
