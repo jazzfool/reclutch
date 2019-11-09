@@ -526,29 +526,31 @@ fn draw_command_group(cmds: &[DisplayCommand], display: &mut SkiaGraphicsDisplay
                 match filter {
                     Filter::Blur(sigma_x, sigma_y) => {
                         // TODO(jazzfool): cache blur filter
-                        let blur = sk::blur_image_filter::new(
-                            (*sigma_x, *sigma_y),
-                            display
-                                .surface
-                                .image_snapshot_with_bounds(sk::IRect::from_xywh(
-                                    bounds.origin.x.floor() as _,
-                                    bounds.origin.y.floor() as _,
-                                    bounds.size.width.ceil() as _,
-                                    bounds.size.height.ceil() as _,
-                                ))
-                                .unwrap()
-                                .as_filter()
-                                .unwrap(),
-                            &sk::ImageFilterCropRect::new(&convert_rect(&bounds), None),
-                            sk::blur_image_filter::TileMode::Clamp,
-                        )
-                        .unwrap();
+                        let snapshot_bounds = bounds.round_out();
 
-                        {
-                            display
-                                .surface
-                                .canvas()
-                                .save_layer(&sk::SaveLayerRec::default().backdrop(&blur));
+                        if let Some(ref snapshot_rect) = snapshot_bounds.intersection(&Rect::new(
+                            Point::default(),
+                            Size::new(display.size().0 as _, display.size().1 as _),
+                        )) {
+                            let blur = sk::blur_image_filter::new(
+                                (*sigma_x, *sigma_y),
+                                display
+                                    .surface
+                                    .image_snapshot(/*convert_rect(snapshot_rect).round()*/)
+                                    //.unwrap()
+                                    .as_filter()
+                                    .unwrap(),
+                                &sk::ImageFilterCropRect::new(&convert_rect(&bounds), None),
+                                sk::blur_image_filter::TileMode::Clamp,
+                            )
+                            .unwrap();
+
+                            {
+                                display
+                                    .surface
+                                    .canvas()
+                                    .save_layer(&sk::SaveLayerRec::default().backdrop(&blur));
+                            }
                         }
                     }
                     Filter::Invert => {
