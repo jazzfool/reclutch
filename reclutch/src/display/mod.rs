@@ -368,7 +368,7 @@ pub enum DisplayClip {
     /// Rectangle clip.
     Rectangle {
         rect: Rect,
-        /// Set to true if [`rect`](DisplayClip::Rectangle::rect) isn't pixel-aligned.
+        /// As a general rule, set to true if [`rect`](DisplayClip::Rectangle.rect) isn't pixel-aligned.
         antialias: bool,
     },
     RoundRectangle {
