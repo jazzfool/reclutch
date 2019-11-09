@@ -343,7 +343,8 @@ fn convert_paint(paint: &GraphicsDisplayPaint) -> sk::Paint {
         }
         GraphicsDisplayPaint::Stroke(ref stroke) => {
             let mut paint = sk::Paint::default();
-            paint.set_anti_alias(true);
+            paint.set_anti_alias(stroke.antialias);
+            paint.set_style(sk::PaintStyle::Stroke);
 
             apply_color(&stroke.color, &mut paint);
 
