@@ -25,21 +25,23 @@ use crate::display::{GraphicsDisplay, Rect};
 /// Interface to get children of a widget as an array of dynamic widgets.
 ///
 /// Ideally, this wouldn't be implemented directly, but rather with `derive(WidgetChildren)`.
-pub trait WidgetChildren {
-    fn children(&self) -> Vec<&dyn Widget> {
+pub trait WidgetChildren<Aux>: Widget<Aux = Aux> {
+    fn children(&self) -> Vec<&dyn Widget<Aux = Aux>> {
         Vec::new()
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
+    fn children_mut(&mut self) -> Vec<&mut dyn Widget<Aux = Aux>> {
         Vec::new()
     }
 }
 
 /// Simple widget trait with a render boundary and event updating, with a generic auxiliary type.
-pub trait Widget<Aux = ()>: WidgetChildren {
+pub trait Widget {
+    type Aux;
+
     fn bounds(&self) -> Rect;
 
-    fn update(&mut self, _aux: &mut Aux) {}
+    fn update(&mut self, _aux: &mut Self::Aux) {}
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay);
 }
@@ -57,6 +59,8 @@ mod tests {
         struct ExampleChild(i8);
 
         impl Widget for ExampleChild {
+            type Aux = ();
+
             fn bounds(&self) -> Rect {
                 Rect::new(Point::new(self.0 as _, 0.0), Default::default())
             }

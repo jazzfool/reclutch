@@ -58,7 +58,7 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     if children.is_empty() {
         quote! {
-            impl #impl_generics reclutch::WidgetChildren for #name #ty_generics #where_clause {}
+            impl #impl_generics reclutch::WidgetChildren<<Self as reclutch::Widget>::Aux> for #name #ty_generics #where_clause {}
         }
     } else {
         let (children, mut_children): (Vec<_>, Vec<_>) = children
@@ -76,11 +76,11 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
             .unzip();
 
         quote! {
-            impl #impl_generics reclutch::WidgetChildren for #name #ty_generics #where_clause {
-                fn children(&self) -> Vec<&dyn Widget> {
+            impl #impl_generics reclutch::WidgetChildren<<Self as reclutch::Widget>::Aux> for #name #ty_generics #where_clause {
+                fn children(&self) -> Vec<&dyn Widget<Aux=Self::Aux>> {
                     vec![ #(#children),* ]
                 }
-                fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
+                fn children_mut(&mut self) -> Vec<&mut dyn Widget<Aux=Self::Aux>> {
                     vec![ #(#mut_children),* ]
                 }
             }

@@ -75,6 +75,8 @@ impl Counter {
 }
 
 impl Widget for Counter {
+    type Aux = ();
+
     fn bounds(&self) -> Rect {
         Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0))
     }
@@ -146,6 +148,8 @@ impl Button {
 }
 
 impl Widget for Button {
+    type Aux = ();
+
     fn bounds(&self) -> Rect {
         Rect::new(self.position, Size::new(150.0, 50.0))
     }
