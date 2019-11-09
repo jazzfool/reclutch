@@ -39,11 +39,11 @@ pub trait WidgetChildren<Aux>: Widget<Aux = Aux> {
 pub trait Widget {
     type Aux;
 
-    fn bounds(&self) -> Rect;
+    fn bounds(&self) -> Rect { Rect::default() }
 
     fn update(&mut self, _aux: &mut Self::Aux) {}
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay);
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {}
 }
 
 #[cfg(test)]
@@ -64,7 +64,6 @@ mod tests {
             fn bounds(&self) -> Rect {
                 Rect::new(Point::new(self.0 as _, 0.0), Default::default())
             }
-            fn draw(&mut self, _: &mut dyn GraphicsDisplay) {}
         }
 
         #[derive(WidgetChildren)]
