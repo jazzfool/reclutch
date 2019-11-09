@@ -39,11 +39,13 @@ pub trait WidgetChildren<Aux>: Widget<Aux = Aux> {
 pub trait Widget {
     type Aux;
 
-    fn bounds(&self) -> Rect { Rect::default() }
+    fn bounds(&self) -> Rect {
+        Rect::default()
+    }
 
     fn update(&mut self, _aux: &mut Self::Aux) {}
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {}
+    fn draw(&mut self, _display: &mut dyn GraphicsDisplay) {}
 }
 
 #[cfg(test)]
@@ -68,7 +70,7 @@ mod tests {
 
         #[derive(WidgetChildren)]
         struct Unnamed(#[widget_child] ExampleChild, #[widget_child] ExampleChild);
-        
+
         impl Widget for Unnamed {
             type Aux = ();
         }
@@ -80,7 +82,7 @@ mod tests {
             #[widget_child]
             b: ExampleChild,
         };
-        
+
         impl Widget for Named {
             type Aux = ();
         }

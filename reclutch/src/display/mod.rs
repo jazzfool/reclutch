@@ -39,7 +39,7 @@ pub trait GraphicsDisplay {
         commands: &[DisplayCommand],
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
     /// Returns an existing command group by the handle returned from `push_command_group`.
-    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
+    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]>;
     /// Overwrites an existing command group by the handle returned from `push_command_group`.
     fn modify_command_group(&mut self, handle: CommandGroupHandle, commands: &[DisplayCommand]);
     /// Removes a command group by the handle returned from `push_command_group`.

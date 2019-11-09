@@ -93,7 +93,8 @@ impl Widget for Titlebar {
                     glutin::event::ElementState::Pressed => {
                         if self.bounds().contains(aux.cursor.clone()) {
                             self.cursor_anchor = Some(aux.cursor.clone());
-                            self.move_event.push(TitlebarEvent::BeginClick(aux.cursor.clone()));
+                            self.move_event
+                                .push(TitlebarEvent::BeginClick(aux.cursor.clone()));
                         }
                     }
                     glutin::event::ElementState::Released => {
@@ -153,7 +154,12 @@ struct Panel {
 
 impl Panel {
     fn new(position: Point, size: Size, global: &mut RcEventQueue<WindowEvent>) -> Self {
-        let titlebar = Titlebar::new(position.clone(), size.width - 1.0, "Reclutch Logo".into(), global);
+        let titlebar = Titlebar::new(
+            position.clone(),
+            size.width - 1.0,
+            "Reclutch Logo".into(),
+            global,
+        );
         let titlebar_move_listener = titlebar.move_event.listen();
 
         Panel {
