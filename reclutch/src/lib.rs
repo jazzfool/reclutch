@@ -26,11 +26,11 @@ use crate::display::{GraphicsDisplay, Rect};
 ///
 /// Ideally, this wouldn't be implemented directly, but rather with `derive(WidgetChildren)`.
 pub trait WidgetChildren<Aux>: Widget<Aux = Aux> {
-    fn children(&self) -> Vec<&dyn Widget<Aux = Aux>> {
+    fn children(&self) -> Vec<&dyn WidgetChildren<Aux>> {
         Vec::new()
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget<Aux = Aux>> {
+    fn children_mut(&mut self) -> Vec<&mut dyn WidgetChildren<Aux>> {
         Vec::new()
     }
 }

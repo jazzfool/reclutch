@@ -37,6 +37,8 @@ impl Button {
 }
 
 impl Widget for Button {
+    type Aux = ();
+
     pub fn bounds(&self) -> Rect { /* --snip-- */ }
 
     pub fn update(&mut self, _aux: &mut ()) {
@@ -70,15 +72,15 @@ struct ExampleWidget {
 }
 ```
 
-Which expands to...
+Which expands to exactly...
 
 ```rust
-impl reclutch::WidgetChildren for ExampleWidget {
-    fn children(&self) -> Vec<&dyn Widget> {
+impl reclutch::WidgetChildren<<Self as reclutch::Widget>::Aux> for ExampleWidget {
+    fn children(&self) -> Vec<&dyn reclutch::WidgetChildren<Self::Aux>> {
         vec![&self.child]
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn Widget> {
+    fn children_mut(&mut self) -> Vec<&mut dyn reclutch::WidgetChildren<Self::Aux>> {
         vec![&mut self.child]
     }
 }
@@ -134,11 +136,13 @@ impl Widget for VisualWidget {
 
 The `update` method on widgets is an opportunity for widgets to update layout, animations, etc. and more importantly handle events that have been emitted since the last `update`.
 
-Widgets have a generic type; `Aux`, which is by default simply `()` which allows for a global object to be passed around during updating. This is useful for things like updating a layout.
+Widgets have an associated type; `Aux` which allows for a global object to be passed around during updating. This is useful for things like updating a layout.
 
 Here's a simple example;
 
 ```rust
+type Aux = Globals;
+
 fn update(&mut self, aux: &mut Globals) {
     if aux.layout.node_is_dirty(self.layout_node) {
         self.bounds = aux.layout.get_node(self.layout_node);
