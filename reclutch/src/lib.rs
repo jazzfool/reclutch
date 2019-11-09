@@ -68,6 +68,10 @@ mod tests {
 
         #[derive(WidgetChildren)]
         struct Unnamed(#[widget_child] ExampleChild, #[widget_child] ExampleChild);
+        
+        impl Widget for Unnamed {
+            type Aux = ();
+        }
 
         #[derive(WidgetChildren)]
         struct Named {
@@ -76,6 +80,10 @@ mod tests {
             #[widget_child]
             b: ExampleChild,
         };
+        
+        impl Widget for Named {
+            type Aux = ();
+        }
 
         let mut unnamed = Unnamed(ExampleChild(0), ExampleChild(1));
         let mut named = Named {
