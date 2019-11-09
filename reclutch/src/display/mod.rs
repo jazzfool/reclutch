@@ -153,6 +153,12 @@ pub enum LineCap {
     Round,
 }
 
+impl Default for LineCap {
+    fn default() -> Self {
+        LineCap::Flat
+    }
+}
+
 /// Path corner appearance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineJoin {
@@ -162,6 +168,12 @@ pub enum LineJoin {
     Round,
     /// The corner will be cut off with a line normal to the mid-value of the tangents of the adjacent lines.
     Bevel,
+}
+
+impl Default for LineJoin {
+    fn default() -> Self {
+        LineJoin::Miter
+    }
 }
 
 /// Stroke/outline appearance.
@@ -179,6 +191,22 @@ pub struct GraphicsDisplayStroke {
     pub join: LineJoin,
     /// With regards to [`miter`](LineJoin::Miter), describes the maximum value of the miter length (the distance between the outer-most and inner-most part of the corner).
     pub miter_limit: f32,
+    /// Whether this stroke should be antialiased or not. This can be used to achieve sharp, thin outlines.
+    pub antialias: bool,
+}
+
+impl Default for GraphicsDisplayStroke {
+    fn default() -> Self {
+        GraphicsDisplayStroke {
+            color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
+            thickness: 1.0,
+            begin_cap: LineCap::default(),
+            end_cap: LineCap::default(),
+            join: LineJoin::default(),
+            miter_limit: 4.0,
+            antialias: true,
+        }
+    }
 }
 
 /// Appearance of a display item.
