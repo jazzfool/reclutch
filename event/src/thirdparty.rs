@@ -2,7 +2,7 @@
 //! of `std::sync::mpsc`, because it's faster.
 //! (enable the support for `crossbeam-channel` via the feature flag)
 
-use crate::traits::GenericQueueInterface;
+use crate::{channels_api, traits::GenericQueueInterface};
 
 impl<T> GenericQueueInterface<T> for crate::BlackHole<T> {
     #[inline]
@@ -25,16 +25,17 @@ impl<T> GenericQueueInterface<T> for std::sync::mpsc::SyncSender<T> {
     }
 }
 
-#[cfg(feature = "crossbeam-channel")]
-impl<T> GenericQueueInterface<T> for crossbeam_channel::Sender<T> {
-    #[inline]
-    fn push(&self, event: T) -> bool {
-        self.send(event).is_ok()
-    }
+channels_api! {
+    impl<T> GenericQueueInterface<T> for crossbeam_channel::Sender<T> {
+        #[inline]
+        fn push(&self, event: T) -> bool {
+            self.send(event).is_ok()
+        }
 
-    #[inline]
-    fn is_empty(&self) -> bool {
-        crossbeam_channel::Sender::is_empty(self)
+        #[inline]
+        fn is_empty(&self) -> bool {
+            crossbeam_channel::Sender::is_empty(self)
+        }
     }
 }
 
