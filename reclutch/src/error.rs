@@ -13,6 +13,7 @@ pub enum FontError {
 
 /// An error within Skia and its interactions with OpenGL.
 #[derive(Error, Debug)]
+#[cfg(feature = "skia")]
 pub enum SkiaError {
     #[error("the OpenGL target {0} is invalid")]
     InvalidTarget(String),
