@@ -16,6 +16,8 @@
 
 There is an (optional) OpenGL Skia implementation for the renderer.
 
+<img src=".media/screen.png" height="250px"/> <img src=".media/image_viewer.png" width="300px"/>
+
 ## Example
 
 All rendering details have been excluded for simplicity.
@@ -57,8 +59,6 @@ impl Widget for Button {
 The classic counter example can be found in examples/overview.
 
 ---
-
-<img align="right" src=".media/screen.png" width="300px"/>
 
 ## Children
 
