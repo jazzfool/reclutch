@@ -2,9 +2,6 @@
 //
 // Be warned: this runs quite slow due to Raqote's current text rendering.
 
-#[cfg(not(feature = "skia"))]
-#[path = "../cpu.rs"]
-mod cpu;
 
 #[macro_use]
 extern crate reclutch_derive;
