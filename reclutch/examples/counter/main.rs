@@ -2,14 +2,14 @@
 //
 // Be warned: this runs quite slow due to Raqote's current text rendering.
 
-
 #[macro_use]
 extern crate reclutch_derive;
 
 use reclutch::{
     display::{
         Color, CommandGroup, DisplayCommand, DisplayItem, FontInfo, GraphicsDisplay,
-        GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size, StyleColor, TextDisplayItem,
+        GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, ResourceData, ResourceDescriptor,
+        ResourceReference, Size, StyleColor, TextDisplayItem,
     },
     event::{RcEventListener, RcEventQueue},
     prelude::*,
@@ -23,12 +23,6 @@ use {
         event_loop::{ControlFlow, EventLoop},
     },
     reclutch::display,
-};
-
-#[cfg(not(feature = "skia"))]
-use winit::{
-    event::{Event as WinitEvent, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -48,7 +42,8 @@ struct Counter {
     button_increase_press_listener: RcEventListener<Point>,
     button_decrease_press_listener: RcEventListener<Point>,
     command_group: CommandGroup,
-    font: FontInfo,
+    font_info: FontInfo,
+    font: Option<ResourceReference>,
 }
 
 impl Counter {
@@ -66,7 +61,9 @@ impl Counter {
             button_increase_press_listener,
             button_decrease_press_listener,
             command_group: CommandGroup::new(),
-            font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
+            font_info: FontInfo::from_name("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"])
+                .unwrap(),
+            font: None,
         }
     }
 }
@@ -95,6 +92,14 @@ impl Widget for Counter {
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+        if self.font.is_none() {
+            self.font = display
+                .new_resource(ResourceDescriptor::Font(ResourceData::Data(
+                    self.font_info.data().unwrap(),
+                )))
+                .ok();
+        }
+
         let bounds = self.bounds();
 
         self.command_group.push(
@@ -103,7 +108,8 @@ impl Widget for Counter {
                 DisplayCommand::Clear(Color::new(1.0, 1.0, 1.0, 1.0)),
                 DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
                     text: format!("Count: {}", self.count),
-                    font: self.font.clone(),
+                    font: self.font.as_ref().unwrap().clone(),
+                    font_info: self.font_info.clone(),
                     size: 23.0,
                     bottom_left: bounds.origin.add_size(&Size::new(10.0, 22.0)),
                     color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
@@ -127,7 +133,8 @@ struct Button {
     hover: bool,
     global_listener: RcEventListener<GlobalEvent>,
     command_group: CommandGroup,
-    font: FontInfo,
+    font_info: FontInfo,
+    font: Option<ResourceReference>,
 }
 
 impl Button {
@@ -139,7 +146,9 @@ impl Button {
             hover: false,
             global_listener: global.listen(),
             command_group: CommandGroup::new(),
-            font: FontInfo::new("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"]).unwrap(),
+            font_info: FontInfo::from_name("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"])
+                .unwrap(),
+            font: None,
         }
     }
 }
@@ -172,6 +181,14 @@ impl Widget for Button {
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+        if self.font.is_none() {
+            self.font = display
+                .new_resource(ResourceDescriptor::Font(ResourceData::Data(
+                    self.font_info.data().unwrap(),
+                )))
+                .ok();
+        }
+
         let bounds = self.bounds();
         let color = if self.hover {
             Color::new(0.25, 0.60, 0.70, 1.0)
@@ -189,7 +206,8 @@ impl Widget for Button {
                 })),
                 DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
                     text: self.text.clone(),
-                    font: self.font.clone(),
+                    font: self.font.as_ref().unwrap().clone(),
+                    font_info: self.font_info.clone(),
                     size: 22.0,
                     bottom_left: bounds
                         .origin
@@ -255,7 +273,7 @@ fn main() {
                 }
 
                 counter.draw(&mut display);
-                display.present(None);
+                display.present(None).unwrap();
                 context.swap_buffers().unwrap();
             }
             WinitEvent::WindowEvent {
@@ -301,58 +319,5 @@ fn main() {
 
 #[cfg(not(feature = "skia"))]
 fn main() {
-    let window_size = (500u32, 500u32);
-
-    let event_loop = EventLoop::new();
-
-    let mut display = cpu::CpuGraphicsDisplay::new(window_size, &event_loop).unwrap();
-
-    // set up the UI
-    let mut window_q = RcEventQueue::new();
-    let mut counter = Counter::new(&mut window_q);
-    let mut cursor = Point::default();
-
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
-
-        match event {
-            WinitEvent::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
-                counter.draw(&mut display);
-                display.present(None);
-            }
-            WinitEvent::WindowEvent {
-                event: WindowEvent::CursorMoved { position, .. },
-                ..
-            } => {
-                let position = position.to_physical(display.window.hidpi_factor());
-                cursor = Point::new(position.x as _, position.y as _);
-
-                window_q.push(GlobalEvent::MouseMove(cursor));
-            }
-            WinitEvent::WindowEvent {
-                event:
-                    WindowEvent::MouseInput {
-                        state: winit::event::ElementState::Pressed,
-                        button: winit::event::MouseButton::Left,
-                        ..
-                    },
-                ..
-            } => {
-                window_q.push(GlobalEvent::Click(cursor));
-            }
-            WinitEvent::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
-                *control_flow = ControlFlow::Exit;
-            }
-            _ => return,
-        }
-
-        counter.update();
-        display.window.request_redraw();
-    });
+    compile_error!("this example requires the Skia backend")
 }

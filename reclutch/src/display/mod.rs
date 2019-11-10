@@ -3,8 +3,7 @@
 #[cfg(feature = "skia")]
 pub mod skia;
 
-use crate::error;
-use palette::Srgba;
+use {crate::error, palette::Srgba};
 
 /// Two-dimensional floating-point absolute point.
 pub type Point = euclid::Point2D<f32, euclid::UnknownUnit>;
@@ -51,14 +50,21 @@ pub trait GraphicsDisplay {
     fn before_exit(&mut self);
 
     /// Displays the entire scene, optionally with a cull.
-    fn present(&mut self, cull: Option<Rect>);
+    fn present(&mut self, cull: Option<Rect>) -> Result<(), error::DisplayError>;
+}
+
+/// Resource data, either as a file or an in-memory buffer.
+#[derive(Debug, Clone)]
+pub enum ResourceData {
+    File(std::path::PathBuf),
+    Data(Vec<u8>),
 }
 
 /// Contains information required to load a resource through [`new_resource`](GraphicsDisplay::new_resource).
 #[derive(Debug, Clone)]
 pub enum ResourceDescriptor {
-    ImageFile(std::path::PathBuf),
-    ImageData(Vec<u8>),
+    Image(ResourceData),
+    Font(ResourceData),
 }
 
 /// Contains a tagged ID to an existing resource, created through [`new_resource`](GraphicsDisplay::new_resource).
@@ -67,13 +73,14 @@ pub enum ResourceDescriptor {
 #[derive(Debug, Clone)]
 pub enum ResourceReference {
     Image(u64),
+    Font(u64),
 }
 
 impl ResourceReference {
     /// Returns the inner ID of the resource reference.
     pub fn id(&self) -> u64 {
         match self {
-            ResourceReference::Image(id) => *id,
+            ResourceReference::Image(id) | ResourceReference::Font(id) => *id,
         }
     }
 }
@@ -310,7 +317,8 @@ impl GraphicsDisplayItem {
 #[derive(Debug, Clone)]
 pub struct TextDisplayItem {
     pub text: String,
-    pub font: FontInfo,
+    pub font: ResourceReference,
+    pub font_info: FontInfo,
     pub size: f32,
     pub bottom_left: Point,
     pub color: StyleColor,
@@ -324,10 +332,10 @@ impl TextDisplayItem {
         for c in self.text.chars() {
             rect = rect.union(
                 &self
-                    .font
+                    .font_info
                     .font
                     .raster_bounds(
-                        self.font.font.glyph_for_char(c).unwrap_or_default(),
+                        self.font_info.font.glyph_for_char(c).unwrap_or_default(),
                         self.size,
                         &font_kit::loader::FontTransform::identity(),
                         &self.bottom_left,
@@ -352,7 +360,7 @@ pub struct FontInfo {
 
 impl FontInfo {
     /// Creates a new font reference, matched to the font `name`, with optional `fallbacks`.
-    pub fn new(name: &str, fallbacks: &[&str]) -> Result<Self, error::FontError> {
+    pub fn from_name(name: &str, fallbacks: &[&str]) -> Result<Self, error::FontError> {
         let mut names = vec![font_kit::family_name::FamilyName::Title(name.to_string())];
         names.append(
             &mut fallbacks
@@ -364,6 +372,33 @@ impl FontInfo {
         let font = font_kit::source::SystemSource::new()
             .select_best_match(&names, &font_kit::properties::Properties::default())?
             .load()?;
+
+        Ok(Self {
+            name: font.full_name(),
+            font,
+        })
+    }
+
+    /// Creates a new font reference from a font file located at `path`.
+    /// If the font file contains more than one font, use `font_index` to select the font to load.
+    pub fn from_path<P: AsRef<std::path::Path>>(
+        path: P,
+        font_index: u32,
+    ) -> Result<Self, error::FontError> {
+        let font = font_kit::font::Font::from_path(path, font_index)?;
+
+        Ok(Self {
+            name: font.full_name(),
+            font,
+        })
+    }
+
+    /// Creates a new font reference from font data.
+    /// Similar to [`from_path`](FontInfo::from_path), however as bytes rather than a path to a file.
+    pub fn from_data(data: &[u8], font_index: u32) -> Result<Self, error::FontError> {
+        let font =
+            font_kit::font::Font::from_bytes(std::sync::Arc::new(data.to_vec()), font_index)?;
+
         Ok(Self {
             name: font.full_name(),
             font,
@@ -373,6 +408,11 @@ impl FontInfo {
     /// Returns the final unique name of the loaded font.
     pub fn name(&self) -> String {
         self.name.clone()
+    }
+
+    /// Returns the font data as bytes.
+    pub fn data(&self) -> Option<Vec<u8>> {
+        Some((*self.font.copy_font_data()?).clone())
     }
 }
 

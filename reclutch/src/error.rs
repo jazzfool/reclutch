@@ -19,6 +19,8 @@ pub enum SkiaError {
     InvalidTarget(String),
     #[error("invalid OpenGL context")]
     InvalidContext,
+    #[error("unknown skia error")]
+    UnknownError,
 }
 
 /// An error associated with loading graphical resources.
@@ -30,6 +32,19 @@ pub enum ResourceError {
     IoError(#[from] std::io::Error),
     #[error("given resource data is invalid and cannot be read/decoded")]
     InvalidData,
+    #[error("{0}")]
+    InternalError(#[from] Box<dyn std::error::Error>),
+}
+
+/// An error related to [`GraphicsDisplay`](crate::display::GraphicsDisplay).
+#[derive(Error, Debug)]
+pub enum DisplayError {
+    #[error("{0}")]
+    ResourceError(#[from] ResourceError),
+    #[error("non-existent resource reference (id: {0})")]
+    InvalidResource(u64),
+    #[error("mismatched resource reference type (id: {0})")]
+    MismatchedResource(u64),
     #[error("{0}")]
     InternalError(#[from] Box<dyn std::error::Error>),
 }
