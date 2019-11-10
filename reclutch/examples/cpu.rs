@@ -81,10 +81,20 @@ impl GraphicsDisplay for CpuGraphicsDisplay {
         Ok(CommandGroupHandle::new(id))
     }
 
-    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>> {
-        self.cmds
-            .get(&handle.id())
-            .map(|cmds| cmds.iter().cloned().collect::<Vec<_>>())
+    fn new_resource(
+        &mut self,
+        _descriptor: reclutch::display::ResourceDescriptor,
+    ) -> Result<reclutch::display::ResourceReference, reclutch::error::ResourceError> {
+        // FIXME: implement
+        return Err(reclutch::error::ResourceError::InvalidData);
+    }
+
+    fn remove_resource(&mut self, _rid: reclutch::display::ResourceReference) {
+        // FIXME: implement
+    }
+
+    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]> {
+        self.cmds.get(&handle.id()).map(|cmds| &cmds[..])
     }
 
     fn modify_command_group(&mut self, handle: CommandGroupHandle, commands: &[DisplayCommand]) {
@@ -124,6 +134,7 @@ impl GraphicsDisplay for CpuGraphicsDisplay {
                                 GraphicsDisplayItem::Rectangle { paint, .. }
                                 | GraphicsDisplayItem::RoundRectangle { paint, .. }
                                 | GraphicsDisplayItem::Ellipse { paint, .. } => paint.clone(),
+                                _ => unimplemented!(),
                             };
 
                             match paint {
@@ -329,6 +340,7 @@ fn convert_item(item: &GraphicsDisplayItem) -> raqote::Path {
             pb.close();
             pb.finish()
         }
+        _ => unimplemented!(),
     }
 }
 

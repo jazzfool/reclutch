@@ -4,7 +4,6 @@ use super::*;
 use crate::error;
 use skia_safe as sk;
 use std::collections::HashMap;
-use std::io::Read;
 
 /// Contains information about an existing OpenGL framebuffer.
 #[derive(Debug, Clone, Copy)]
@@ -82,79 +81,71 @@ impl SkiaGraphicsDisplay {
         target: &SkiaOpenGlFramebuffer,
     ) -> Result<sk::Surface, error::SkiaError> {
         let mut context = Self::new_gl_context()?;
-        let surface = {
-            let info = sk::gpu::BackendRenderTarget::new_gl(
-                target.size,
-                None,
-                8,
-                sk::gpu::gl::FramebufferInfo {
-                    fboid: target.framebuffer_id,
-                    format: gl::RGBA8,
-                },
-            );
+        let info = sk::gpu::BackendRenderTarget::new_gl(
+            target.size,
+            None,
+            8,
+            sk::gpu::gl::FramebufferInfo {
+                fboid: target.framebuffer_id,
+                format: gl::RGBA8,
+            },
+        );
 
-            sk::Surface::from_backend_render_target(
-                &mut context,
-                &info,
-                sk::gpu::SurfaceOrigin::BottomLeft,
-                sk::ColorType::RGBA8888,
-                sk::ColorSpace::new_srgb(),
-                None,
-            )
-            .ok_or(error::SkiaError::InvalidTarget(String::from("framebuffer")))?
-        };
-
-        Ok(surface)
+        Ok(sk::Surface::from_backend_render_target(
+            &mut context,
+            &info,
+            sk::gpu::SurfaceOrigin::BottomLeft,
+            sk::ColorType::RGBA8888,
+            sk::ColorSpace::new_srgb(),
+            None,
+        )
+        .ok_or(error::SkiaError::InvalidTarget(String::from("framebuffer")))?)
     }
 
     fn new_gl_texture_surface(target: &SkiaOpenGlTexture) -> Result<sk::Surface, error::SkiaError> {
         let mut context = Self::new_gl_context()?;
-        let surface = {
-            let info = unsafe {
-                sk::gpu::BackendTexture::new_gl(
-                    target.size,
-                    if target.mip_mapped {
-                        sk::gpu::MipMapped::Yes
-                    } else {
-                        sk::gpu::MipMapped::No
-                    },
-                    sk::gpu::gl::TextureInfo::from_target_and_id(target.target, target.texture_id),
-                )
-            };
-
-            sk::Surface::from_backend_texture(
-                &mut context,
-                &info,
-                sk::gpu::SurfaceOrigin::BottomLeft,
-                None,
-                sk::ColorType::RGBA8888,
-                sk::ColorSpace::new_srgb(),
-                None,
+        let info = unsafe {
+            sk::gpu::BackendTexture::new_gl(
+                target.size,
+                if target.mip_mapped {
+                    sk::gpu::MipMapped::Yes
+                } else {
+                    sk::gpu::MipMapped::No
+                },
+                sk::gpu::gl::TextureInfo::from_target_and_id(target.target, target.texture_id),
             )
-            .ok_or(error::SkiaError::InvalidTarget(String::from("texture")))?
         };
 
-        Ok(surface)
+        Ok(sk::Surface::from_backend_texture(
+            &mut context,
+            &info,
+            sk::gpu::SurfaceOrigin::BottomLeft,
+            None,
+            sk::ColorType::RGBA8888,
+            sk::ColorSpace::new_srgb(),
+            None,
+        )
+        .ok_or(error::SkiaError::InvalidTarget(String::from("texture")))?)
     }
 
     fn new_gl_context() -> Result<sk::gpu::Context, error::SkiaError> {
-        let interface = sk::gpu::gl::Interface::new_native();
-        sk::gpu::Context::new_gl(interface).ok_or(error::SkiaError::InvalidContext)
+        sk::gpu::Context::new_gl(sk::gpu::gl::Interface::new_native())
+            .ok_or(error::SkiaError::InvalidContext)
     }
 }
 
 impl GraphicsDisplay for SkiaGraphicsDisplay {
     fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>> {
-        match self.surface_type {
+        self.surface = match self.surface_type {
             SurfaceType::OpenGlFramebuffer(ref mut target) => {
                 target.size = (size.0 as i32, size.1 as i32);
-                self.surface = Self::new_gl_framebuffer_surface(target)?;
+                Self::new_gl_framebuffer_surface(target)
             }
             SurfaceType::OpenGlTexture(ref mut target) => {
                 target.size = (size.0 as i32, size.1 as i32);
-                self.surface = Self::new_gl_texture_surface(target)?;
+                Self::new_gl_texture_surface(target)
             }
-        };
+        }?;
 
         Ok(())
     }
@@ -163,26 +154,23 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         &mut self,
         descriptor: ResourceDescriptor,
     ) -> Result<ResourceReference, error::ResourceError> {
-        let res = match descriptor {
-            ResourceDescriptor::ImageFile(path) => {
-                if path.is_file() {
-                    let mut data = Vec::new();
-                    std::fs::File::open(path)?.read_to_end(&mut data)?;
-                    Resource::Image(
-                        sk::Image::from_encoded(sk::Data::new_copy(&data), None)
-                            .ok_or(error::ResourceError::InvalidData)?,
-                    )
-                } else {
-                    return Err(error::ResourceError::InvalidPath(
-                        path.to_string_lossy().to_string(),
-                    ));
-                }
-            }
-            ResourceDescriptor::ImageData(data) => Resource::Image(
-                sk::Image::from_encoded(sk::Data::new_copy(&data), None)
-                    .ok_or(error::ResourceError::InvalidData)?,
-            ),
-        };
+        let res = Resource::Image(
+            sk::Image::from_encoded(
+                match descriptor {
+                    ResourceDescriptor::ImageFile(path) => {
+                        if !path.is_file() {
+                            return Err(error::ResourceError::InvalidPath(
+                                path.to_string_lossy().to_string(),
+                            ));
+                        }
+                        sk::Data::new_copy(&std::fs::read(path)?)
+                    }
+                    ResourceDescriptor::ImageData(data) => sk::Data::new_copy(&data),
+                },
+                None,
+            )
+            .ok_or(error::ResourceError::InvalidData)?,
+        );
 
         let id = self.next_resource_id;
         self.next_resource_id += 1;
@@ -193,9 +181,7 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
     }
 
     fn remove_resource(&mut self, reference: ResourceReference) {
-        if self.resources.contains_key(&reference.id()) {
-            self.resources.remove(&reference.id());
-        }
+        self.resources.remove(&reference.id());
     }
 
     fn push_command_group(
@@ -213,8 +199,10 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
     }
 
     #[inline]
-    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>> {
-        Some(self.command_groups.get(&handle.id())?.0.clone())
+    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]> {
+        self.command_groups
+            .get(&handle.id())
+            .map(|cmdgroup| &cmdgroup.0[..])
     }
 
     fn modify_command_group(&mut self, handle: CommandGroupHandle, commands: &[DisplayCommand]) {
@@ -237,27 +225,28 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
     }
 
     fn present(&mut self, cull: Option<Rect>) {
-        // for loop written twice so that we only have to see if cull exists once
-        if let Some(cull) = cull {
-            let cmds = self.command_groups.values().cloned().collect::<Vec<_>>();
-            for (ref cmd_group, ref bounds) in cmds {
-                if cull.intersects(bounds) {
-                    let count = self.surface.canvas().save();
-                    draw_command_group(cmd_group, self);
-                    // to ensure that no clips, transformations, layers, etc, "leak" from the command group.
-                    self.surface.canvas().restore_to_count(count);
+        let cmds = self
+            .command_groups
+            .values()
+            .map(|cmds| (&cmds.0, &cmds.1))
+            .filter_map(|(cmd_group, bounds)| {
+                if cull.map(|cull| cull.intersects(bounds)).unwrap_or(true) {
+                    Some(cmd_group)
+                } else {
+                    None
                 }
-            }
-        } else {
-            let cmds = self.command_groups.values().cloned().collect::<Vec<_>>();
-            for (ref cmd_group, _) in cmds {
-                let count = self.surface.canvas().save();
-                draw_command_group(cmd_group, self);
-                self.surface.canvas().restore_to_count(count);
-            }
+            });
+        let resources = &self.resources;
+        let size = self.size();
+        let surface = &mut self.surface;
+        for cmd_group in cmds {
+            let count = surface.canvas().save();
+            draw_command_group(cmd_group, surface, resources, size);
+            // to ensure that no clips, transformations, layers, etc, "leak" from the command group.
+            surface.canvas().restore_to_count(count);
         }
 
-        self.surface.flush();
+        surface.flush();
     }
 }
 
@@ -331,18 +320,15 @@ fn convert_line_join(join: &LineJoin) -> sk::PaintJoin {
     }
 }
 
-fn convert_paint(paint: &GraphicsDisplayPaint) -> sk::Paint {
-    match paint {
+fn convert_paint(gdpaint: &GraphicsDisplayPaint) -> sk::Paint {
+    let mut paint = sk::Paint::default();
+    match gdpaint {
         GraphicsDisplayPaint::Fill(ref color) => {
-            let mut paint = sk::Paint::default();
             paint.set_anti_alias(true);
 
             apply_color(color, &mut paint);
-
-            paint
         }
         GraphicsDisplayPaint::Stroke(ref stroke) => {
-            let mut paint = sk::Paint::default();
             paint.set_anti_alias(stroke.antialias);
             paint.set_style(sk::PaintStyle::Stroke);
 
@@ -352,10 +338,9 @@ fn convert_paint(paint: &GraphicsDisplayPaint) -> sk::Paint {
             paint.set_stroke_cap(convert_line_cap(&stroke.begin_cap));
             paint.set_stroke_join(convert_line_join(&stroke.join));
             paint.set_stroke_miter(stroke.miter_limit);
-
-            paint
         }
     }
+    paint
 }
 
 fn convert_rect(rect: &Rect) -> sk::Rect {
@@ -405,7 +390,12 @@ fn apply_clip(canvas: &mut sk::Canvas, clip: &DisplayClip) {
     };
 }
 
-fn draw_command_group(cmds: &[DisplayCommand], display: &mut SkiaGraphicsDisplay) {
+fn draw_command_group(
+    cmds: &[DisplayCommand],
+    surface: &mut sk::Surface,
+    resources: &HashMap<u64, Resource>,
+    size: (i32, i32),
+) {
     for cmd in cmds {
         match cmd {
             DisplayCommand::Item(item) => {
@@ -414,22 +404,17 @@ fn draw_command_group(cmds: &[DisplayCommand], display: &mut SkiaGraphicsDisplay
                         GraphicsDisplayItem::Line { a, b, stroke } => {
                             let paint =
                                 convert_paint(&GraphicsDisplayPaint::Stroke((*stroke).clone()));
-                            display.surface.canvas().draw_line(
-                                convert_point(a),
-                                convert_point(b),
-                                &paint,
-                            );
+                            surface
+                                .canvas()
+                                .draw_line(convert_point(a), convert_point(b), &paint);
                         }
                         GraphicsDisplayItem::Rectangle { rect, paint } => {
                             let paint = convert_paint(paint);
-                            display
-                                .surface
-                                .canvas()
-                                .draw_rect(&convert_rect(rect), &paint);
+                            surface.canvas().draw_rect(&convert_rect(rect), &paint);
                         }
                         GraphicsDisplayItem::RoundRectangle { rect, radii, paint } => {
                             let paint = convert_paint(paint);
-                            display.surface.canvas().draw_rrect(
+                            surface.canvas().draw_rrect(
                                 sk::RRect::new_rect_radii(
                                     convert_rect(rect),
                                     &[
@@ -443,48 +428,33 @@ fn draw_command_group(cmds: &[DisplayCommand], display: &mut SkiaGraphicsDisplay
                             );
                         }
                         GraphicsDisplayItem::Ellipse { paint, .. } => {
-                            let paint = convert_paint(paint);
-                            display
-                                .surface
+                            surface
                                 .canvas()
-                                .draw_oval(convert_rect(&item.bounds()), &paint);
+                                .draw_oval(convert_rect(&item.bounds()), &convert_paint(paint));
                         }
                         #[allow(irrefutable_let_patterns)]
                         GraphicsDisplayItem::Image { src, dst, resource } => {
+                            let mut successful = false;
                             if let ResourceReference::Image(ref id) = resource {
                                 if let Resource::Image(ref img) =
-                                    display.resources.get(id).expect("invalid resource ID")
+                                    resources.get(id).expect("invalid resource ID")
                                 {
-                                    // TODO(jazzfool): this is really ugly, but I couldn't find a way to `src.map` since `draw_image_rect` expects a Option<(&Rect, ...)>
-                                    if let Some(src_rect) = src {
-                                        display.surface.canvas().draw_image_rect(
-                                            (*img).clone(),
-                                            Some((
-                                                &convert_rect(src_rect),
-                                                sk::SrcRectConstraint::Fast,
-                                            )),
-                                            &convert_rect(dst),
-                                            &sk::Paint::default(),
-                                        );
-                                    } else {
-                                        display.surface.canvas().draw_image_rect(
-                                            (*img).clone(),
-                                            None,
-                                            &convert_rect(dst),
-                                            &sk::Paint::default(),
-                                        );
-                                    }
-                                } else {
-                                    display.surface.canvas().draw_rect(
+                                    successful = true;
+                                    let o_src = src.map(|src_rect| convert_rect(&src_rect));
+                                    surface.canvas().draw_image_rect(
+                                        (*img).clone(),
+                                        o_src.as_ref().map(|src_rect| {
+                                            (src_rect, sk::SrcRectConstraint::Fast)
+                                        }),
                                         &convert_rect(dst),
-                                        &convert_paint(&GraphicsDisplayPaint::Fill(
-                                            StyleColor::Color(Color::new(1.0, 0.0, 1.0, 1.0)),
-                                        )),
+                                        &sk::Paint::default(),
                                     );
                                 }
                             } else {
                                 // TODO(jazzfool): should we panic instead here?
-                                display.surface.canvas().draw_rect(
+                            }
+                            if !successful {
+                                surface.canvas().draw_rect(
                                     &convert_rect(dst),
                                     &convert_paint(&GraphicsDisplayPaint::Fill(StyleColor::Color(
                                         Color::new(1.0, 0.0, 1.0, 1.0),
@@ -496,7 +466,7 @@ fn draw_command_group(cmds: &[DisplayCommand], display: &mut SkiaGraphicsDisplay
                     DisplayItem::Text(ref item) => {
                         let paint = convert_paint(&GraphicsDisplayPaint::Fill(item.color.clone()));
 
-                        display.surface.canvas().draw_text_blob(
+                        surface.canvas().draw_text_blob(
                             &sk::TextBlob::from_text(
                                 item.text.as_bytes(),
                                 sk::TextEncoding::UTF8,
@@ -514,28 +484,21 @@ fn draw_command_group(cmds: &[DisplayCommand], display: &mut SkiaGraphicsDisplay
                 }
             }
             DisplayCommand::BackdropFilter(ref clip, ref filter) => {
-                let count = display.surface.canvas().save();
+                let count = surface.canvas().save();
 
-                {
-                    let canvas = display.surface.canvas();
-                    apply_clip(canvas, clip);
-                }
+                apply_clip(surface.canvas(), clip);
 
                 let bounds = clip.bounds();
 
                 match filter {
                     Filter::Blur(sigma_x, sigma_y) => {
                         // TODO(jazzfool): cache blur filter
-                        let snapshot_bounds = bounds.round_out();
-
-                        if let Some(ref snapshot_rect) = snapshot_bounds.intersection(&Rect::new(
-                            Point::default(),
-                            Size::new(display.size().0 as _, display.size().1 as _),
-                        )) {
+                        if let Some(ref _snapshot_rect) = bounds.round_out().intersection(
+                            &Rect::new(Point::default(), Size::new(size.0 as _, size.1 as _)),
+                        ) {
                             let blur = sk::blur_image_filter::new(
                                 (*sigma_x, *sigma_y),
-                                display
-                                    .surface
+                                surface
                                     .image_snapshot(/*convert_rect(snapshot_rect).round()*/)
                                     //.unwrap()
                                     .as_filter()
@@ -545,12 +508,9 @@ fn draw_command_group(cmds: &[DisplayCommand], display: &mut SkiaGraphicsDisplay
                             )
                             .unwrap();
 
-                            {
-                                display
-                                    .surface
-                                    .canvas()
-                                    .save_layer(&sk::SaveLayerRec::default().backdrop(&blur));
-                            }
+                            surface
+                                .canvas()
+                                .save_layer(&sk::SaveLayerRec::default().backdrop(&blur));
                         }
                     }
                     Filter::Invert => {
@@ -561,54 +521,44 @@ fn draw_command_group(cmds: &[DisplayCommand], display: &mut SkiaGraphicsDisplay
 
                         paint.set_color_filter(sk::ColorFilters::matrix(&color_matrix));
 
-                        {
-                            display
-                                .surface
-                                .canvas()
-                                .save_layer(&sk::SaveLayerRec::default().paint(&paint));
-                        }
+                        surface
+                            .canvas()
+                            .save_layer(&sk::SaveLayerRec::default().paint(&paint));
                     }
                 }
 
-                display.surface.canvas().restore_to_count(count);
+                surface.canvas().restore_to_count(count);
             }
             DisplayCommand::Clip(ref clip) => {
-                apply_clip(display.surface.canvas(), clip);
+                apply_clip(surface.canvas(), clip);
             }
             DisplayCommand::Save => {
-                display.surface.canvas().save();
+                surface.canvas().save();
             }
             DisplayCommand::SaveLayer(opacity) => {
                 let mut paint = sk::Paint::default();
                 paint.set_alpha_f(*opacity);
 
-                {
-                    display
-                        .surface
-                        .canvas()
-                        .save_layer(&sk::SaveLayerRec::default().paint(&paint));
-                }
+                surface
+                    .canvas()
+                    .save_layer(&sk::SaveLayerRec::default().paint(&paint));
             }
             DisplayCommand::Restore => {
-                display.surface.canvas().restore();
+                surface.canvas().restore();
             }
             DisplayCommand::Translate(ref offset) => {
-                display
-                    .surface
+                surface
                     .canvas()
                     .translate(sk::Vector::new(offset.x, offset.y));
             }
             DisplayCommand::Scale(ref scale) => {
-                display.surface.canvas().scale((scale.x, scale.y));
+                surface.canvas().scale((scale.x, scale.y));
             }
             DisplayCommand::Rotate(ref angle) => {
-                display.surface.canvas().rotate(angle.to_degrees(), None);
+                surface.canvas().rotate(angle.to_degrees(), None);
             }
             DisplayCommand::Clear(ref color) => {
-                display
-                    .surface
-                    .canvas()
-                    .clear(convert_color(color).to_color());
+                surface.canvas().clear(convert_color(color).to_color());
             }
         }
     }
