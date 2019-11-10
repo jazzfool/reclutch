@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 use {
     glutin::{
         event::{Event, WindowEvent},
@@ -7,8 +9,8 @@ use {
         display::{
             self, Color, CommandGroup, DisplayClip, DisplayCommand, DisplayItem, Filter, FontInfo,
             GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint, GraphicsDisplayStroke,
-            Point, Rect, ResourceDescriptor, ResourceReference, Size, StyleColor, TextDisplayItem,
-            Vector,
+            Point, Rect, ResourceData, ResourceDescriptor, ResourceReference, Size, StyleColor,
+            TextDisplayItem, Vector,
         },
         event::{RcEventListener, RcEventQueue},
         prelude::*,
@@ -39,6 +41,7 @@ struct Titlebar {
     width: f32,
     text: String,
     font: FontInfo,
+    font_resource: Option<ResourceReference>,
 }
 
 impl Titlebar {
@@ -56,7 +59,8 @@ impl Titlebar {
             command_group: CommandGroup::new(),
             width,
             text,
-            font: FontInfo::new("Arial", &["Segoe UI", "Helvetica", "Arial"]).unwrap(),
+            font: FontInfo::from_name("Segoe UI", &["SF Display", "Arial"]).unwrap(),
+            font_resource: None,
         }
     }
 
@@ -70,7 +74,7 @@ impl Widget for Titlebar {
     type Aux = Globals;
 
     fn bounds(&self) -> Rect {
-        Rect::new(self.position, Size::new(self.width, 25.0))
+        Rect::new(self.position, Size::new(self.width, 30.0))
     }
 
     fn update(&mut self, aux: &mut Globals) {
@@ -110,6 +114,14 @@ impl Widget for Titlebar {
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+        if self.font_resource.is_none() {
+            self.font_resource = display
+                .new_resource(ResourceDescriptor::Font(ResourceData::Data(
+                    self.font.data().unwrap(),
+                )))
+                .ok();
+        }
+
         let bounds = self.bounds();
 
         self.command_group.push(
@@ -120,19 +132,32 @@ impl Widget for Titlebar {
                         rect: bounds.clone(),
                         antialias: true,
                     },
-                    Filter::Blur(20.0, 20.0),
+                    Filter::Blur(10.0, 10.0),
                 ),
                 DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Rectangle {
                     rect: bounds.clone(),
                     paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::new(
-                        1.0, 1.0, 1.0, 0.8,
+                        1.0, 1.0, 1.0, 0.7,
                     ))),
+                })),
+                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Line {
+                    a: Point::new(bounds.origin.x, bounds.origin.y + bounds.size.height),
+                    b: Point::new(
+                        bounds.origin.x + bounds.size.width,
+                        bounds.origin.y + bounds.size.height,
+                    ),
+                    stroke: GraphicsDisplayStroke {
+                        thickness: 1.0,
+                        antialias: false,
+                        ..Default::default()
+                    },
                 })),
                 DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
                     text: self.text.clone(),
-                    font: self.font.clone(),
-                    size: 17.0,
-                    bottom_left: bounds.origin + Size::new(5.0, 17.0),
+                    font: self.font_resource.as_ref().unwrap().clone(),
+                    font_info: self.font.clone(),
+                    size: 22.0,
+                    bottom_left: bounds.origin + Size::new(5.0, 22.0),
                     color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
                 })),
             ],
@@ -147,6 +172,7 @@ struct Panel {
     position_anchor: Option<Point>,
     position: Point,
     size: Size,
+    global_listener: RcEventListener<WindowEvent>,
     titlebar_move_listener: RcEventListener<TitlebarEvent>,
     command_group: CommandGroup,
     image: Option<ResourceReference>,
@@ -167,10 +193,34 @@ impl Panel {
             position_anchor: None,
             position,
             size,
+            global_listener: global.listen(),
             titlebar_move_listener,
             command_group: CommandGroup::new(),
             image: None,
         }
+    }
+
+    fn fit_in_window(&mut self, size: &Size) {
+        let window_rect = Rect::new(Point::default(), size.clone());
+        let bounds = self.bounds();
+
+        let vert = if bounds.min_y() < window_rect.min_y() {
+            window_rect.min_y() - bounds.min_y()
+        } else if bounds.max_y() > window_rect.max_y() {
+            window_rect.max_y() - bounds.max_y()
+        } else {
+            0.0
+        };
+
+        let horiz = if bounds.min_x() < window_rect.min_x() {
+            window_rect.min_x() - bounds.min_x()
+        } else if bounds.max_x() > window_rect.max_x() {
+            window_rect.max_x() - bounds.max_x()
+        } else {
+            0.0
+        };
+
+        self.position += Vector::new(horiz, vert);
     }
 }
 
@@ -195,26 +245,8 @@ impl Widget for Panel {
                     if let Some(position_anchor) = self.position_anchor {
                         self.position = position_anchor + delta;
 
-                        let window_rect = Rect::new(Point::default(), aux.size.clone());
-                        let bounds = self.bounds();
+                        self.fit_in_window(&aux.size);
 
-                        let vert = if bounds.min_y() < window_rect.min_y() {
-                            window_rect.min_y() - bounds.min_y()
-                        } else if bounds.max_y() > window_rect.max_y() {
-                            window_rect.max_y() - bounds.max_y()
-                        } else {
-                            0.0
-                        };
-
-                        let horiz = if bounds.min_x() < window_rect.min_x() {
-                            window_rect.min_x() - bounds.min_x()
-                        } else if bounds.max_x() > window_rect.max_x() {
-                            window_rect.max_x() - bounds.max_x()
-                        } else {
-                            0.0
-                        };
-
-                        self.position += Vector::new(horiz, vert);
                         self.titlebar.set_position(self.position.clone());
                         self.command_group.repaint();
                     }
@@ -224,12 +256,24 @@ impl Widget for Panel {
                 }
             }
         }
+
+        for event in self.global_listener.peek() {
+            match event {
+                WindowEvent::Resized(_) => {
+                    self.fit_in_window(&aux.size);
+
+                    self.titlebar.set_position(self.position.clone());
+                    self.command_group.repaint();
+                }
+                _ => (),
+            }
+        }
     }
 
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
         if self.image.is_none() {
             self.image = display
-                .new_resource(ResourceDescriptor::ImageFile(
+                .new_resource(ResourceDescriptor::Image(ResourceData::File(
                     std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), file!()))
                         .parent()
                         .unwrap()
@@ -239,7 +283,7 @@ impl Widget for Panel {
                         .to_str()
                         .unwrap()
                         .into(),
-                ))
+                )))
                 .ok();
         }
 
@@ -284,9 +328,13 @@ fn main() {
     let event_loop = EventLoop::new();
 
     let wb = glutin::window::WindowBuilder::new()
-        .with_title("Counter with Reclutch")
+        .with_title("Image Viewer with Reclutch")
         .with_inner_size(
             glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
+                .to_logical(event_loop.primary_monitor().hidpi_factor()),
+        )
+        .with_min_inner_size(
+            glutin::dpi::PhysicalSize::new(400.0, 200.0)
                 .to_logical(event_loop.primary_monitor().hidpi_factor()),
         );
 
@@ -322,7 +370,7 @@ fn main() {
 
     let mut panel = Panel::new(
         Point::new(20.0, 20.0),
-        Size::new(236.5, 62.5),
+        Size::new(378.4, 100.0),
         &mut global_q,
     );
 
@@ -347,7 +395,7 @@ fn main() {
                 }
 
                 panel.draw(&mut display);
-                display.present(None);
+                display.present(None).unwrap();
                 context.swap_buffers().unwrap();
             }
             Event::WindowEvent {
@@ -382,5 +430,5 @@ fn main() {
 
 #[cfg(not(feature = "skia"))]
 fn main() {
-    panic!("this example requires the Skia backend")
+    compile_error!("this example requires the Skia backend")
 }
