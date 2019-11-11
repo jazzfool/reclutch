@@ -1,6 +1,4 @@
 // The classic counter GUI.
-//
-// Be warned: this runs quite slow due to Raqote's current text rendering.
 
 #[macro_use]
 extern crate reclutch_derive;
