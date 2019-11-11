@@ -540,22 +540,29 @@ fn draw_command_group(
                                 )),
                             )?;
 
-                            surface
-                                .canvas()
-                                .save_layer(&sk::SaveLayerRec::default().backdrop(&blur));
+                            surface.canvas().save_layer(
+                                &sk::SaveLayerRec::default()
+                                    .flags(sk::SaveLayerFlags::INIT_WITH_PREVIOUS)
+                                    .backdrop(&blur),
+                            );
                         }
                     }
                     Filter::Invert => {
                         let mut paint = sk::Paint::default();
 
                         let mut color_matrix = sk::ColorMatrix::default();
-                        color_matrix.set_scale(-1.0, -1.0, -1.0, None);
+                        color_matrix.set_20(&[
+                            -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0,
+                            1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0,
+                        ]);
 
                         paint.set_color_filter(sk::ColorFilters::matrix(&color_matrix));
 
-                        surface
-                            .canvas()
-                            .save_layer(&sk::SaveLayerRec::default().paint(&paint));
+                        surface.canvas().save_layer(
+                            &sk::SaveLayerRec::default()
+                                .flags(sk::SaveLayerFlags::INIT_WITH_PREVIOUS)
+                                .paint(&paint),
+                        );
                     }
                 }
 
