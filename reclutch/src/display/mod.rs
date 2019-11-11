@@ -119,26 +119,28 @@ impl CommandGroupHandle {
 }
 
 /// Helper wrapper around [`CommandGroupHandle`](CommandGroupHandle).
-#[derive(Debug, Clone)]
-pub struct CommandGroup(Option<CommandGroupHandle>, bool);
+#[derive(Clone)]
+pub struct CommandGroup(Option<CommandGroupHandle>, bool, Vec<DisplayCommand>);
 
 impl CommandGroup {
     /// Creates a new, empty command group.
     pub fn new() -> Self {
-        CommandGroup(None, true)
+        CommandGroup(None, true, Vec::new())
     }
 
     /// Pushes a list of commands if the repaint flag is set, and resets repaint flag if so.
     pub fn push(&mut self, display: &mut dyn GraphicsDisplay, commands: &[DisplayCommand]) {
         if self.1 {
             self.1 = false;
-            match self.0 {
-                Some(ref handle) => {
-                    display.modify_command_group(*handle, commands);
-                }
-                None => {
-                    self.0 = display.push_command_group(commands).ok();
-                }
+            self.2 = commands.to_vec();
+        }
+
+        match self.0 {
+            Some(ref handle) => {
+                display.modify_command_group(*handle, &self.2);
+            }
+            None => {
+                self.0 = display.push_command_group(&self.2).ok();
             }
         }
     }
