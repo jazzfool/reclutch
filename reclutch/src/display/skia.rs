@@ -33,7 +33,7 @@ enum Resource {
 pub struct SkiaGraphicsDisplay {
     surface: sk::Surface,
     surface_type: SurfaceType,
-    command_groups: indexmap::IndexMap<u64, (Vec<DisplayCommand>, Rect)>,
+    command_groups: linked_hash_map::LinkedHashMap<u64, (Vec<DisplayCommand>, Rect)>,
     next_command_group_id: u64,
     resources: HashMap<u64, Resource>,
     next_resource_id: u64,
@@ -47,7 +47,7 @@ impl SkiaGraphicsDisplay {
         Ok(Self {
             surface: Self::new_gl_framebuffer_surface(target)?,
             surface_type: SurfaceType::OpenGlFramebuffer(*target),
-            command_groups: indexmap::IndexMap::new(),
+            command_groups: linked_hash_map::LinkedHashMap::new(),
             next_command_group_id: 0,
             resources: HashMap::new(),
             next_resource_id: 0,
@@ -61,7 +61,7 @@ impl SkiaGraphicsDisplay {
         Ok(Self {
             surface: Self::new_gl_texture_surface(target)?,
             surface_type: SurfaceType::OpenGlTexture(*target),
-            command_groups: indexmap::IndexMap::new(),
+            command_groups: linked_hash_map::LinkedHashMap::new(),
             next_command_group_id: 0,
             resources: HashMap::new(),
             next_resource_id: 0,
