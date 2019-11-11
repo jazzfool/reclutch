@@ -369,11 +369,14 @@ impl PanelContainer {
 
 impl WidgetChildren<Globals> for PanelContainer {
     fn children(&self) -> Vec<&dyn WidgetChildren<Globals>> {
-        self.panels.iter().map(|p| &p.0 as _).collect()
+        self.panels.iter().map(|(ref p, _)| p as _).collect()
     }
 
     fn children_mut(&mut self) -> Vec<&mut dyn WidgetChildren<Globals>> {
-        self.panels.iter_mut().map(|p| &mut p.0 as _).collect()
+        self.panels
+            .iter_mut()
+            .map(|(ref mut p, _)| p as _)
+            .collect()
     }
 }
 
@@ -397,7 +400,7 @@ impl Widget for PanelContainer {
                 if let Some(panel_idx) = self
                     .panels
                     .iter()
-                    .position(|p| &p.0 as *const Panel == event)
+                    .position(|(ref p, _)| p as *const Panel == event)
                 {
                     let last = self.panels.len() - 1;
                     self.panels.swap(panel_idx, last);
