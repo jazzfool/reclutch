@@ -233,6 +233,10 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         }
     }
 
+    fn maintain_command_group(&mut self, handle: CommandGroupHandle) {
+        self.command_groups.get_refresh(&handle.id());
+    }
+
     #[inline]
     fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>> {
         Some(self.command_groups.remove(&handle.id())?.0)
