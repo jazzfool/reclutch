@@ -196,7 +196,7 @@ struct Panel {
     global_listener: RcEventListener<GlobalEvent>,
     titlebar_move_listener: RcEventListener<TitlebarEvent>,
     command_group: CommandGroup,
-    image_path: std::path::PathBuf,
+    image_data: &'static [u8],
     image: Option<ResourceReference>,
 }
 
@@ -205,7 +205,7 @@ impl Panel {
         position: Point,
         size: Size,
         text: String,
-        image_path: std::path::PathBuf,
+        image_data: &'static [u8],
         global: &mut RcEventQueue<GlobalEvent>,
     ) -> Self {
         let titlebar = Titlebar::new(position.clone(), size.width - 1.0, text, global);
@@ -220,7 +220,7 @@ impl Panel {
             global_listener: global.listen(),
             titlebar_move_listener,
             command_group: CommandGroup::new(),
-            image_path,
+            image_data,
             image: None,
         }
     }
@@ -304,9 +304,8 @@ impl Widget for Panel {
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
         if self.image.is_none() {
             self.image = display
-                .new_resource(ResourceDescriptor::Image(ResourceData::File(
-                    /*,*/
-                    self.image_path.clone(),
+                .new_resource(ResourceDescriptor::Image(ResourceData::Data(
+                    self.image_data.to_vec(),
                 )))
                 .ok();
         }
@@ -463,26 +462,13 @@ fn main() {
         size: Size::new(window_size.0 as _, window_size.1 as _),
     };
 
-    /*let mut panel = Panel::new(
-        Point::new(20.0, 20.0),
-        Size::new(378.4, 100.0),
-        &mut global_q,
-    );*/
     let mut panel_container = PanelContainer::new();
 
     panel_container.add_panel(Panel::new(
         Point::new(10.0, 10.0),
         Size::new(378.4, 100.0),
         "Reclutch Logo".into(),
-        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), file!()))
-            .parent()
-            .unwrap()
-            .join("../../../.media/reclutch.png")
-            .canonicalize()
-            .unwrap()
-            //.to_str()
-            //.unwrap()
-            .into(),
+        include_bytes!("../../../.media/reclutch.png"),
         &mut global_q,
     ));
 
@@ -490,15 +476,7 @@ fn main() {
         Point::new(30.0, 30.0),
         Size::new(300.0, 200.0),
         "Photography (by S. Unrau)".into(),
-        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), file!()))
-            .parent()
-            .unwrap()
-            .join("../../../reclutch/examples/image_viewer/image.jpg")
-            .canonicalize()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .into(),
+        include_bytes!("image.jpg"),
         &mut global_q,
     ));
 
