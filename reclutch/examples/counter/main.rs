@@ -286,8 +286,8 @@ fn main() {
             WinitEvent::WindowEvent {
                 event:
                     WindowEvent::MouseInput {
-                        state: winit::event::ElementState::Pressed,
-                        button: winit::event::MouseButton::Left,
+                        state: glutin::event::ElementState::Pressed,
+                        button: glutin::event::MouseButton::Left,
                         ..
                     },
                 ..
