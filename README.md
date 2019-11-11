@@ -16,7 +16,7 @@
 
 There is an (optional) OpenGL Skia implementation for the renderer.
 
-<img src=".media/screen.png" height="250px"/> <img src=".media/image_viewer.png" width="300px"/>
+<img src=".media/screen.png" height="200px"/> <img src=".media/image_viewer.png" height="200px"/>
 
 ## Example
 
