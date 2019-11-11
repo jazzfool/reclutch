@@ -109,16 +109,22 @@ Rendering is done through "command groups". It's designed in a way that both a r
 
 ```rust
 struct VisualWidget {
-    command_group: Option<CommandGroupHandle>,
+    command_group: CommandGroup,
 }
 
 impl Widget for VisualWidget {
     // --snip--
+    
+    fn update(&mut self, _aux: &mut ()) {
+        if self.changed {
+            self.command_group.repaint();
+        }
+    }
 
     // Draws a nice red rectangle.
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
-        // If self.command_group is `None` then `display.push_command_group` otherwise `display.modify_command_group`.
-        ok_or_push(&mut self.command_group, display, &[
+        // Only pushes/modifies command group if a repaint is needed.
+        self.command_group.push(display, &[
             DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Rectangle {
                 rect: Rect::new(Point::new(10.0, 10.0), Size::new(30.0, 50.0)),
                 paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::new(1.0, 0.0, 0.0, 1.0))),
