@@ -16,7 +16,9 @@
 
 There is an (optional) OpenGL Skia implementation for the renderer.
 
-<img src=".media/screen.png" height="200px"/> <img src=".media/image_viewer.png" height="200px"/>
+<p align="center">
+    <img src=".media/showcase.png" width="90%"/>
+</p>
 
 ## Example
 
@@ -99,7 +101,7 @@ fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
 }
 ```
 
-**Note:** `Widget` requires that `WidgetChildren` is implemented.
+**Note:** `WidgetChildren` requires that `Widget` is implemented.
 
 The derive functionality is a feature, enabled by default.
 
