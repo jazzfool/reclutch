@@ -16,7 +16,6 @@ pub struct SkiaOpenGlTexture {
     pub size: (i32, i32),
     pub mip_mapped: bool,
     pub texture_id: u32,
-    pub target: u32,
 }
 
 enum SurfaceType {
@@ -33,6 +32,7 @@ enum Resource {
 pub struct SkiaGraphicsDisplay {
     surface: sk::Surface,
     surface_type: SurfaceType,
+    context: sk::gpu::Context,
     command_groups: linked_hash_map::LinkedHashMap<u64, (Vec<DisplayCommand>, Rect)>,
     next_command_group_id: u64,
     resources: HashMap<u64, Resource>,
@@ -44,9 +44,11 @@ impl SkiaGraphicsDisplay {
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components.
     pub fn new_gl_framebuffer(target: &SkiaOpenGlFramebuffer) -> Result<Self, error::SkiaError> {
+        let (surface, context) = Self::new_gl_framebuffer_surface(target)?;
         Ok(Self {
-            surface: Self::new_gl_framebuffer_surface(target)?,
+            surface,
             surface_type: SurfaceType::OpenGlFramebuffer(*target),
+            context,
             command_groups: linked_hash_map::LinkedHashMap::new(),
             next_command_group_id: 0,
             resources: HashMap::new(),
@@ -58,9 +60,11 @@ impl SkiaGraphicsDisplay {
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components
     pub fn new_gl_texture(target: &SkiaOpenGlTexture) -> Result<Self, error::SkiaError> {
+        let (surface, context) = Self::new_gl_texture_surface(target)?;
         Ok(Self {
-            surface: Self::new_gl_texture_surface(target)?,
+            surface,
             surface_type: SurfaceType::OpenGlTexture(*target),
+            context,
             command_groups: linked_hash_map::LinkedHashMap::new(),
             next_command_group_id: 0,
             resources: HashMap::new(),
@@ -78,8 +82,19 @@ impl SkiaGraphicsDisplay {
 
     fn new_gl_framebuffer_surface(
         target: &SkiaOpenGlFramebuffer,
-    ) -> Result<sk::Surface, error::SkiaError> {
+    ) -> Result<(sk::Surface, sk::gpu::Context), error::SkiaError> {
         let mut context = Self::new_gl_context()?;
+
+        Ok((
+            SkiaGraphicsDisplay::new_gl_framebuffer_from_context(target, &mut context)?,
+            context,
+        ))
+    }
+
+    fn new_gl_framebuffer_from_context(
+        target: &SkiaOpenGlFramebuffer,
+        context: &mut sk::gpu::Context,
+    ) -> Result<sk::Surface, error::SkiaError> {
         let info = sk::gpu::BackendRenderTarget::new_gl(
             target.size,
             None,
@@ -91,7 +106,7 @@ impl SkiaGraphicsDisplay {
         );
 
         Ok(sk::Surface::from_backend_render_target(
-            &mut context,
+            context,
             &info,
             sk::gpu::SurfaceOrigin::BottomLeft,
             sk::ColorType::RGBA8888,
@@ -101,8 +116,21 @@ impl SkiaGraphicsDisplay {
         .ok_or(error::SkiaError::InvalidTarget(String::from("framebuffer")))?)
     }
 
-    fn new_gl_texture_surface(target: &SkiaOpenGlTexture) -> Result<sk::Surface, error::SkiaError> {
+    fn new_gl_texture_surface(
+        target: &SkiaOpenGlTexture,
+    ) -> Result<(sk::Surface, sk::gpu::Context), error::SkiaError> {
         let mut context = Self::new_gl_context()?;
+
+        Ok((
+            SkiaGraphicsDisplay::new_gl_texture_from_context(target, &mut context)?,
+            context,
+        ))
+    }
+
+    fn new_gl_texture_from_context(
+        target: &SkiaOpenGlTexture,
+        context: &mut sk::gpu::Context,
+    ) -> Result<sk::Surface, error::SkiaError> {
         let info = unsafe {
             sk::gpu::BackendTexture::new_gl(
                 target.size,
@@ -111,12 +139,16 @@ impl SkiaGraphicsDisplay {
                 } else {
                     sk::gpu::MipMapped::No
                 },
-                sk::gpu::gl::TextureInfo::from_target_and_id(target.target, target.texture_id),
+                sk::gpu::gl::TextureInfo {
+                    format: gl::RGBA8,
+                    target: gl::TEXTURE_2D,
+                    id: target.texture_id,
+                },
             )
         };
 
         Ok(sk::Surface::from_backend_texture(
-            &mut context,
+            context,
             &info,
             sk::gpu::SurfaceOrigin::BottomLeft,
             None,
@@ -138,11 +170,11 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         self.surface = match self.surface_type {
             SurfaceType::OpenGlFramebuffer(ref mut target) => {
                 target.size = (size.0 as i32, size.1 as i32);
-                Self::new_gl_framebuffer_surface(target)
+                Self::new_gl_framebuffer_from_context(target, &mut self.context)
             }
             SurfaceType::OpenGlTexture(ref mut target) => {
                 target.size = (size.0 as i32, size.1 as i32);
-                Self::new_gl_texture_surface(target)
+                Self::new_gl_texture_from_context(target, &mut self.context)
             }
         }?;
 
