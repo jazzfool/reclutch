@@ -14,7 +14,6 @@ use reclutch::{
     Widget,
 };
 
-#[cfg(feature = "skia")]
 use {
     glutin::{
         event::{Event as WinitEvent, WindowEvent},
@@ -217,7 +216,6 @@ impl Widget for Button {
     }
 }
 
-#[cfg(feature = "skia")]
 fn main() {
     let window_size = (500u32, 500u32);
 
@@ -313,9 +311,4 @@ fn main() {
         counter.update(&mut ());
         context.window().request_redraw();
     });
-}
-
-#[cfg(not(feature = "skia"))]
-fn main() {
-    compile_error!("this example requires the Skia backend")
 }

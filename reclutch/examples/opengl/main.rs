@@ -84,7 +84,6 @@ const QUAD_VERTICES: [TextureVertex; 4] = [
 
 const QUAD_INDICES: [u32; 6] = [0, 1, 2, 0, 2, 3];
 
-#[cfg(feature = "skia")]
 fn main() {
     let window_size = (500u32, 500u32);
 
@@ -346,9 +345,4 @@ fn main() {
             _ => return,
         }
     });
-}
-
-#[cfg(not(feature = "skia"))]
-fn main() {
-    compile_error!("this example requires the Skia backend")
 }

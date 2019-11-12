@@ -415,7 +415,6 @@ impl Widget for PanelContainer {
     }
 }
 
-#[cfg(feature = "skia")]
 fn main() {
     let window_size = (500u32, 500u32);
 
@@ -548,9 +547,4 @@ fn main() {
         panel_container.update(&mut globals);
         context.window().request_redraw();
     });
-}
-
-#[cfg(not(feature = "skia"))]
-fn main() {
-    compile_error!("this example requires the Skia backend")
 }
