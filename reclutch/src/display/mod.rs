@@ -269,22 +269,35 @@ pub enum GraphicsDisplayItem {
 }
 
 impl GraphicsDisplayItem {
-    /// Returns the inexact maximum boundaries for the item.
+    /// Returns the exact maximum boundaries for the item.
     pub fn bounds(&self) -> Rect {
         match self {
             GraphicsDisplayItem::Line { a, b, stroke } => {
-                Rect::from_points([*a, *b].iter()).inflate(stroke.thickness, stroke.thickness)
+                let size = Size::new(1.0, (*a - *b).length());
+                let axis_rect_xy =
+                    Point::new((a.x + b.x) / 2.0, ((a.y + b.y) / 2.0) - (size.height / 2.0));
+                rotated_rectangle_bounds(
+                    &Rect::new(axis_rect_xy, size).inflate(
+                        stroke.thickness / 2.0,
+                        if stroke.cap != LineCap::Flat {
+                            stroke.thickness / 2.0
+                        } else {
+                            0.0
+                        },
+                    ),
+                    &Angle::radians(2.0 * ((*a - axis_rect_xy).length() / size.height).asin()),
+                )
             }
             GraphicsDisplayItem::Rectangle { rect, paint } => match paint {
                 GraphicsDisplayPaint::Fill(_) => *rect,
                 GraphicsDisplayPaint::Stroke(stroke) => {
-                    rect.inflate(stroke.thickness, stroke.thickness)
+                    rect.inflate(stroke.thickness / 2.0, stroke.thickness / 2.0)
                 }
             },
             GraphicsDisplayItem::RoundRectangle { rect, paint, .. } => match paint {
                 GraphicsDisplayPaint::Fill(_) => *rect,
                 GraphicsDisplayPaint::Stroke(stroke) => {
-                    rect.inflate(stroke.thickness, stroke.thickness)
+                    rect.inflate(stroke.thickness / 2.0, stroke.thickness / 2.0)
                 }
             },
             GraphicsDisplayItem::Ellipse {
@@ -299,7 +312,7 @@ impl GraphicsDisplayItem {
                 match paint {
                     GraphicsDisplayPaint::Fill(_) => rect,
                     GraphicsDisplayPaint::Stroke(stroke) => {
-                        rect.inflate(stroke.thickness, stroke.thickness)
+                        rect.inflate(stroke.thickness / 2.0, stroke.thickness / 2.0)
                     }
                 }
             }
