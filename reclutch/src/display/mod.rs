@@ -573,3 +573,154 @@ pub enum Filter {
     Blur(f32, f32),
     Invert,
 }
+
+fn rotate_point(p: &Point, center: &Point, angle: &Angle) -> Point {
+    let (angle_sin, angle_cos) = angle.sin_cos();
+    Point::new(
+        angle_cos * (p.x - center.x) - angle_sin * (p.y - center.y) + center.x,
+        angle_sin * (p.x - center.x) + angle_cos * (p.y - center.y) + center.y,
+    )
+}
+
+fn rotated_rectangle_bounds(rect: &Rect, angle: &Angle) -> Rect {
+    Rect::from_points(
+        [
+            rect.origin,
+            rect.origin + rect.size,
+            rect.origin + Size::new(rect.size.width, 0.0),
+            rect.origin + Size::new(0.0, rect.size.height),
+        ]
+        .iter()
+        .map(|p| rotate_point(p, &rect.center(), angle)),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use float_cmp::approx_eq;
+
+    fn epsilon_rect(a: &Rect, b: &Rect) {
+        assert!(approx_eq!(f32, a.origin.x, b.origin.x, epsilon = TOLERANCE));
+        assert!(approx_eq!(f32, a.origin.y, b.origin.y, epsilon = TOLERANCE));
+        assert!(approx_eq!(
+            f32,
+            a.size.width,
+            b.size.width,
+            epsilon = TOLERANCE
+        ));
+        assert!(approx_eq!(
+            f32,
+            a.size.height,
+            b.size.height,
+            epsilon = TOLERANCE
+        ));
+    }
+
+    // Tolerance for what is determined to be a correct boundary.
+    const TOLERANCE: f32 = 1.0;
+
+    #[test]
+    fn test_line_bounds() {
+        epsilon_rect(
+            &GraphicsDisplayItem::Line {
+                a: Point::new(64.0, 32.0),
+                b: Point::new(128.0, 64.0),
+                stroke: GraphicsDisplayStroke {
+                    thickness: 16.0,
+                    ..Default::default()
+                },
+            }
+            .bounds(),
+            &Rect::new(Point::new(60.0, 24.0), Size::new(71.0, 47.0)),
+        );
+    }
+
+    #[test]
+    fn test_rectangle_fill_bounds() {
+        const RECT: Rect = Rect::new(Point::new(-20.0, 70.0), Size::new(15.0, 50.0));
+        epsilon_rect(
+            &GraphicsDisplayItem::Rectangle {
+                rect: RECT,
+                paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::default())),
+            }
+            .bounds(),
+            &RECT,
+        );
+    }
+
+    #[test]
+    fn test_rectangle_stroke_bounds() {
+        epsilon_rect(
+            &GraphicsDisplayItem::Rectangle {
+                rect: Rect::new(Point::new(-20.0, 70.0), Size::new(15.0, 50.0)),
+                paint: GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                    thickness: 8.0,
+                    ..Default::default()
+                }),
+            }
+            .bounds(),
+            &Rect::new(Point::new(-24.0, 66.0), Size::new(23.0, 58.0)),
+        );
+    }
+
+    #[test]
+    fn test_round_rectangle_fill_bounds() {
+        const RECT: Rect = Rect::new(Point::new(-20.0, 70.0), Size::new(15.0, 50.0));
+        epsilon_rect(
+            &GraphicsDisplayItem::RoundRectangle {
+                rect: RECT,
+                radii: [10.0; 4],
+                paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::default())),
+            }
+            .bounds(),
+            &RECT,
+        );
+    }
+
+    #[test]
+    fn test_round_rectangle_stroke_bounds() {
+        epsilon_rect(
+            &GraphicsDisplayItem::RoundRectangle {
+                rect: Rect::new(Point::new(-20.0, 70.0), Size::new(15.0, 50.0)),
+                radii: [10.0; 4],
+                paint: GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                    thickness: 8.0,
+                    ..Default::default()
+                }),
+            }
+            .bounds(),
+            &Rect::new(Point::new(-24.0, 66.0), Size::new(23.0, 58.0)),
+        );
+    }
+
+    #[test]
+    fn test_ellipse_fill_bounds() {
+        epsilon_rect(
+            &GraphicsDisplayItem::Ellipse {
+                center: Point::new(13.0, -56.0),
+                radii: Vector::new(43.0, 12.0),
+                paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::default())),
+            }
+            .bounds(),
+            &Rect::new(Point::new(-30.0, -68.0), Size::new(86.0, 24.0)),
+        );
+    }
+
+    #[test]
+    fn test_ellipse_stroke_bounds() {
+        epsilon_rect(
+            &GraphicsDisplayItem::Ellipse {
+                center: Point::new(13.0, -56.0),
+                radii: Vector::new(43.0, 12.0),
+                paint: GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                    thickness: 8.0,
+                    ..Default::default()
+                }),
+            }
+            .bounds(),
+            &Rect::new(Point::new(-34.0, -72.0), Size::new(94.0, 32.0)),
+        );
+    }
+}
