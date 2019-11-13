@@ -393,7 +393,7 @@ fn convert_paint(gdpaint: &GraphicsDisplayPaint) -> Result<sk::Paint, error::Ski
             apply_color(&stroke.color, &mut paint)?;
 
             paint.set_stroke_width(stroke.thickness);
-            paint.set_stroke_cap(convert_line_cap(&stroke.begin_cap));
+            paint.set_stroke_cap(convert_line_cap(&stroke.cap));
             paint.set_stroke_join(convert_line_join(&stroke.join));
             paint.set_stroke_miter(stroke.miter_limit);
         }

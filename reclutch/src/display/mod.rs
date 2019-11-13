@@ -193,10 +193,8 @@ pub struct GraphicsDisplayStroke {
     pub color: StyleColor,
     /// How thick the stroke should appear; the stroke width.
     pub thickness: f32,
-    /// Appearance of the start of the stroke.
-    pub begin_cap: LineCap,
-    /// Appearance of the end of the stroke.
-    pub end_cap: LineCap,
+    /// Appearance of the caps of the stroke.
+    pub cap: LineCap,
     /// Appearance of the corners of the stroke.
     pub join: LineJoin,
     /// With regards to [`miter`](LineJoin::Miter), describes the maximum value of the miter length (the distance between the outer-most and inner-most part of the corner).
@@ -210,8 +208,7 @@ impl Default for GraphicsDisplayStroke {
         GraphicsDisplayStroke {
             color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
             thickness: 1.0,
-            begin_cap: LineCap::default(),
-            end_cap: LineCap::default(),
+            cap: LineCap::default(),
             join: LineJoin::default(),
             miter_limit: 4.0,
             antialias: true,
