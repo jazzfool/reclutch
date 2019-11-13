@@ -362,7 +362,7 @@ impl TextDisplayItem {
 #[derive(Debug, Clone)]
 pub struct FontInfo {
     name: String,
-    /// Underlying font reference created by [`new`](FontInfo::new).
+    /// Underlying font reference.
     pub font: font_kit::font::Font,
 }
 
