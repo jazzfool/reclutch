@@ -411,6 +411,32 @@ fn convert_rect(rect: &Rect) -> sk::Rect {
     )
 }
 
+fn convert_display_text(
+    text: &DisplayText,
+    font: sk::Font,
+) -> Result<sk::TextBlob, error::SkiaError> {
+    match text {
+        DisplayText::Simple(ref text) => {
+            sk::TextBlob::from_text(text.as_bytes(), sk::TextEncoding::UTF8, &font)
+                .ok_or(error::SkiaError::UnknownError)
+        }
+        DisplayText::Shaped(ref glyphs) => {
+            let mut builder = sk::TextBlobBuilder::new();
+            let blob_glyphs = builder.alloc_run_pos(font, glyphs.len(), None);
+
+            let mut xy = Point::new(0.0, 0.0);
+            for (i, glyph) in glyphs.iter().enumerate() {
+                blob_glyphs.0[i] = glyph.codepoint as u16;
+                blob_glyphs.1[i].x = xy.x + glyph.offset.x;
+                blob_glyphs.1[i].y = xy.y + glyph.offset.y;
+                xy += glyph.advance;
+            }
+
+            builder.make().ok_or(error::SkiaError::UnknownError)
+        }
+    }
+}
+
 fn apply_clip(canvas: &mut sk::Canvas, clip: &DisplayClip) {
     match clip {
         DisplayClip::Rectangle {
@@ -527,17 +553,13 @@ fn draw_command_group(
                             let paint =
                                 convert_paint(&GraphicsDisplayPaint::Fill(item.color.clone()))
                                     .map_err(|e| error::DisplayError::InternalError(e.into()))?;
+
                             surface.canvas().draw_text_blob(
-                                &sk::TextBlob::from_text(
-                                    item.text.as_bytes(),
-                                    sk::TextEncoding::UTF8,
-                                    &sk::Font::new(typeface.clone(), item.size),
+                                &convert_display_text(
+                                    &item.text,
+                                    sk::Font::new(typeface.clone(), item.size),
                                 )
-                                .ok_or(
-                                    error::DisplayError::InternalError(
-                                        error::SkiaError::UnknownError.into(),
-                                    ),
-                                )?,
+                                .map_err(|e| error::DisplayError::InternalError(e.into()))?,
                                 convert_point(&item.bottom_left),
                                 &paint,
                             );

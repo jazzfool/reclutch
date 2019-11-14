@@ -102,7 +102,7 @@ impl Widget for Counter {
         builder.push_clear(Color::new(1.0, 1.0, 1.0, 1.0));
 
         builder.push_text(TextDisplayItem {
-            text: format!("Count: {}", self.count),
+            text: format!("Count: {}", self.count).into(),
             font: self.font.as_ref().unwrap().clone(),
             font_info: self.font_info.clone(),
             size: 23.0,
@@ -196,7 +196,7 @@ impl Widget for Button {
         builder.push_round_rectangle(bounds, [10.0; 4], GraphicsDisplayPaint::Fill(color.into()));
 
         builder.push_text(TextDisplayItem {
-            text: self.text.clone(),
+            text: self.text.clone().into(),
             font: self.font.as_ref().unwrap().clone(),
             font_info: self.font_info.clone(),
             size: 22.0,

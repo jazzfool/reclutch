@@ -167,7 +167,7 @@ impl Widget for Titlebar {
         );
 
         builder.push_text(TextDisplayItem {
-            text: self.text.clone(),
+            text: self.text.clone().into(),
             font: self.font_resource.as_ref().unwrap().clone(),
             font_info: self.font.clone(),
             size: 22.0,

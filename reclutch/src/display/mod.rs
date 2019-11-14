@@ -321,10 +321,32 @@ impl GraphicsDisplayItem {
     }
 }
 
+/// A single shaped glyph.
+/// This should be generated from the output of a shaping engine.
+#[derive(Debug, Clone, Copy)]
+pub struct ShapedGlyph {
+    codepoint: u32,
+    advance: Vector,
+    offset: Vector,
+}
+
+/// Render-able text, either as a simple string or pre-shaped glyphs (via a library such as HarfBuzz).
+#[derive(Debug, Clone)]
+pub enum DisplayText {
+    Simple(String),
+    Shaped(Vec<ShapedGlyph>),
+}
+
+impl From<String> for DisplayText {
+    fn from(text: String) -> Self {
+        DisplayText::Simple(text)
+    }
+}
+
 /// Describes a text render item.
 #[derive(Debug, Clone)]
 pub struct TextDisplayItem {
-    pub text: String,
+    pub text: DisplayText,
     pub font: ResourceReference,
     pub font_info: FontInfo,
     pub size: f32,
@@ -337,13 +359,27 @@ impl TextDisplayItem {
     pub fn bounds(&self) -> Result<Rect, error::FontError> {
         let mut rect = Rect::new(self.bottom_left, Size::default());
 
-        for c in self.text.chars() {
+        let glyph_iter: Vec<_> = match self.text {
+            DisplayText::Simple(ref text) => text
+                .as_bytes()
+                .iter()
+                .map(|&c| {
+                    self.font_info
+                        .font
+                        .glyph_for_char(c as char)
+                        .unwrap_or_default()
+                })
+                .collect(),
+            DisplayText::Shaped(ref glyphs) => glyphs.iter().map(|glyph| glyph.codepoint).collect(),
+        };
+
+        for glyph in glyph_iter {
             rect = rect.union(
                 &self
                     .font_info
                     .font
                     .raster_bounds(
-                        self.font_info.font.glyph_for_char(c).unwrap_or_default(),
+                        glyph,
                         self.size,
                         &font_kit::loader::FontTransform::identity(),
                         &self.bottom_left,
