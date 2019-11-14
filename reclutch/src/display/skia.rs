@@ -560,15 +560,11 @@ fn draw_command_group(
                         if let Some(ref _snapshot_rect) = bounds.round_out().intersection(
                             &Rect::new(Point::default(), Size::new(size.0 as _, size.1 as _)),
                         ) {
-                            let blur = sk::blur_image_filter::new(
+                            let blur = sk::image_filters::blur(
                                 (*sigma_x, *sigma_y),
-                                surface.image_snapshot().as_filter().ok_or(
-                                    error::DisplayError::InternalError(Box::new(
-                                        error::SkiaError::UnknownError,
-                                    )),
-                                )?,
-                                &sk::ImageFilterCropRect::new(&convert_rect(&bounds), None),
-                                sk::blur_image_filter::TileMode::Clamp,
+                                sk::TileMode::Clamp,
+                                None,
+                                &convert_rect(&bounds).round(),
                             )
                             .ok_or(
                                 error::DisplayError::InternalError(Box::new(
@@ -576,11 +572,9 @@ fn draw_command_group(
                                 )),
                             )?;
 
-                            surface.canvas().save_layer(
-                                &sk::SaveLayerRec::default()
-                                    .flags(sk::SaveLayerFlags::INIT_WITH_PREVIOUS)
-                                    .backdrop(&blur),
-                            );
+                            surface
+                                .canvas()
+                                .save_layer(&sk::SaveLayerRec::default().backdrop(&blur));
                         }
                     }
                     Filter::Invert => {
@@ -594,11 +588,9 @@ fn draw_command_group(
 
                         paint.set_color_filter(sk::ColorFilters::matrix(&color_matrix));
 
-                        surface.canvas().save_layer(
-                            &sk::SaveLayerRec::default()
-                                .flags(sk::SaveLayerFlags::INIT_WITH_PREVIOUS)
-                                .paint(&paint),
-                        );
+                        surface
+                            .canvas()
+                            .save_layer(&sk::SaveLayerRec::default().paint(&paint));
                     }
                 }
 
