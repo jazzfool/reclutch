@@ -3,23 +3,21 @@
 #[macro_use]
 extern crate reclutch_derive;
 
-use reclutch::{
-    display::{
-        Color, CommandGroup, DisplayCommand, DisplayItem, FontInfo, GraphicsDisplay,
-        GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, ResourceData, ResourceDescriptor,
-        ResourceReference, Size, StyleColor, TextDisplayItem,
-    },
-    event::{RcEventListener, RcEventQueue},
-    prelude::*,
-    Widget,
-};
-
 use {
     glutin::{
         event::{Event as WinitEvent, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
     },
-    reclutch::display,
+    reclutch::{
+        display::{
+            self, Color, CommandGroup, DisplayListBuilder, FontInfo, GraphicsDisplay,
+            GraphicsDisplayPaint, Point, Rect, ResourceData, ResourceDescriptor, ResourceReference,
+            Size, TextDisplayItem,
+        },
+        event::{RcEventListener, RcEventQueue},
+        prelude::*,
+        Widget,
+    },
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -99,20 +97,20 @@ impl Widget for Counter {
 
         let bounds = self.bounds();
 
-        self.command_group.push(
-            display,
-            &[
-                DisplayCommand::Clear(Color::new(1.0, 1.0, 1.0, 1.0)),
-                DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
-                    text: format!("Count: {}", self.count),
-                    font: self.font.as_ref().unwrap().clone(),
-                    font_info: self.font_info.clone(),
-                    size: 23.0,
-                    bottom_left: bounds.origin.add_size(&Size::new(10.0, 22.0)),
-                    color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
-                })),
-            ],
-        );
+        let mut builder = DisplayListBuilder::new();
+
+        builder.push_clear(Color::new(1.0, 1.0, 1.0, 1.0));
+
+        builder.push_text(TextDisplayItem {
+            text: format!("Count: {}", self.count),
+            font: self.font.as_ref().unwrap().clone(),
+            font_info: self.font_info.clone(),
+            size: 23.0,
+            bottom_left: bounds.origin.add_size(&Size::new(10.0, 22.0)),
+            color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
+        });
+
+        self.command_group.push(display, &builder.build());
 
         for child in self.children_mut() {
             child.draw(display);
@@ -193,26 +191,22 @@ impl Widget for Button {
             Color::new(0.20, 0.55, 0.65, 1.0)
         };
 
-        self.command_group.push(
-            display,
-            &[
-                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::RoundRectangle {
-                    rect: bounds,
-                    radii: [10.0; 4],
-                    paint: GraphicsDisplayPaint::Fill(StyleColor::Color(color)),
-                })),
-                DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
-                    text: self.text.clone(),
-                    font: self.font.as_ref().unwrap().clone(),
-                    font_info: self.font_info.clone(),
-                    size: 22.0,
-                    bottom_left: bounds
-                        .origin
-                        .add_size(&Size::new(10.0, bounds.size.height / 2.0)),
-                    color: StyleColor::Color(Color::new(1.0, 1.0, 1.0, 1.0)),
-                })),
-            ],
-        );
+        let mut builder = DisplayListBuilder::new();
+
+        builder.push_round_rectangle(bounds, [10.0; 4], GraphicsDisplayPaint::Fill(color.into()));
+
+        builder.push_text(TextDisplayItem {
+            text: self.text.clone(),
+            font: self.font.as_ref().unwrap().clone(),
+            font_info: self.font_info.clone(),
+            size: 22.0,
+            bottom_left: bounds
+                .origin
+                .add_size(&Size::new(10.0, bounds.size.height / 2.0)),
+            color: Color::new(1.0, 1.0, 1.0, 1.0).into(),
+        });
+
+        self.command_group.push(display, &builder.build());
     }
 }
 

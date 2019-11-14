@@ -7,10 +7,10 @@ use {
     },
     reclutch::{
         display::{
-            self, Color, CommandGroup, DisplayClip, DisplayCommand, DisplayItem, Filter, FontInfo,
-            GraphicsDisplay, GraphicsDisplayItem, GraphicsDisplayPaint, GraphicsDisplayStroke,
-            Point, Rect, ResourceData, ResourceDescriptor, ResourceReference, Size, StyleColor,
-            TextDisplayItem, Vector,
+            self, Color, CommandGroup, DisplayClip, DisplayCommand, DisplayItem,
+            DisplayListBuilder, Filter, FontInfo, GraphicsDisplay, GraphicsDisplayItem,
+            GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect, ResourceData,
+            ResourceDescriptor, ResourceReference, Size, TextDisplayItem, Vector,
         },
         event::{merge::Merge, RcEventListener, RcEventQueue},
         prelude::*,
@@ -144,44 +144,38 @@ impl Widget for Titlebar {
 
         let bounds = self.bounds();
 
-        self.command_group.push(
-            display,
-            &[
-                DisplayCommand::BackdropFilter(
-                    DisplayClip::Rectangle {
-                        rect: bounds.clone(),
-                        antialias: true,
-                    },
-                    Filter::Blur(10.0, 10.0),
-                ),
-                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Rectangle {
-                    rect: bounds.clone(),
-                    paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::new(
-                        1.0, 1.0, 1.0, 0.6,
-                    ))),
-                })),
-                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Line {
-                    a: Point::new(bounds.origin.x, bounds.origin.y + bounds.size.height),
-                    b: Point::new(
-                        bounds.origin.x + bounds.size.width,
-                        bounds.origin.y + bounds.size.height,
-                    ),
-                    stroke: GraphicsDisplayStroke {
-                        thickness: 1.0,
-                        antialias: false,
-                        ..Default::default()
-                    },
-                })),
-                DisplayCommand::Item(DisplayItem::Text(TextDisplayItem {
-                    text: self.text.clone(),
-                    font: self.font_resource.as_ref().unwrap().clone(),
-                    font_info: self.font.clone(),
-                    size: 22.0,
-                    bottom_left: bounds.origin + Size::new(5.0, 22.0),
-                    color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
-                })),
-            ],
+        let mut builder = DisplayListBuilder::new();
+
+        builder.push_rectangle_backdrop(bounds, true, Filter::Blur(10.0, 10.0));
+
+        builder.push_rectangle(
+            bounds,
+            GraphicsDisplayPaint::Fill(Color::new(1.0, 1.0, 1.0, 0.6).into()),
         );
+
+        builder.push_line(
+            Point::new(bounds.origin.x, bounds.origin.y + bounds.size.height),
+            Point::new(
+                bounds.origin.x + bounds.size.width,
+                bounds.origin.y + bounds.size.height,
+            ),
+            GraphicsDisplayStroke {
+                thickness: 1.0,
+                antialias: false,
+                ..Default::default()
+            },
+        );
+
+        builder.push_text(TextDisplayItem {
+            text: self.text.clone(),
+            font: self.font_resource.as_ref().unwrap().clone(),
+            font_info: self.font.clone(),
+            size: 22.0,
+            bottom_left: bounds.origin + Size::new(5.0, 22.0),
+            color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
+        });
+
+        self.command_group.push(display, &builder.build());
     }
 }
 
@@ -312,38 +306,28 @@ impl Widget for Panel {
 
         let bounds = self.bounds();
 
-        self.command_group.push(
-            display,
-            &[
-                DisplayCommand::BackdropFilter(
-                    DisplayClip::Rectangle {
-                        rect: bounds.clone(),
-                        antialias: true,
-                    },
-                    Filter::Blur(5.0, 5.0),
-                ),
-                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Rectangle {
-                    rect: bounds.clone(),
-                    paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::new(
-                        0.9, 0.9, 0.9, 0.5,
-                    ))),
-                })),
-                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Image {
-                    src: None,
-                    dst: bounds.clone(),
-                    resource: self.image.clone().unwrap(),
-                })),
-                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Rectangle {
-                    rect: bounds.inflate(0.0, 1.0), /*.round_out()*/
-                    paint: GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
-                        color: StyleColor::Color(Color::new(0.0, 0.0, 0.0, 1.0)),
-                        thickness: 1.0,
-                        antialias: false,
-                        ..Default::default()
-                    }),
-                })),
-            ],
+        let mut builder = DisplayListBuilder::new();
+
+        builder.push_rectangle_backdrop(bounds, true, Filter::Blur(5.0, 5.0));
+
+        builder.push_rectangle(
+            bounds,
+            GraphicsDisplayPaint::Fill(Color::new(0.9, 0.9, 0.9, 0.5).into()),
         );
+
+        builder.push_image(None, bounds, self.image.clone().unwrap());
+
+        builder.push_rectangle(
+            bounds.inflate(0.0, 0.5),
+            GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
+                thickness: 1.0,
+                antialias: false,
+                ..Default::default()
+            }),
+        );
+
+        self.command_group.push(display, &builder.build());
 
         for child in self.children_mut() {
             child.draw(display);

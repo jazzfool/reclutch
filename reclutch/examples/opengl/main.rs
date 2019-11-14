@@ -8,8 +8,8 @@ use {
         event_loop::{ControlFlow, EventLoop},
     },
     reclutch::display::{
-        self, Color, DisplayClip, DisplayCommand, DisplayItem, Filter, GraphicsDisplay,
-        GraphicsDisplayItem, GraphicsDisplayPaint, Point, Rect, Size, StyleColor,
+        self, Color, DisplayListBuilder, Filter, GraphicsDisplay, GraphicsDisplayPaint, Point,
+        Rect, Size,
     },
 };
 
@@ -228,24 +228,17 @@ fn main() {
     {
         let rect = Rect::new(Point::new(150.0, 150.0), Size::new(100.0, 150.0));
 
-        display
-            .push_command_group(&[
-                DisplayCommand::BackdropFilter(
-                    DisplayClip::RoundRectangle {
-                        rect,
-                        radii: [20.0; 4],
-                    },
-                    Filter::Blur(10.0, 10.0),
-                ),
-                DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::RoundRectangle {
-                    rect,
-                    radii: [20.0; 4],
-                    paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::new(
-                        0.0, 0.0, 0.0, 0.2,
-                    ))),
-                })),
-            ])
-            .unwrap();
+        let mut builder = DisplayListBuilder::new();
+
+        builder.push_round_rectangle_backdrop(rect, [20.0; 4], Filter::Blur(10.0, 10.0));
+
+        builder.push_round_rectangle(
+            rect,
+            [20.0; 4],
+            GraphicsDisplayPaint::Fill(Color::new(0.0, 0.0, 0.0, 0.2).into()),
+        );
+
+        display.push_command_group(&builder.build()).unwrap();
     }
 
     let mut latest_window_size = window_size;

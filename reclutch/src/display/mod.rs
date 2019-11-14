@@ -567,11 +567,192 @@ impl StyleColor {
     }
 }
 
+impl From<Color> for StyleColor {
+    fn from(color: Color) -> Self {
+        StyleColor::Color(color)
+    }
+}
+
 /// Graphical filter.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Filter {
     Blur(f32, f32),
     Invert,
+}
+
+/// Interface to simplify creating a list of display commands.
+#[derive(Clone)]
+pub struct DisplayListBuilder {
+    display_list: Vec<DisplayCommand>,
+}
+
+impl DisplayListBuilder {
+    /// Creates a new, empty display list builder.
+    pub fn new() -> Self {
+        DisplayListBuilder {
+            display_list: Vec::new(),
+        }
+    }
+
+    /// Creates a new display list builder, initialized with an existing list of display commands.
+    pub fn from_commands(commands: &[DisplayCommand]) -> Self {
+        DisplayListBuilder {
+            display_list: commands.to_vec(),
+        }
+    }
+
+    /// Pushes a stroked line, spanning from `a` to `b`.
+    pub fn push_line(&mut self, a: Point, b: Point, stroke: GraphicsDisplayStroke) {
+        self.display_list
+            .push(DisplayCommand::Item(DisplayItem::Graphics(
+                GraphicsDisplayItem::Line { a, b, stroke },
+            )));
+    }
+
+    /// Pushes a filled/stroked rectangle.
+    pub fn push_rectangle(&mut self, rect: Rect, paint: GraphicsDisplayPaint) {
+        self.display_list
+            .push(DisplayCommand::Item(DisplayItem::Graphics(
+                GraphicsDisplayItem::Rectangle { rect, paint },
+            )));
+    }
+
+    /// Pushes a filled/stroked rectangle, with rounded corners.
+    pub fn push_round_rectangle(
+        &mut self,
+        rect: Rect,
+        radii: [f32; 4],
+        paint: GraphicsDisplayPaint,
+    ) {
+        self.display_list
+            .push(DisplayCommand::Item(DisplayItem::Graphics(
+                GraphicsDisplayItem::RoundRectangle { rect, radii, paint },
+            )));
+    }
+
+    /// Pushes a filled/stroked ellipse.
+    pub fn push_ellipse(&mut self, center: Point, radii: Vector, paint: GraphicsDisplayPaint) {
+        self.display_list
+            .push(DisplayCommand::Item(DisplayItem::Graphics(
+                GraphicsDisplayItem::Ellipse {
+                    center,
+                    radii,
+                    paint,
+                },
+            )));
+    }
+
+    /// Pushes an image.
+    pub fn push_image(
+        &mut self,
+        src: impl Into<Option<Rect>>,
+        dst: Rect,
+        image: ResourceReference,
+    ) {
+        self.display_list
+            .push(DisplayCommand::Item(DisplayItem::Graphics(
+                GraphicsDisplayItem::Image {
+                    src: src.into(),
+                    dst,
+                    resource: image,
+                },
+            )));
+    }
+
+    /// Pushes a line of text.
+    pub fn push_text(&mut self, text: TextDisplayItem) {
+        self.display_list
+            .push(DisplayCommand::Item(DisplayItem::Text(text)));
+    }
+
+    /// Pushes a rectangle which applies a filter on everything behind it.
+    pub fn push_rectangle_backdrop(&mut self, rect: Rect, antialias: bool, filter: Filter) {
+        self.display_list.push(DisplayCommand::BackdropFilter(
+            DisplayClip::Rectangle { rect, antialias },
+            filter,
+        ));
+    }
+
+    /// Pushes a rectangle with rounded corners which applies a filter on everything behind it.
+    pub fn push_round_rectangle_backdrop(&mut self, rect: Rect, radii: [f32; 4], filter: Filter) {
+        self.display_list.push(DisplayCommand::BackdropFilter(
+            DisplayClip::RoundRectangle { rect, radii },
+            filter,
+        ));
+    }
+
+    /// Pushes an ellipse which applies a filter on everything behind it.
+    pub fn push_ellipse_backdrop(&mut self, center: Point, radii: Vector, filter: Filter) {
+        self.display_list.push(DisplayCommand::BackdropFilter(
+            DisplayClip::Ellipse { center, radii },
+            filter,
+        ));
+    }
+
+    /// Pushes a rectangle which clips proceeding display commands.
+    pub fn push_rectangle_clip(&mut self, rect: Rect, antialias: bool) {
+        self.display_list
+            .push(DisplayCommand::Clip(DisplayClip::Rectangle {
+                rect,
+                antialias,
+            }));
+    }
+
+    /// Pushes a rectangle with rounded corners which clips proceeding display commands.
+    pub fn push_round_rectangle_clip(&mut self, rect: Rect, radii: [f32; 4]) {
+        self.display_list
+            .push(DisplayCommand::Clip(DisplayClip::RoundRectangle {
+                rect,
+                radii,
+            }));
+    }
+
+    /// Pushes an ellipse which clips proceeding display commands.
+    pub fn push_ellipse_clip(&mut self, center: Point, radii: Vector) {
+        self.display_list
+            .push(DisplayCommand::Clip(DisplayClip::Ellipse { center, radii }));
+    }
+
+    /// Saves the current draw state (clip, transformation, layers).
+    pub fn save(&mut self) {
+        self.display_list.push(DisplayCommand::Save);
+    }
+
+    /// Saves the current draw state (clip, transformation, layers) and begins drawing to a new layer, with a specified opacity.
+    pub fn save_layer(&mut self, opacity: f32) {
+        self.display_list.push(DisplayCommand::SaveLayer(opacity));
+    }
+
+    /// Restores previously saved states.
+    pub fn restore(&mut self) {
+        self.display_list.push(DisplayCommand::Restore);
+    }
+
+    /// Pushes translation (offset) to the transformation matrix.
+    pub fn push_translation(&mut self, translation: Vector) {
+        self.display_list
+            .push(DisplayCommand::Translate(translation));
+    }
+
+    /// Pushes scaling to the transformation matrix.
+    pub fn push_scaling(&mut self, scaling: Vector) {
+        self.display_list.push(DisplayCommand::Scale(scaling));
+    }
+
+    /// Pushes rotation to the transformation matrix.
+    pub fn push_rotation(&mut self, rotation: Angle) {
+        self.display_list.push(DisplayCommand::Rotate(rotation));
+    }
+
+    /// Fills the screen/clip with a solid color.
+    pub fn push_clear(&mut self, color: Color) {
+        self.display_list.push(DisplayCommand::Clear(color));
+    }
+
+    /// Returns the final list of display commands.
+    pub fn build(self) -> Vec<DisplayCommand> {
+        self.display_list
+    }
 }
 
 fn rotate_point(p: &Point, center: &Point, angle: &Angle) -> Point {
