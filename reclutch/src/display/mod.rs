@@ -3,7 +3,7 @@
 #[cfg(feature = "skia")]
 pub mod skia;
 
-use {crate::error, palette::Srgba};
+use {crate::error, palette::Srgba, std::sync::Arc};
 
 /// Two-dimensional floating-point absolute point.
 pub type Point = euclid::Point2D<f32, euclid::UnknownUnit>;
@@ -60,7 +60,7 @@ pub trait GraphicsDisplay {
 #[derive(Debug, Clone)]
 pub enum ResourceData {
     File(std::path::PathBuf),
-    Data(Vec<u8>),
+    Data(SharedData),
 }
 
 /// Contains information required to load a resource through [`new_resource`](GraphicsDisplay::new_resource).
@@ -86,6 +86,13 @@ impl ResourceReference {
             ResourceReference::Image(id) | ResourceReference::Font(id) => *id,
         }
     }
+}
+
+/// Data stored as bytes, either in a atomically reference counted `Vec` or a static reference.
+#[derive(Debug, Clone)]
+pub enum SharedData {
+    RefCount(Arc<Vec<u8>>),
+    Static(&'static [u8]),
 }
 
 /// Pushes or modifies a command group, depending on whether `handle` contains a value or not.
@@ -399,7 +406,7 @@ impl TextDisplayItem {
 pub struct FontInfo {
     name: String,
     /// Underlying font reference.
-    pub font: font_kit::font::Font,
+    pub font: Arc<font_kit::font::Font>,
 }
 
 impl FontInfo {
@@ -419,11 +426,12 @@ impl FontInfo {
 
         Ok(Self {
             name: font.full_name(),
-            font,
+            font: Arc::new(font),
         })
     }
 
     /// Creates a new font reference from a font file located at `path`.
+    ///
     /// If the font file contains more than one font, use `font_index` to select the font to load.
     pub fn from_path<P: AsRef<std::path::Path>>(
         path: P,
@@ -433,19 +441,18 @@ impl FontInfo {
 
         Ok(Self {
             name: font.full_name(),
-            font,
+            font: Arc::new(font),
         })
     }
 
     /// Creates a new font reference from font data.
     /// Similar to [`from_path`](FontInfo::from_path), however as bytes rather than a path to a file.
-    pub fn from_data(data: &[u8], font_index: u32) -> Result<Self, error::FontError> {
-        let font =
-            font_kit::font::Font::from_bytes(std::sync::Arc::new(data.to_vec()), font_index)?;
+    pub fn from_data(data: Arc<Vec<u8>>, font_index: u32) -> Result<Self, error::FontError> {
+        let font = font_kit::font::Font::from_bytes(data, font_index)?;
 
         Ok(Self {
             name: font.full_name(),
-            font,
+            font: Arc::new(font),
         })
     }
 

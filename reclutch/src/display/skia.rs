@@ -203,7 +203,12 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
                     sk::Image::from_encoded(
                         match data {
                             ResourceData::File(path) => load_file(path.clone())?,
-                            ResourceData::Data(data) => sk::Data::new_copy(&data),
+                            ResourceData::Data(SharedData::RefCount(data)) => {
+                                sk::Data::new_copy(&(*data))
+                            }
+                            ResourceData::Data(SharedData::Static(data)) => {
+                                sk::Data::new_copy(data)
+                            }
                         },
                         None,
                     )
@@ -216,7 +221,12 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
                     sk::Typeface::from_data(
                         match data {
                             ResourceData::File(path) => load_file(path.clone())?,
-                            ResourceData::Data(data) => sk::Data::new_copy(&data),
+                            ResourceData::Data(SharedData::RefCount(data)) => {
+                                sk::Data::new_copy(&(*data))
+                            }
+                            ResourceData::Data(SharedData::Static(data)) => {
+                                sk::Data::new_copy(data)
+                            }
                         },
                         None,
                     )

@@ -12,7 +12,7 @@ use {
         display::{
             self, Color, CommandGroup, DisplayListBuilder, FontInfo, GraphicsDisplay,
             GraphicsDisplayPaint, Point, Rect, ResourceData, ResourceDescriptor, ResourceReference,
-            Size, TextDisplayItem,
+            SharedData, Size, TextDisplayItem,
         },
         event::{RcEventListener, RcEventQueue},
         prelude::*,
@@ -90,7 +90,7 @@ impl Widget for Counter {
         if self.font.is_none() {
             self.font = display
                 .new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                    self.font_info.data().unwrap(),
+                    SharedData::RefCount(std::sync::Arc::new(self.font_info.data().unwrap())),
                 )))
                 .ok();
         }
@@ -179,7 +179,7 @@ impl Widget for Button {
         if self.font.is_none() {
             self.font = display
                 .new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                    self.font_info.data().unwrap(),
+                    SharedData::RefCount(std::sync::Arc::new(self.font_info.data().unwrap())),
                 )))
                 .ok();
         }

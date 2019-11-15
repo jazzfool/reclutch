@@ -10,7 +10,7 @@ use {
             self, Color, CommandGroup, DisplayClip, DisplayCommand, DisplayItem,
             DisplayListBuilder, Filter, FontInfo, GraphicsDisplay, GraphicsDisplayItem,
             GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect, ResourceData,
-            ResourceDescriptor, ResourceReference, Size, TextDisplayItem, Vector,
+            ResourceDescriptor, ResourceReference, SharedData, Size, TextDisplayItem, Vector,
         },
         event::{merge::Merge, RcEventListener, RcEventQueue},
         prelude::*,
@@ -137,7 +137,7 @@ impl Widget for Titlebar {
         if self.font_resource.is_none() {
             self.font_resource = display
                 .new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                    self.font.data().unwrap(),
+                    SharedData::RefCount(std::sync::Arc::new(self.font.data().unwrap())),
                 )))
                 .ok();
         }
@@ -299,7 +299,7 @@ impl Widget for Panel {
         if self.image.is_none() {
             self.image = display
                 .new_resource(ResourceDescriptor::Image(ResourceData::Data(
-                    self.image_data.to_vec(),
+                    SharedData::Static(self.image_data),
                 )))
                 .ok();
         }
