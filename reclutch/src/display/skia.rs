@@ -438,7 +438,7 @@ fn convert_display_text(
             for (i, glyph) in glyphs.iter().enumerate() {
                 blob_glyphs.0[i] = glyph.codepoint as u16;
                 blob_glyphs.1[i].x = xy.x + glyph.offset.x;
-                blob_glyphs.1[i].y = xy.y + glyph.offset.y;
+                blob_glyphs.1[i].y = xy.y - glyph.offset.y;
                 xy += glyph.advance;
             }
 

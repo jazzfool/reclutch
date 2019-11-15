@@ -332,9 +332,9 @@ impl GraphicsDisplayItem {
 /// This should be generated from the output of a shaping engine.
 #[derive(Debug, Clone, Copy)]
 pub struct ShapedGlyph {
-    codepoint: u32,
-    advance: Vector,
-    offset: Vector,
+    pub codepoint: u32,
+    pub advance: Vector,
+    pub offset: Vector,
 }
 
 /// Render-able text, either as a simple string or pre-shaped glyphs (via a library such as HarfBuzz).
@@ -362,42 +362,56 @@ pub struct TextDisplayItem {
 }
 
 impl TextDisplayItem {
-    /// Returns the exact maximum boundaries for the text.
+    /// Returns the maximum boundaries for the text.
+    ///
+    /// The height of the bounding box is conservative; it doesn't change based on the contents of
+    /// `text`, is defined on a per-font basis, and is "worst-case" (as in it represents the largest
+    /// height value in the font).
+    ///
+    /// The bounding box is identical to that of a browser's.
     pub fn bounds(&self) -> Result<Rect, error::FontError> {
-        let mut rect = Rect::new(self.bottom_left, Size::default());
+        let metrics = self.font_info.font.metrics();
+        let units_per_em = metrics.units_per_em as f32;
 
-        let glyph_iter: Vec<_> = match self.text {
-            DisplayText::Simple(ref text) => text
-                .as_bytes()
+        let font_height = metrics.ascent - metrics.descent;
+        let line_height = if font_height > units_per_em {
+            font_height
+        } else {
+            font_height + metrics.line_gap
+        };
+        let height = line_height / units_per_em * self.size;
+
+        let y = self.bottom_left.y - metrics.ascent / units_per_em * self.size;
+
+        let width = match self.text {
+            DisplayText::Simple(ref text) => {
+                text.as_bytes().iter().try_fold(
+                    0.0,
+                    |width, &character| -> Result<f32, error::FontError> {
+                        Ok(width
+                            + self
+                                .font_info
+                                .font
+                                .advance(
+                                    self.font_info
+                                        .font
+                                        .glyph_for_char(character as char)
+                                        .ok_or(error::FontError::CodepointError)?,
+                                )?
+                                .x)
+                    },
+                )? / units_per_em
+                    * self.size
+            }
+            DisplayText::Shaped(ref glyphs) => glyphs
                 .iter()
-                .map(|&c| {
-                    self.font_info
-                        .font
-                        .glyph_for_char(c as char)
-                        .unwrap_or_default()
-                })
-                .collect(),
-            DisplayText::Shaped(ref glyphs) => glyphs.iter().map(|glyph| glyph.codepoint).collect(),
+                .fold(0.0, |width, glyph| width + glyph.advance.x),
         };
 
-        for glyph in glyph_iter {
-            rect = rect.union(
-                &self
-                    .font_info
-                    .font
-                    .raster_bounds(
-                        glyph,
-                        self.size,
-                        &font_kit::loader::FontTransform::identity(),
-                        &self.bottom_left,
-                        font_kit::hinting::HintingOptions::Full(self.size),
-                        font_kit::canvas::RasterizationOptions::SubpixelAa,
-                    )?
-                    .to_f32(),
-            );
-        }
-
-        Ok(rect)
+        Ok(
+            Rect::new(Point::new(self.bottom_left.x, y), Size::new(width, height))
+                .inflate(self.size / 8.0, 0.0),
+        )
     }
 }
 

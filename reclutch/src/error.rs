@@ -9,6 +9,8 @@ pub enum FontError {
     GlyphLoadingError(#[from] font_kit::error::GlyphLoadingError),
     #[error("{0}")]
     MatchingError(#[from] font_kit::error::SelectionError),
+    #[error("failed to look up matching codepoint for character")]
+    CodepointError,
 }
 
 /// An error within Skia and its interactions with OpenGL.
