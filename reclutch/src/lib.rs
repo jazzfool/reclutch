@@ -1,3 +1,127 @@
+//! Reclutch UI Core
+//!
+//! Reclutch is a barebones foundation to build a UI from, with a strong focus
+//! on control.
+//!
+//! # `Widgets`
+//!
+//! A widget only defines 3 methods; [`bounds`](trait.Widget.html#tymethod.bounds),
+//! [`update`](trait.Widget.html#tymethod.update), and [`draw`](trait.Widget.html#tymethod.draw).
+//! It also defines an associated type (`Aux`), discussed in the `update` section.
+//!
+//! When implementing these methods, child widgets must be considered. Therefore
+//! it is advisable to propagate them;
+//! ```rust
+//! for child in self.children_mut() {
+//!     child.update(aux);
+//!     // or:
+//!     child.draw(display);
+//! }
+//! ```
+//! The above example involves the `WidgetChildren` trait, which will be discussed
+//! later.
+//!
+//! ## `bounds`
+//!
+//! The bounds method doesn't necessarily have an internal need within Reclutch,
+//! however widget boundaries is crucial data in every GUI, for things such as
+//! layout, partial redraw, and input.
+//!
+//! ## `update`
+//!
+//! Perhaps the most important method, this method gives every widget an opportunity
+//! to process events, emit events and execute all the side effects attached to such.
+//! Event handling is performed through a focused event system (see the event module).
+//!
+//! This is also where the `Aux` associated type comes in. It allows you to pass
+//! mutable data around during updating.
+//!
+//! Here's an example implementation of `update`;
+//! ```rust
+//! #[derive(WidgetChildren)]
+//! struct Counter { /* fields omitted */ }
+//!
+//! impl Widget for Counter {
+//!     type Aux = GlobalData;
+//!
+//!     fn update(&mut self, aux: &mut GlobalData) {
+//!         // propagate to children
+//!         propagate_update(self, aux);
+//!
+//!         for event in self.count_up_listener.peek() {
+//!             self.count += 1;
+//!             self.command_group.repaint();
+//!         }
+//!
+//!         for event in self.count_down_listener.peek() {
+//!             self.count -= 1;
+//!             self.command_group.repaint();
+//!         }
+//!     }
+//!
+//!     // --snip--
+//! }
+//! ```
+//!
+//! ## `draw`
+//!
+//! Drawing is renderer-agnostic, however this doesn't mean the API is restrictive.
+//! Generally, drawing is performed through [`CommandGroups`](display.struct.CommandGroups.html).
+//! A simple example of this can be seen below:
+//! ```rust
+//! struct MyWidget {
+//!     cmd_group: CommandGroup,
+//! }
+//!
+//! impl Widget for MyWidget {
+//!     // --snip--
+//!
+//!     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+//!         // note that the builder is an optional abstraction which stands in
+//!         // place of creating an array of DisplayCommands by hand, which can be
+//!         // cumbersome.
+//!         let mut builder = DisplayListBuilder::new();
+//!
+//!         // push display items to the builder
+//!
+//!         self.cmd_group.push(display, &builder.build(), None);
+//!     }
+//! }
+//! ```
+//!
+//! # `WidgetChildren`
+//!
+//! `WidgetChildren` is a supertrait which defines an interface to collate all the
+//! child widgets from fields into a single `Vec`.
+//!
+//! Most of the time you don't want to implement `WidgetChildren` manually, instead
+//! you can use the provided `derive` crate to reduce it to a couple extra lines;
+//! ```rust
+//! #[derive(WidgetChildren)]
+//! struct CounterWidget {
+//!     // --snip--
+//!
+//!     #[widget_child]
+//!     count_label: LabelWidget,
+//!     #[widget_child]
+//!     count_up: ButtonWidget,
+//!     #[widget_child]
+//!     count_down: ButtonWidget,
+//! }
+//! ```
+//! This will resolve down to the following code:
+//! ```rust
+//! impl reclutch::WidgetChildren<<Self as reclutch::Widget>::Aux> for CounterWidget {
+//!     fn children(&self) -> Vec<&dyn reclutch::WidgetChildren<Self::Aux>> {
+//!         vec![&self.count_label, &self.count_up, &self.count_down]
+//!     }
+//!
+//!     fn children_mut(&mut self) -> Vec<&mut dyn reclutch::WidgetChildren<Self::Aux>> {
+//!         vec![&mut self.count_label, &mut self.count_up, &mut self.count_down]
+//!     }
+//! }
+//! ```
+
 pub mod display;
 pub mod error;
 

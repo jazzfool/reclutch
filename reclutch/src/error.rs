@@ -38,7 +38,7 @@ pub enum ResourceError {
     InternalError(#[from] Box<dyn std::error::Error>),
 }
 
-/// An error related to [`GraphicsDisplay`](crate::display::GraphicsDisplay).
+/// An error related to [`GraphicsDisplay`](../display/trait.GraphicsDisplay.html).
 #[derive(Error, Debug)]
 pub enum DisplayError {
     #[error("{0}")]

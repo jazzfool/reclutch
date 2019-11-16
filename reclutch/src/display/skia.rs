@@ -1,4 +1,4 @@
-//! Robust implementation of `reclutch::display::GraphicsDisplay` using Google's Skia.
+//! Robust implementation of [`GraphicsDisplay`](../trait.GraphicsDisplay.html) using Google's Skia.
 
 use super::*;
 use {crate::error, skia_safe as sk, std::collections::HashMap};
@@ -28,7 +28,7 @@ enum Resource {
     Font(sk::Typeface),
 }
 
-/// Converts [`DisplayCommand`](DisplayCommand) to immediate-mode Skia commands.
+/// Converts [`DisplayCommand`](../enum.DisplayCommand.html) to immediate-mode Skia commands.
 pub struct SkiaGraphicsDisplay {
     surface: sk::Surface,
     surface_type: SurfaceType,
@@ -40,7 +40,7 @@ pub struct SkiaGraphicsDisplay {
 }
 
 impl SkiaGraphicsDisplay {
-    /// Creates a new [`SkiaGraphicsDisplay`](SkiaGraphicsDisplay) with the Skia OpenGL backend, drawing into an existing framebuffer.
+    /// Creates a new [`SkiaGraphicsDisplay`](struct.SkiaGraphicsDisplay.html) with the Skia OpenGL backend, drawing into an existing framebuffer.
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components.
     pub fn new_gl_framebuffer(target: &SkiaOpenGlFramebuffer) -> Result<Self, error::SkiaError> {
@@ -56,7 +56,7 @@ impl SkiaGraphicsDisplay {
         })
     }
 
-    /// Creates a new [`SkiaGraphicsDisplay`](SkiaGraphicsDisplay) with the Skia OpenGL backend, drawing into an existing texture.
+    /// Creates a new [`SkiaGraphicsDisplay`](struct.SkiaGraphicsDisplay.html) with the Skia OpenGL backend, drawing into an existing texture.
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components
     pub fn new_gl_texture(target: &SkiaOpenGlTexture) -> Result<Self, error::SkiaError> {
@@ -203,12 +203,10 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
                     sk::Image::from_encoded(
                         match data {
                             ResourceData::File(path) => load_file(path.clone())?,
-                            ResourceData::Data(SharedData::RefCount(data)) => {
-                                sk::Data::new_copy(&(*data))
-                            }
-                            ResourceData::Data(SharedData::Static(data)) => {
-                                sk::Data::new_copy(data)
-                            }
+                            ResourceData::Data(data) => sk::Data::new_copy(match data {
+                                SharedData::RefCount(data) => &(*data),
+                                SharedData::Static(data) => data,
+                            }),
                         },
                         None,
                     )
@@ -221,12 +219,10 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
                     sk::Typeface::from_data(
                         match data {
                             ResourceData::File(path) => load_file(path.clone())?,
-                            ResourceData::Data(SharedData::RefCount(data)) => {
-                                sk::Data::new_copy(&(*data))
-                            }
-                            ResourceData::Data(SharedData::Static(data)) => {
-                                sk::Data::new_copy(data)
-                            }
+                            ResourceData::Data(data) => sk::Data::new_copy(match data {
+                                SharedData::RefCount(data) => &(*data),
+                                SharedData::Static(data) => data,
+                            }),
                         },
                         None,
                     )
@@ -506,6 +502,8 @@ fn apply_clip(canvas: &mut sk::Canvas, clip: &DisplayClip) {
     };
 }
 
+// The meat of this module.
+// If there are any drawing bugs, they probably happen here.
 fn draw_command_group(
     cmds: &[DisplayCommand],
     surface: &mut sk::Surface,
@@ -558,7 +556,7 @@ fn draw_command_group(
                                 .ok_or(error::DisplayError::InvalidResource(*id))?
                             {
                                 let mut paint = sk::Paint::default();
-                                paint.set_filter_quality(sk::FilterQuality::High);
+                                paint.set_filter_quality(sk::FilterQuality::Medium); // TODO(jazzfool): perhaps we can expose the image filter quality?
 
                                 let o_src = src.map(|src_rect| convert_rect(&src_rect));
                                 surface.canvas().draw_image_rect(
@@ -609,7 +607,7 @@ fn draw_command_group(
 
                 match filter {
                     Filter::Blur(sigma_x, sigma_y) => {
-                        // TODO(jazzfool): cache blur filter
+                        // TODO(jazzfool): cache blur filter (figure out a way to cache by floats)
                         if let Some(ref _snapshot_rect) = bounds.round_out().intersection(
                             &Rect::new(Point::default(), Size::new(size.0 as _, size.1 as _)),
                         ) {
