@@ -238,7 +238,7 @@ fn main() {
             GraphicsDisplayPaint::Fill(Color::new(0.0, 0.0, 0.0, 0.2).into()),
         );
 
-        display.push_command_group(&builder.build()).unwrap();
+        display.push_command_group(&builder.build(), None).unwrap();
     }
 
     let mut latest_window_size = window_size;

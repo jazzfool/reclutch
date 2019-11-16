@@ -141,7 +141,7 @@ fn main() {
             builder.push_text(text_blob);
         }
 
-        display.push_command_group(&builder.build()).unwrap();
+        display.push_command_group(&builder.build(), None).unwrap();
     }
 
     event_loop.run(move |event, _, control_flow| {

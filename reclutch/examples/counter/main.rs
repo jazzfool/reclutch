@@ -110,7 +110,7 @@ impl Widget for Counter {
             color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
         });
 
-        self.command_group.push(display, &builder.build());
+        self.command_group.push(display, &builder.build(), None);
 
         for child in self.children_mut() {
             child.draw(display);
@@ -206,7 +206,7 @@ impl Widget for Button {
             color: Color::new(1.0, 1.0, 1.0, 1.0).into(),
         });
 
-        self.command_group.push(display, &builder.build());
+        self.command_group.push(display, &builder.build(), None);
     }
 }
 

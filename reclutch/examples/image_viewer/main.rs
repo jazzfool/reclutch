@@ -175,7 +175,7 @@ impl Widget for Titlebar {
             color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
         });
 
-        self.command_group.push(display, &builder.build());
+        self.command_group.push(display, &builder.build(), None);
     }
 }
 
@@ -327,7 +327,7 @@ impl Widget for Panel {
             }),
         );
 
-        self.command_group.push(display, &builder.build());
+        self.command_group.push(display, &builder.build(), None);
 
         for child in self.children_mut() {
             child.draw(display);
@@ -433,7 +433,10 @@ fn main() {
     .unwrap();
 
     display
-        .push_command_group(&[DisplayCommand::Clear(Color::new(1.0, 1.0, 1.0, 1.0))])
+        .push_command_group(
+            &[DisplayCommand::Clear(Color::new(1.0, 1.0, 1.0, 1.0))],
+            None,
+        )
         .unwrap();
 
     let mut latest_window_size = window_size;

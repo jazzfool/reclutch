@@ -33,7 +33,7 @@ pub struct SkiaGraphicsDisplay {
     surface: sk::Surface,
     surface_type: SurfaceType,
     context: sk::gpu::Context,
-    command_groups: linked_hash_map::LinkedHashMap<u64, (Vec<DisplayCommand>, Rect)>,
+    command_groups: linked_hash_map::LinkedHashMap<u64, (Vec<DisplayCommand>, Rect, bool)>,
     next_command_group_id: u64,
     resources: HashMap<u64, Resource>,
     next_resource_id: u64,
@@ -248,11 +248,18 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
     fn push_command_group(
         &mut self,
         commands: &[DisplayCommand],
+        protected: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>> {
         let id = self.next_command_group_id;
 
-        self.command_groups
-            .insert(id, (commands.to_owned(), display_list_bounds(commands)?));
+        self.command_groups.insert(
+            id,
+            (
+                commands.to_owned(),
+                display_list_bounds(commands)?,
+                protected.unwrap_or(true),
+            ),
+        );
 
         self.next_command_group_id += 1;
 
@@ -266,11 +273,18 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
             .map(|cmdgroup| &cmdgroup.0[..])
     }
 
-    fn modify_command_group(&mut self, handle: CommandGroupHandle, commands: &[DisplayCommand]) {
+    fn modify_command_group(
+        &mut self,
+        handle: CommandGroupHandle,
+        commands: &[DisplayCommand],
+        protected: Option<bool>,
+    ) {
         if self.command_groups.contains_key(&handle.id()) {
             if let Ok(bounds) = display_list_bounds(commands) {
-                self.command_groups
-                    .insert(handle.id(), (commands.to_owned(), bounds));
+                self.command_groups.insert(
+                    handle.id(),
+                    (commands.to_owned(), bounds, protected.unwrap_or(true)),
+                );
             }
         }
     }
@@ -293,10 +307,10 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         let cmds = self
             .command_groups
             .values()
-            .map(|cmds| (&cmds.0, &cmds.1))
-            .filter_map(|(cmd_group, bounds)| {
+            .map(|cmds| (&cmds.0, &cmds.1, &cmds.2))
+            .filter_map(|(cmd_group, bounds, protected)| {
                 if cull.map(|cull| cull.intersects(bounds)).unwrap_or(true) {
-                    Some(cmd_group)
+                    Some((cmd_group, protected))
                 } else {
                     None
                 }
@@ -305,10 +319,17 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         let size = self.size();
         let surface = &mut self.surface;
         for cmd_group in cmds {
-            let count = surface.canvas().save();
-            draw_command_group(cmd_group, surface, resources, size)?;
-            // to ensure that no clips, transformations, layers, etc, "leak" from the command group.
-            surface.canvas().restore_to_count(count);
+            let count = if *cmd_group.1 {
+                Some(surface.canvas().save())
+            } else {
+                None
+            };
+
+            draw_command_group(cmd_group.0, surface, resources, size)?;
+
+            if let Some(count) = count {
+                surface.canvas().restore_to_count(count);
+            }
         }
 
         surface.flush();

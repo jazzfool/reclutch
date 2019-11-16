@@ -33,14 +33,23 @@ pub trait GraphicsDisplay {
     fn remove_resource(&mut self, reference: ResourceReference);
 
     /// Pushes a new command group to the scene, returning the handle which can be used to manipulate it later.
+    ///
+    /// Normally `Save` and `Restore` (more specifically `RestoreToCount`) is invoked between command group execution to prevent any leaking
+    /// of clips/transforms, however this can be explicitly disabled by letting `protected` be `false`.
     fn push_command_group(
         &mut self,
         commands: &[DisplayCommand],
+        protected: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
     /// Returns an existing command group by the handle returned from `push_command_group`.
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]>;
     /// Overwrites an existing command group by the handle returned from `push_command_group`.
-    fn modify_command_group(&mut self, handle: CommandGroupHandle, commands: &[DisplayCommand]);
+    fn modify_command_group(
+        &mut self,
+        handle: CommandGroupHandle,
+        commands: &[DisplayCommand],
+        protected: Option<bool>,
+    );
     /// Refreshes a command group.
     /// Typically this means moving the command group to the front.
     fn maintain_command_group(&mut self, handle: CommandGroupHandle);
@@ -101,13 +110,14 @@ pub fn ok_or_push(
     handle: &mut Option<CommandGroupHandle>,
     display: &mut dyn GraphicsDisplay,
     commands: &[DisplayCommand],
+    protected: impl Into<Option<bool>>,
 ) {
     match handle {
         Some(ref handle) => {
-            display.modify_command_group(*handle, commands);
+            display.modify_command_group(*handle, commands, protected.into());
         }
         None => {
-            *handle = display.push_command_group(commands).ok();
+            *handle = display.push_command_group(commands, protected.into()).ok();
         }
     }
 }
@@ -139,10 +149,17 @@ impl CommandGroup {
     }
 
     /// Pushes a list of commands if the repaint flag is set, and resets repaint flag if so.
-    pub fn push(&mut self, display: &mut dyn GraphicsDisplay, commands: &[DisplayCommand]) {
+    ///
+    /// See [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group)
+    pub fn push(
+        &mut self,
+        display: &mut dyn GraphicsDisplay,
+        commands: &[DisplayCommand],
+        protected: impl Into<Option<bool>>,
+    ) {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, commands);
+            ok_or_push(&mut self.0, display, commands, protected);
         } else {
             display.maintain_command_group(self.0.unwrap());
         }
