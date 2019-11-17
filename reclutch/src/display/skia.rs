@@ -185,48 +185,54 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         &mut self,
         descriptor: ResourceDescriptor,
     ) -> Result<ResourceReference, error::ResourceError> {
-        let load_file = |path: std::path::PathBuf| -> Result<sk::Data, error::ResourceError> {
-            if !path.is_file() {
-                return Err(error::ResourceError::InvalidPath(
-                    path.to_string_lossy().to_string(),
-                ));
-            }
+        let load_data = |data: ResourceData| -> Result<sk::Data, error::ResourceError> {
+            Ok(match data {
+                ResourceData::File(path) => {
+                    if !path.is_file() {
+                        return Err(error::ResourceError::InvalidPath(
+                            path.to_string_lossy().to_string(),
+                        ));
+                    }
 
-            Ok(sk::Data::new_copy(&std::fs::read(path)?))
+                    sk::Data::new_copy(&std::fs::read(path)?)
+                }
+                ResourceData::Data(data) => sk::Data::new_copy(match data {
+                    SharedData::RefCount(ref data) => &(*data),
+                    SharedData::Static(data) => data,
+                }),
+            })
         };
 
         let id = self.next_resource_id;
         let (rid, res) = match &descriptor {
             ResourceDescriptor::Image(data) => (
                 ResourceReference::Image(id),
-                Resource::Image(
-                    sk::Image::from_encoded(
-                        match data {
-                            ResourceData::File(path) => load_file(path.clone())?,
-                            ResourceData::Data(data) => sk::Data::new_copy(match data {
-                                SharedData::RefCount(data) => &(*data),
-                                SharedData::Static(data) => data,
-                            }),
-                        },
-                        None,
+                Resource::Image(match data {
+                    ImageData::Encoded(data) => {
+                        sk::Image::from_encoded(load_data(data.clone())?, None)
+                            .ok_or(error::ResourceError::InvalidData)?
+                    }
+                    ImageData::Raw(data, info) => sk::Image::from_raster_data(
+                        &sk::ImageInfo::new(
+                            sk::ISize::new(info.size.0 as _, info.size.1 as _),
+                            match info.format {
+                                RasterImageFormat::Rgba8 => sk::ColorType::RGBA8888,
+                                RasterImageFormat::Bgra8 => sk::ColorType::BGRA8888,
+                            },
+                            sk::AlphaType::Unpremul,
+                            None,
+                        ),
+                        load_data(data.clone())?,
+                        info.size.0 as usize * 4, // width * 4 bytes -> 4 x 8-bit components
                     )
                     .ok_or(error::ResourceError::InvalidData)?,
-                ),
+                }),
             ),
             ResourceDescriptor::Font(data) => (
                 ResourceReference::Font(id),
                 Resource::Font(
-                    sk::Typeface::from_data(
-                        match data {
-                            ResourceData::File(path) => load_file(path.clone())?,
-                            ResourceData::Data(data) => sk::Data::new_copy(match data {
-                                SharedData::RefCount(data) => &(*data),
-                                SharedData::Static(data) => data,
-                            }),
-                        },
-                        None,
-                    )
-                    .ok_or(error::ResourceError::InvalidData)?,
+                    sk::Typeface::from_data(load_data(data.clone())?, None)
+                        .ok_or(error::ResourceError::InvalidData)?,
                 ),
             ),
         };

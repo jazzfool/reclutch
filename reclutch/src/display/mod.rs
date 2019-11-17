@@ -72,10 +72,34 @@ pub enum ResourceData {
     Data(SharedData),
 }
 
+/// Whether the given image data is encoded.
+/// Formats like PNG and JPEG are encoded, however formats like RAW and a simple array of pixels aren't.
+#[derive(Debug, Clone)]
+pub enum ImageData {
+    Encoded(ResourceData),
+    Raw(ResourceData, RasterImageInfo),
+}
+
+/// How pixels are stored in memory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RasterImageFormat {
+    /// 4x8-bit components, in order of; red, green, blue and alpha.
+    Rgba8,
+    /// 4x8-bit components, in order of; blue, green, red and alpha.
+    Bgra8,
+}
+
+/// Information about a raster image.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RasterImageInfo {
+    pub size: (u32, u32),
+    pub format: RasterImageFormat,
+}
+
 /// Contains information required to load a resource through [`new_resource`](trait.GraphicsDisplay.html#tymethod.new_resource).
 #[derive(Debug, Clone)]
 pub enum ResourceDescriptor {
-    Image(ResourceData),
+    Image(ImageData),
     Font(ResourceData),
 }
 
