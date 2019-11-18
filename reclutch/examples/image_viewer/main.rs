@@ -9,7 +9,7 @@ use {
         display::{
             self, Color, CommandGroup, DisplayClip, DisplayCommand, DisplayItem,
             DisplayListBuilder, Filter, FontInfo, GraphicsDisplay, GraphicsDisplayItem,
-            GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect, ResourceData,
+            GraphicsDisplayPaint, GraphicsDisplayStroke, ImageData, Point, Rect, ResourceData,
             ResourceDescriptor, ResourceReference, SharedData, Size, TextDisplayItem, Vector,
         },
         event::{merge::Merge, RcEventListener, RcEventQueue},
@@ -298,8 +298,8 @@ impl Widget for Panel {
     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
         if self.image.is_none() {
             self.image = display
-                .new_resource(ResourceDescriptor::Image(ResourceData::Data(
-                    SharedData::Static(self.image_data),
+                .new_resource(ResourceDescriptor::Image(ImageData::Encoded(
+                    ResourceData::Data(SharedData::Static(self.image_data)),
                 )))
                 .ok();
         }
