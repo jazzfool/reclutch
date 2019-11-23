@@ -1,10 +1,7 @@
 // The classic counter GUI.
 
-#[macro_use]
-extern crate reclutch_derive;
-
 use {
-    glutin::{
+    glium::glutin::{
         event::{Event as WinitEvent, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
     },
@@ -16,7 +13,7 @@ use {
         },
         event::{RcEventListener, RcEventQueue},
         prelude::*,
-        Widget,
+        WidgetChildren,
     },
 };
 
@@ -135,7 +132,7 @@ struct Button {
 impl Button {
     pub fn new(text: String, position: Point, global: &mut RcEventQueue<GlobalEvent>) -> Self {
         Self {
-            press_event: RcEventQueue::new(),
+            press_event: RcEventQueue::default(),
             text,
             position,
             hover: false,
@@ -162,7 +159,7 @@ impl Widget for Button {
             match event {
                 GlobalEvent::Click(pt) => {
                     if bounds.contains(pt) {
-                        self.press_event.push(pt);
+                        self.press_event.emit_owned(pt);
                     }
                 }
                 GlobalEvent::MouseMove(pt) => {
@@ -240,7 +237,7 @@ fn main() {
     .unwrap();
 
     // set up the UI
-    let mut window_q = RcEventQueue::new();
+    let mut window_q = RcEventQueue::default();
     let mut counter = Counter::new(&mut window_q);
     let mut cursor = Point::default();
 
@@ -273,7 +270,7 @@ fn main() {
                 let position = position.to_physical(context.window().hidpi_factor());
                 cursor = Point::new(position.x as _, position.y as _);
 
-                window_q.push(GlobalEvent::MouseMove(cursor));
+                window_q.emit_owned(GlobalEvent::MouseMove(cursor));
             }
             WinitEvent::WindowEvent {
                 event:
@@ -284,7 +281,7 @@ fn main() {
                     },
                 ..
             } => {
-                window_q.push(GlobalEvent::Click(cursor));
+                window_q.emit_owned(GlobalEvent::Click(cursor));
             }
             WinitEvent::WindowEvent {
                 event: WindowEvent::CloseRequested,

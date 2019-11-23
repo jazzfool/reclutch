@@ -36,14 +36,6 @@ impl<T> Queue<T> {
         self.events.drain(0..min_idx);
     }
 
-    pub fn push(&mut self, x: T) -> bool {
-        if self.listeners.is_empty() {
-            return false;
-        }
-        self.events.push(x);
-        true
-    }
-
     /// Creates a subscription
     pub fn create_listener(&mut self) -> ListenerKey {
         let maxidx = self.events.len();
@@ -58,13 +50,13 @@ impl<T> Queue<T> {
         }
     }
 
-    /// Get a the start index of new events since last `pull`
+    /// Get the start index of new events since last `pull`
     fn pull(&mut self, key: ListenerKey) -> usize {
         let maxidx = self.events.len();
         std::mem::replace(self.listeners.get_mut(key).unwrap(), maxidx)
     }
 
-    /// Applies a function to the list of new events since last `pull`/`pull_with`
+    /// Applies a function to the list of new events since last `pull`
     #[inline]
     pub fn pull_with<F, R>(&mut self, key: ListenerKey, f: F) -> R
     where
@@ -79,10 +71,60 @@ impl<T> Queue<T> {
         ret
     }
 
+    /// Get the next event since last `pull`
+    #[inline]
+    pub fn peek_get(&self, key: ListenerKey) -> Option<&T> {
+        self.events.get(*self.listeners.get(key)?)
+    }
+
+    /// Finish with this peek, go to next event
+    #[inline]
+    pub fn peek_finish(&mut self, key: ListenerKey) {
+        let maxidx = self.events.len();
+        let was_blocker = self
+            .listeners
+            .get_mut(key)
+            .map(|idx| {
+                if *idx < maxidx {
+                    // only increment the idx if it is in bounds
+                    *idx += 1;
+                    *idx == 1
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false);
+        if was_blocker {
+            // this was a blocker
+            self.cleanup();
+        }
+    }
+
     #[cfg(test)]
     #[inline]
-    pub(crate) fn event_len(&self) -> usize {
+    pub(crate) fn events_len(&self) -> usize {
         self.events.len()
+    }
+}
+
+impl<T> crate::traits::QueueInterfaceCommon for Queue<T> {
+    type Item = T;
+
+    #[inline]
+    fn buffer_is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+}
+
+impl<T: Clone> crate::traits::EmitterMut for Queue<T> {
+    #[inline]
+    fn emit<'a>(&mut self, event: std::borrow::Cow<'a, T>) -> crate::traits::EmitResult<'a, T> {
+        if !self.listeners.is_empty() {
+            self.events.push(event.into_owned());
+            Ok(())
+        } else {
+            Err(event)
+        }
     }
 }
 
@@ -92,25 +134,28 @@ impl<A> std::iter::Extend<A> for Queue<A> {
     where
         T: IntoIterator<Item = A>,
     {
-        self.events.extend(iter)
+        if !self.listeners.is_empty() {
+            self.events.extend(iter)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Queue;
+    use crate::traits::EmitterMutExt;
 
     #[test]
     fn test_event_listener() {
         let mut event = Queue::new();
 
-        event.push(0i32);
+        event.emit_owned(0).unwrap_err();
 
         let listener = event.create_listener();
 
-        event.push(1i32);
-        event.push(2i32);
-        event.push(3i32);
+        event.emit_owned(1).unwrap();
+        event.emit_owned(2).unwrap();
+        event.emit_owned(3).unwrap();
 
         event.pull_with(listener, |x| assert_eq!(x, &[1, 2, 3]));
 
@@ -123,29 +168,29 @@ mod tests {
 
         let listener_1 = event.create_listener();
 
-        event.push(10i32);
+        event.emit_owned(10).unwrap();
 
-        assert_eq!(event.event_len(), 1);
+        assert_eq!(event.events_len(), 1);
 
         let listener_2 = event.create_listener();
 
-        event.push(20i32);
+        event.emit_owned(20).unwrap();
 
-        event.pull_with(listener_1, |x| assert_eq!(x, &[10i32, 20i32]));
-        event.pull_with(listener_2, |x| assert_eq!(x, &[20i32]));
+        event.pull_with(listener_1, |x| assert_eq!(x, &[10, 20]));
+        event.pull_with(listener_2, |x| assert_eq!(x, &[20]));
         event.pull_with(listener_2, |x| assert_eq!(x, &[]));
         event.pull_with(listener_2, |x| assert_eq!(x, &[]));
 
-        assert_eq!(event.event_len(), 0);
+        assert_eq!(event.events_len(), 0);
 
         for _i in 0..10 {
-            event.push(30i32);
+            event.emit_owned(30).unwrap();
         }
 
-        event.pull_with(listener_2, |x| assert_eq!(x, &[30i32; 10]));
+        event.pull_with(listener_2, |x| assert_eq!(x, &[30; 10]));
 
         event.remove_listener(listener_1);
 
-        assert_eq!(event.event_len(), 0);
+        assert_eq!(event.events_len(), 0);
     }
 }

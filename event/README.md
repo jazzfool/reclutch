@@ -1,5 +1,27 @@
 # `reclutch_event`
 
+## Overview
+
+```
+╭─── RawEventQueue
+│
+│ ╔═════════════════╦════════════════════╦══════════════════╗
+│ ║  sending halves ║     forwarders     ║ receiving halves ║
+│ ╟─────────────────╫────────────────────╫──────────────────╢
+│ ║ ╭───────────────╫────────────────────╫────────────╮     ║
+│ ║ │               ║                    ║  (push_*)  ↑     ║
+│ ║ │               ║ ╭───── cascade::* ─╫──┬filter───╯     ║
+↕ ║ ↓               ║ ↑                  ║  ╰*...─────╯     ║
+│ ║ │               ║ │                  ║                  ║
+╰─╫─┼─ Emitter[Mut]─╫─┴─ if Listable ─>>─╫──┬─ Listen       ║
+  ╠═╪═══════════════╩════════════════════╬══╪═════════════╤═╩═══════════════╗
+  ║ ├─ nested Emitters...                ║  ├─ merge::*   │  multiplexing/  ║
+  ║ │   (broadcasting)                   ║  │  (muxing)   │  broadcasting   ║
+  ╚═╪════════════════════════════════════╩══╪═════════════╧═════════════════╝
+    ↑                                       ↓
+    ╰─ emit(_Event)                         ╰─ with(_f(&[_Event]))
+```
+
 ## Callbacks
 
 There are no closures when it comes to callbacks, as it would be too much work to have it fit in safe Rust (and it definitely wouldn't be ergonomic to use).

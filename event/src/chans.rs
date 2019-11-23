@@ -1,6 +1,6 @@
 use crate::{
     cascade::{utils::CleanupIndices, CascadeTrait},
-    traits::private::Listen as _,
+    traits::{Emitter},
     *,
 };
 use crossbeam_channel as chan;
@@ -67,7 +67,7 @@ impl<T> Queue<T> {
     }
 
     fn create_channel() -> (chan::Sender<()>, chan::Receiver<()>) {
-        chan::bounded(1)
+        chan::unbounded()
     }
 
     pub fn subscribe(&self) -> chan::Receiver<()> {
@@ -117,41 +117,31 @@ impl<T> Intern<T> {
     }
 }
 
-impl<T> GenericQueueInterface<T> for Queue<T> {
-    #[inline]
-    fn push(&self, event: T) -> bool {
-        self.with_inner_mut(|inner| {
-            if inner.ev.listeners.is_empty() {
-                return false;
-            }
-            inner.ev.events.push(event);
-            inner.notify();
-            true
-        })
-    }
+impl<T> crate::traits::QueueInterfaceCommon for Queue<T> {
+    type Item = T;
 
     #[inline]
-    fn extend<I>(&self, events: I) -> bool
-    where
-        I: IntoIterator<Item = T>,
-    {
-        self.with_inner_mut(|inner| {
-            if inner.ev.listeners.is_empty() {
-                return false;
-            }
-            inner.ev.events.extend(events);
-            inner.notify();
-            true
-        })
-    }
-
-    #[inline]
-    fn is_empty(&self) -> bool {
+    fn buffer_is_empty(&self) -> bool {
         self.with_inner(|inner| inner.ev.events.is_empty())
     }
 }
 
-impl<T> QueueInterface<T> for Queue<T> {
+impl<T: Clone> crate::traits::Emitter for Queue<T> {
+    #[inline]
+    fn emit<'a>(&self, event: std::borrow::Cow<'a, T>) -> crate::traits::EmitResult<'a, T> {
+        self.with_inner_mut(|inner| {
+            if inner.ev.listeners.is_empty() {
+                Err(event)
+            } else {
+                inner.ev.events.push(event.into_owned());
+                inner.notify();
+                Ok(())
+            }
+        })
+    }
+}
+
+impl<T: Clone> QueueInterfaceListable for Queue<T> {
     type Listener = Listener<T>;
 
     #[inline]
@@ -163,19 +153,23 @@ impl<T> QueueInterface<T> for Queue<T> {
 #[derive(Debug)]
 pub struct Listener<T>(ListenerKey, Queue<T>);
 
-impl<T> private::Listen<T> for Listener<T> {
-    fn with_inner_mut<F, R>(&self, f: F) -> Option<R>
+impl<T> EventListen for Listener<T> {
+    type Item = T;
+
+    #[inline]
+    fn with<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(crate::intern::ListenerKey, &mut RawEventQueue<T>) -> R,
+        F: FnOnce(&[Self::Item]) -> R,
     {
-        let mut inner = (self.1).0.write().ok()?;
-        Some(f(self.0, &mut inner.ev))
+        (self.1).0.write().unwrap().ev.pull_with(self.0, f)
     }
 }
 
 impl<T> Drop for Listener<T> {
     fn drop(&mut self) {
-        let _ = self.with_inner_mut(|key, ev| ev.remove_listener(key));
+        if let Ok(mut q) = (self.1).0.write() {
+            q.ev.remove_listener(self.0);
+        }
     }
 }
 
@@ -196,10 +190,12 @@ pub struct Cascade<T> {
     )>,
 }
 
-impl<T: Clone + Send + Sync + 'static> crate::cascade::Push<T> for Cascade<T> {
+impl<T: Clone + Send + Sync + 'static> crate::cascade::Push for Cascade<T> {
+    type Item = T;
+
     fn push<O, F>(mut self, ev_out: O, keep_after_disconnect: bool, filter: F) -> Self
     where
-        O: GenericQueueInterface<T> + Send + 'static,
+        O: Emitter<Item = T> + Send + 'static,
         F: Fn(&T) -> bool + Send + 'static,
     {
         self.outs.push((
@@ -209,7 +205,7 @@ impl<T: Clone + Send + Sync + 'static> crate::cascade::Push<T> for Cascade<T> {
                         .into_iter()
                         .partition(|x| filter(x));
                     *x = keep;
-                    if drop_if_match || ev_out.extend(forward) {
+                    if drop_if_match || forward.into_iter().all(|i| ev_out.emit_owned(i).is_ok()) {
                         Ok(())
                     } else {
                         Err(keep_after_disconnect)
@@ -223,8 +219,8 @@ impl<T: Clone + Send + Sync + 'static> crate::cascade::Push<T> for Cascade<T> {
 
     fn push_map<R, O, F>(mut self, ev_out: O, keep_after_disconnect: bool, filtmap: F) -> Self
     where
-        R: Send + 'static,
-        O: GenericQueueInterface<R> + Send + 'static,
+        R: Clone + Send + 'static,
+        O: Emitter<Item = R> + Send + 'static,
         F: Fn(T) -> Result<R, T> + Send + 'static,
     {
         self.outs.push((
@@ -242,7 +238,7 @@ impl<T: Clone + Send + Sync + 'static> crate::cascade::Push<T> for Cascade<T> {
 
                     *x = keep;
 
-                    if drop_if_match || ev_out.extend(forward) {
+                    if drop_if_match || forward.into_iter().all(|i| ev_out.emit_owned(i).is_ok()) {
                         Ok(())
                     } else {
                         Err(keep_after_disconnect)
@@ -340,21 +336,27 @@ impl<T: Clone + Send + Sync + 'static> CascadeTrait for Cascade<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::traits::QueueInterfaceCommon;
     use std::time::Duration;
 
     #[test]
     fn test_event_listener() {
         let event = Queue::new();
 
-        event.push(0i32);
+        event.emit_owned(0i32).unwrap_err();
 
         let suls = event.listen_and_subscribe();
+        let data = &[1, 2, 3];
         let h = std::thread::spawn(move || {
             assert_eq!(suls.notifier.recv(), Ok(()));
-            assert_eq!(suls.listener.peek(), &[1, 2, 3]);
+            assert_eq!(suls.notifier.recv(), Ok(()));
+            assert_eq!(suls.notifier.recv(), Ok(()));
+            assert_eq!(suls.listener.peek(), data);
         });
 
-        event.extend([1, 2, 3].iter().copied());
+        for i in data.into_iter() {
+            event.emit_borrowed(i).unwrap();
+        }
         h.join().unwrap();
     }
 
@@ -364,17 +366,17 @@ mod tests {
 
         let suls1 = event.listen_and_subscribe();
 
-        event.push(10i32);
+        event.emit_owned(10).unwrap();
 
-        assert!(!event.is_empty());
+        assert!(!event.buffer_is_empty());
 
         let suls2 = event.listen_and_subscribe();
 
-        event.push(20i32);
+        event.emit_owned(20).unwrap();
 
         let h1 = std::thread::spawn(move || {
             assert_eq!(suls1.notifier.recv(), Ok(()));
-            assert_eq!(suls1.listener.peek(), &[10i32, 20i32]);
+            assert_eq!(suls1.listener.peek(), &[10, 20]);
         });
         let h2 = std::thread::spawn(move || {
             assert_eq!(suls2.notifier.recv(), Ok(()));
@@ -387,16 +389,16 @@ mod tests {
         });
 
         std::thread::sleep(Duration::from_millis(200));
-        assert!(event.is_empty());
+        assert!(event.buffer_is_empty());
 
         for _i in 0..10 {
-            event.push(30i32);
+            event.emit_owned(30).unwrap();
         }
 
         h1.join().unwrap();
         h2.join().unwrap();
 
-        assert!(event.is_empty());
+        assert!(event.buffer_is_empty());
     }
 
     #[test]
@@ -407,25 +409,25 @@ mod tests {
         let suls1 = event1.listen_and_subscribe();
         let suls2 = event2.listen_and_subscribe();
 
-        event1.push(20i32);
-        event2.push(10i32);
+        event1.emit_owned(20).unwrap();
+        event2.emit_owned(10).unwrap();
 
         chan::select! {
             recv(suls1.notifier) -> _msg => {
-                assert_eq!(suls1.listener.peek(), &[20i32]);
+                assert_eq!(suls1.listener.peek(), &[20]);
             },
             recv(suls2.notifier) -> _msg => {
-                assert_eq!(suls2.listener.peek(), &[10i32]);
+                assert_eq!(suls2.listener.peek(), &[10]);
             },
             default => panic!(),
         }
 
         chan::select! {
             recv(suls1.notifier) -> _msg => {
-                assert_eq!(suls1.listener.peek(), &[20i32]);
+                assert_eq!(suls1.listener.peek(), &[20]);
             },
             recv(suls2.notifier) -> _msg => {
-                assert_eq!(suls2.listener.peek(), &[10i32]);
+                assert_eq!(suls2.listener.peek(), &[10]);
             },
             default => panic!(),
         }

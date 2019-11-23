@@ -113,7 +113,7 @@ impl SkiaGraphicsDisplay {
             sk::ColorSpace::new_srgb(),
             None,
         )
-        .ok_or(error::SkiaError::InvalidTarget(String::from("framebuffer")))?)
+        .ok_or_else(|| error::SkiaError::InvalidTarget(String::from("framebuffer")))?)
     }
 
     fn new_gl_texture_surface(
@@ -156,7 +156,7 @@ impl SkiaGraphicsDisplay {
             sk::ColorSpace::new_srgb(),
             None,
         )
-        .ok_or(error::SkiaError::InvalidTarget(String::from("texture")))?)
+        .ok_or_else(|| error::SkiaError::InvalidTarget(String::from("texture")))?)
     }
 
     fn new_gl_context() -> Result<sk::gpu::Context, error::SkiaError> {
@@ -340,11 +340,11 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
     }
 }
 
-fn convert_color(color: &Color) -> sk::Color4f {
+fn convert_color(color: Color) -> sk::Color4f {
     sk::Color4f::new(color.red, color.green, color.blue, color.alpha)
 }
 
-fn convert_point(point: &Point) -> sk::Point {
+fn convert_point(point: Point) -> sk::Point {
     sk::Point::new(point.x, point.y)
 }
 
@@ -352,18 +352,18 @@ fn apply_color(color: &StyleColor, paint: &mut sk::Paint) -> Result<(), error::S
     match color {
         StyleColor::Color(ref color) => {
             // we can afford to "make" the SRGB color space every time; it's actually a singleton in the C++ Skia code.
-            paint.set_color4f(convert_color(color), &sk::ColorSpace::new_srgb());
+            paint.set_color4f(convert_color(*color), &sk::ColorSpace::new_srgb());
         }
         StyleColor::LinearGradient(ref gradient) => {
             let (colors, stops): (Vec<_>, Vec<_>) = gradient
                 .stops
                 .iter()
-                .map(|stop| (convert_color(&stop.1).to_color(), stop.0 as sk::scalar))
+                .map(|stop| (convert_color(stop.1).to_color(), stop.0 as sk::scalar))
                 .unzip();
 
             paint.set_shader(
                 sk::gradient_shader::linear(
-                    (convert_point(&gradient.start), convert_point(&gradient.end)),
+                    (convert_point(gradient.start), convert_point(gradient.end)),
                     sk::gradient_shader::GradientShaderColors::Colors(&colors[..]),
                     &stops[..],
                     sk::TileMode::default(),
@@ -377,11 +377,11 @@ fn apply_color(color: &StyleColor, paint: &mut sk::Paint) -> Result<(), error::S
             let (colors, stops): (Vec<_>, Vec<_>) = gradient
                 .stops
                 .iter()
-                .map(|stop| (convert_color(&stop.1).to_color(), stop.0 as sk::scalar))
+                .map(|stop| (convert_color(stop.1).to_color(), stop.0 as sk::scalar))
                 .unzip();
 
             paint.set_shader(sk::gradient_shader::radial(
-                convert_point(&gradient.start),
+                convert_point(gradient.start),
                 (gradient.end - gradient.start).length(),
                 sk::gradient_shader::GradientShaderColors::Colors(&colors[..]),
                 &stops[..],
@@ -395,7 +395,7 @@ fn apply_color(color: &StyleColor, paint: &mut sk::Paint) -> Result<(), error::S
     Ok(())
 }
 
-fn convert_line_cap(cap: &LineCap) -> sk::PaintCap {
+fn convert_line_cap(cap: LineCap) -> sk::PaintCap {
     match cap {
         LineCap::Flat => sk::PaintCap::Butt,
         LineCap::Square => sk::PaintCap::Square,
@@ -403,7 +403,7 @@ fn convert_line_cap(cap: &LineCap) -> sk::PaintCap {
     }
 }
 
-fn convert_line_join(join: &LineJoin) -> sk::PaintJoin {
+fn convert_line_join(join: LineJoin) -> sk::PaintJoin {
     match join {
         LineJoin::Miter => sk::PaintJoin::Miter,
         LineJoin::Round => sk::PaintJoin::Round,
@@ -426,8 +426,8 @@ fn convert_paint(gdpaint: &GraphicsDisplayPaint) -> Result<sk::Paint, error::Ski
             apply_color(&stroke.color, &mut paint)?;
 
             paint.set_stroke_width(stroke.thickness);
-            paint.set_stroke_cap(convert_line_cap(&stroke.cap));
-            paint.set_stroke_join(convert_line_join(&stroke.join));
+            paint.set_stroke_cap(convert_line_cap(stroke.cap));
+            paint.set_stroke_join(convert_line_join(stroke.join));
             paint.set_stroke_miter(stroke.miter_limit);
         }
     }
@@ -525,7 +525,7 @@ fn draw_command_group(
                             .map_err(|e| error::DisplayError::InternalError(e.into()))?;
                         surface
                             .canvas()
-                            .draw_line(convert_point(a), convert_point(b), &paint);
+                            .draw_line(convert_point(*a), convert_point(*b), &paint);
                     }
                     GraphicsDisplayItem::Rectangle { rect, paint } => {
                         let paint = convert_paint(paint)
@@ -595,7 +595,7 @@ fn draw_command_group(
                                     sk::Font::new(typeface.clone(), item.size),
                                 )
                                 .map_err(|e| error::DisplayError::InternalError(e.into()))?,
-                                convert_point(&item.bottom_left),
+                                convert_point(item.bottom_left),
                                 &paint,
                             );
                         }
@@ -623,11 +623,11 @@ fn draw_command_group(
                                 None,
                                 &convert_rect(&bounds).round(),
                             )
-                            .ok_or(
+                            .ok_or_else(|| {
                                 error::DisplayError::InternalError(Box::new(
                                     error::SkiaError::UnknownError,
-                                )),
-                            )?;
+                                ))
+                            })?;
 
                             surface
                                 .canvas()
@@ -682,7 +682,7 @@ fn draw_command_group(
                 surface.canvas().rotate(angle.to_degrees(), None);
             }
             DisplayCommand::Clear(ref color) => {
-                surface.canvas().clear(convert_color(color).to_color());
+                surface.canvas().clear(convert_color(*color).to_color());
             }
         }
     }

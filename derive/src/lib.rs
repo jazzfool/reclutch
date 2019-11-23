@@ -56,35 +56,30 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
         }
     }
 
-    if children.is_empty() {
-        quote! {
-            impl #impl_generics reclutch::WidgetChildren<<Self as reclutch::Widget>::Aux> for #name #ty_generics #where_clause {}
-        }
-    } else {
-        let (children, mut_children): (Vec<_>, Vec<_>) = children
-            .iter()
-            .map(|child| match child {
-                StringOrInt::String(child) => {
-                    let ident = quote::format_ident!("{}", child);
-                    (quote! { &self.#ident }, quote! { &mut self.#ident })
-                }
-                StringOrInt::Int(child) => {
-                    let ident = syn::Index::from(*child);
-                    (quote! { &self.#ident }, quote! { &mut self.#ident })
-                }
-            })
-            .unzip();
+    let (children, mut_children): (Vec<_>, Vec<_>) = children
+        .iter()
+        .map(|child| match child {
+            StringOrInt::String(child) => {
+                let ident = quote::format_ident!("{}", child);
+                (quote! { &self.#ident }, quote! { &mut self.#ident })
+            }
+            StringOrInt::Int(child) => {
+                let ident = syn::Index::from(*child);
+                (quote! { &self.#ident }, quote! { &mut self.#ident })
+            }
+        })
+        .unzip();
 
+    {
         quote! {
-            impl #impl_generics reclutch::WidgetChildren<<Self as reclutch::Widget>::Aux> for #name #ty_generics #where_clause {
-                fn children(&self) -> Vec<&dyn reclutch::WidgetChildren<Self::Aux>> {
-                    vec![ #(#children),* ]
+            impl #impl_generics reclutch::widget::WidgetChildren for #name #ty_generics #where_clause {
+                fn children(&self) -> Vec<&dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
+                        vec![ #(#children),* ]
                 }
-                fn children_mut(&mut self) -> Vec<&mut dyn reclutch::WidgetChildren<Self::Aux>> {
+                fn children_mut(&mut self) -> Vec<&mut dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
                     vec![ #(#mut_children),* ]
                 }
             }
         }
-    }
-    .into()
+    }.into()
 }

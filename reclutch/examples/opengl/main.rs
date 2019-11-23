@@ -1,11 +1,13 @@
 #[macro_use]
 extern crate glium;
 
-use glium::Surface;
 use {
-    glutin::{
-        event::{Event, WindowEvent},
-        event_loop::{ControlFlow, EventLoop},
+    glium::{
+        glutin::{
+            event::{Event, WindowEvent},
+            event_loop::{ControlFlow, EventLoop},
+        },
+        Surface,
     },
     reclutch::display::{
         self, Color, DisplayListBuilder, Filter, GraphicsDisplay, GraphicsDisplayPaint, Point,

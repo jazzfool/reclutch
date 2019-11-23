@@ -10,7 +10,7 @@ pub trait Merge<T> {
 impl<T, EL> Merge<T> for EL
 where
     T: Clone,
-    EL: Listen<T>,
+    EL: Listen<Item = T>,
 {
     fn extend_other(&self, o: &mut Vec<T>) {
         self.with(|j| o.extend(j.iter().cloned()));
@@ -24,7 +24,9 @@ where
     }
 }
 
-impl<T> Listen<T> for Listener<T> {
+impl<T> Listen for Listener<T> {
+    type Item = T;
+
     fn with<F, R>(&self, f: F) -> R
     where
         F: FnOnce(&[T]) -> R,
