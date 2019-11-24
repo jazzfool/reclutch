@@ -11,7 +11,7 @@
 //!
 //! When implementing these methods, child widgets must be considered. Therefore
 //! it is advisable to propagate them;
-//! ```rust
+//! ```ignore
 //! for child in self.children_mut() {
 //!     child.update(aux);
 //!     // or:
@@ -37,7 +37,7 @@
 //! mutable data around during updating.
 //!
 //! Here's an example implementation of `update`;
-//! ```rust
+//! ```ignore
 //! #[derive(WidgetChildren)]
 //! struct Counter { /* fields omitted */ }
 //!
@@ -68,7 +68,7 @@
 //! Drawing is renderer-agnostic, however this doesn't mean the API is restrictive.
 //! Generally, drawing is performed through [`CommandGroups`](display.struct.CommandGroups.html).
 //! A simple example of this can be seen below:
-//! ```rust
+//! ```ignore
 //! struct MyWidget {
 //!     cmd_group: CommandGroup,
 //! }
@@ -96,7 +96,7 @@
 //!
 //! Most of the time you don't want to implement `WidgetChildren` manually, instead
 //! you can use the provided `derive` crate to reduce it to a couple extra lines;
-//! ```rust
+//! ```ignore
 //! #[derive(WidgetChildren)]
 //! struct CounterWidget {
 //!     // --snip--
@@ -110,7 +110,7 @@
 //! }
 //! ```
 //! This will resolve down to the following code:
-//! ```rust
+//! ```ignore
 //! impl reclutch::WidgetChildren<<Self as reclutch::Widget>::Aux> for CounterWidget {
 //!     fn children(&self) -> Vec<&dyn reclutch::WidgetChildren<Self::Aux>> {
 //!         vec![&self.count_label, &self.count_up, &self.count_down]
