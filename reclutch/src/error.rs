@@ -25,6 +25,22 @@ pub enum SkiaError {
     UnknownError,
 }
 
+/// An error within the GPU graphics display implementation.
+#[derive(Error, Debug)]
+#[cfg(feature = "gpu")]
+pub enum GpuError {
+    #[error("shaderc error: {0}")]
+    CompilerError(String),
+    #[error("{0}")]
+    IoError(#[from] std::io::Error),
+    #[error("failed to get GPU adapter")]
+    AdapterError,
+    #[error("failed to tessellate mesh")]
+    TessellationError,
+    #[error("{0}")]
+    FontError(#[from] FontError),
+}
+
 /// An error associated with loading graphical resources.
 #[derive(Error, Debug)]
 pub enum ResourceError {
@@ -49,4 +65,6 @@ pub enum DisplayError {
     MismatchedResource(u64),
     #[error("{0}")]
     InternalError(#[from] Box<dyn std::error::Error>),
+    #[error("{0}")]
+    FontError(#[from] FontError),
 }

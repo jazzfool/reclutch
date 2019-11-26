@@ -3,6 +3,9 @@
 #[cfg(feature = "skia")]
 pub mod skia;
 
+#[cfg(feature = "gpu")]
+pub mod gpu;
+
 use {crate::error, palette::Srgba, std::sync::Arc};
 
 /// Two-dimensional floating-point absolute point.
