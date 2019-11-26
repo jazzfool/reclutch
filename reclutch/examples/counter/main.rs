@@ -210,6 +210,7 @@ impl Widget for Button {
     }
 }
 
+#[cfg(feature = "skia")]
 fn main() {
     let window_size = (500u32, 500u32);
 
@@ -305,4 +306,94 @@ fn main() {
         counter.update(&mut ());
         context.window().request_redraw();
     });
+}
+
+#[cfg(feature = "gpu")]
+fn main() {
+    let window_size = (500u32, 500u32);
+
+    let event_loop = EventLoop::new();
+
+    let window = glutin::window::WindowBuilder::new()
+        .with_title("Counter with Reclutch")
+        .with_inner_size(
+            glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
+                .to_logical(event_loop.primary_monitor().hidpi_factor()),
+        )
+        .build(&event_loop)
+        .unwrap();
+
+    let mut display =
+        display::gpu::GpuGraphicsDisplay::new(&window, window_size.0, window_size.1).unwrap();
+
+    // set up the UI
+    let mut window_q = RcEventQueue::new();
+    let mut counter = Counter::new(&mut window_q);
+    let mut cursor = Point::default();
+
+    let mut latest_window_size = window_size;
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+
+        match event {
+            WinitEvent::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
+                if display.size().0 != latest_window_size.0 as _
+                    || display.size().1 != latest_window_size.1 as _
+                {
+                    display
+                        .resize((latest_window_size.0 as _, latest_window_size.1 as _))
+                        .unwrap();
+                }
+
+                counter.draw(&mut display);
+                display.present(None).unwrap();
+            }
+            WinitEvent::WindowEvent {
+                event: WindowEvent::CursorMoved { position, .. },
+                ..
+            } => {
+                let position = position.to_physical(window.hidpi_factor());
+                cursor = Point::new(position.x as _, position.y as _);
+
+                window_q.push(GlobalEvent::MouseMove(cursor));
+            }
+            WinitEvent::WindowEvent {
+                event:
+                    WindowEvent::MouseInput {
+                        state: glutin::event::ElementState::Pressed,
+                        button: glutin::event::MouseButton::Left,
+                        ..
+                    },
+                ..
+            } => {
+                window_q.push(GlobalEvent::Click(cursor));
+            }
+            WinitEvent::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
+                *control_flow = ControlFlow::Exit;
+            }
+            WinitEvent::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                let size = size.to_physical(window.hidpi_factor());
+                latest_window_size = (size.width as _, size.height as _);
+            }
+            _ => return,
+        }
+
+        counter.update(&mut ());
+        window.request_redraw();
+    });
+}
+
+#[cfg(not(any(feature = "gpu", feature = "skia")))]
+fn main() {
+    compile_error!("this example requires either the 'gpu' or 'skia' features enabled")
 }

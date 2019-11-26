@@ -399,6 +399,7 @@ impl Widget for PanelContainer {
     }
 }
 
+#[cfg(feature = "skia")]
 fn main() {
     let window_size = (500u32, 500u32);
 
@@ -416,7 +417,7 @@ fn main() {
         );
 
     let context = glutin::ContextBuilder::new()
-        //.with_vsync(true) // fast dragging motion at the cost of high GPU usage
+        .with_vsync(true) // fast dragging motion at the cost of high GPU usage
         .build_windowed(wb, &event_loop)
         .unwrap();
 
@@ -534,4 +535,134 @@ fn main() {
         panel_container.update(&mut globals);
         context.window().request_redraw();
     });
+}
+
+#[cfg(feature = "gpu")]
+fn main() {
+    let window_size = (500u32, 500u32);
+
+    let event_loop = EventLoop::new();
+
+    let window = glutin::window::WindowBuilder::new()
+        .with_title("Image Viewer with Reclutch")
+        .with_inner_size(
+            glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
+                .to_logical(event_loop.primary_monitor().hidpi_factor()),
+        )
+        .with_min_inner_size(
+            glutin::dpi::PhysicalSize::new(400.0, 200.0)
+                .to_logical(event_loop.primary_monitor().hidpi_factor()),
+        )
+        .build(&event_loop)
+        .unwrap();
+
+    let mut display =
+        display::gpu::GpuGraphicsDisplay::new(&window, window_size.0, window_size.1).unwrap();
+
+    display
+        .push_command_group(
+            &[DisplayCommand::Clear(Color::new(1.0, 1.0, 1.0, 1.0))],
+            None,
+        )
+        .unwrap();
+
+    let mut latest_window_size = window_size;
+    let mut global_q = RcEventQueue::new();
+
+    let mut globals = Globals {
+        hidpi_factor: window.hidpi_factor(),
+        cursor: Point::default(),
+        size: Size::new(window_size.0 as _, window_size.1 as _),
+    };
+
+    let mut panel_container = PanelContainer::new();
+
+    panel_container.add_panel(Panel::new(
+        Point::new(10.0, 10.0),
+        Size::new(378.4, 100.0),
+        "Reclutch Logo".into(),
+        include_bytes!("../../../.media/reclutch.png"),
+        &mut global_q,
+    ));
+
+    panel_container.add_panel(Panel::new(
+        Point::new(30.0, 30.0),
+        Size::new(300.0, 200.0),
+        "Photography (by S. Unrau)".into(),
+        include_bytes!("image.jpg"),
+        &mut global_q,
+    ));
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::RedrawRequested,
+                ..
+            } => {
+                if display.size().0 != latest_window_size.0 as _
+                    || display.size().1 != latest_window_size.1 as _
+                {
+                    display
+                        .resize((latest_window_size.0 as _, latest_window_size.1 as _))
+                        .unwrap();
+                }
+
+                panel_container.draw(&mut display);
+                display.present(None).unwrap();
+            }
+            Event::WindowEvent {
+                event: WindowEvent::CursorMoved { position, .. },
+                ..
+            } => {
+                let position = position.to_physical(globals.hidpi_factor);
+                globals.cursor = Point::new(position.x as _, position.y as _);
+                global_q.push(GlobalEvent::MouseMove(globals.cursor.clone()));
+            }
+            Event::WindowEvent {
+                event:
+                    WindowEvent::MouseInput {
+                        button: glutin::event::MouseButton::Left,
+                        state,
+                        ..
+                    },
+                ..
+            } => match state {
+                glutin::event::ElementState::Pressed => {
+                    global_q.push(GlobalEvent::MouseClick(ConsumableEvent::new(
+                        globals.cursor.clone(),
+                    )));
+                }
+                glutin::event::ElementState::Released => {
+                    global_q.push(GlobalEvent::MouseRelease(globals.cursor.clone()));
+                }
+            },
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => {
+                *control_flow = ControlFlow::Exit;
+            }
+            Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                let size = size.to_physical(window.hidpi_factor());
+                latest_window_size = (size.width as _, size.height as _);
+                globals.size.width = size.width as _;
+                globals.size.height = size.height as _;
+                global_q.push(GlobalEvent::WindowResize);
+            }
+            _ => return,
+        }
+
+        panel_container.update(&mut globals);
+        window.request_redraw();
+    });
+}
+
+#[cfg(not(any(feature = "gpu", feature = "skia")))]
+fn main() {
+    compile_error!("this example requires either the 'gpu' or 'skia' features enabled")
 }
