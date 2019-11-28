@@ -2,53 +2,316 @@
 //! of `std::sync::mpsc`, because it's faster.
 //! (enable the support for `crossbeam-channel` via the feature flag)
 
-use crate::{channels_api, traits::GenericQueueInterface};
+use crate::{
+    channels_api,
+    traits::{EmitResult, Emitter, EmitterMut, EmitterMutExt, QueueInterfaceCommon},
+};
+use retain_mut::RetainMut;
+use std::{
+    borrow::Cow,
+    cell::RefCell,
+    ops::{Deref, DerefMut},
+    sync::{mpsc, Arc, RwLock},
+};
 
-impl<T> GenericQueueInterface<T> for crate::BlackHole<T> {
-    #[inline]
-    fn push(&self, _event: T) -> bool {
-        false
+impl<Q> EmitterMut for Q
+where
+    Q: Emitter,
+    Self::Item: Clone,
+{
+    #[inline(always)]
+    fn emit<'a>(&mut self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        Emitter::emit(&*self, event)
     }
 }
 
-impl<T> GenericQueueInterface<T> for std::sync::mpsc::Sender<T> {
-    #[inline]
-    fn push(&self, event: T) -> bool {
-        self.send(event).is_ok()
+impl<T> QueueInterfaceCommon for std::marker::PhantomData<T> {
+    type Item = T;
+}
+
+impl<T: Clone> Emitter for std::marker::PhantomData<T> {
+    #[inline(always)]
+    fn emit<'a>(&self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        Err(event)
     }
 }
 
-impl<T> GenericQueueInterface<T> for std::sync::mpsc::SyncSender<T> {
+impl<Q: QueueInterfaceCommon> QueueInterfaceCommon for [Q] {
+    type Item = <Q as QueueInterfaceCommon>::Item;
+
     #[inline]
-    fn push(&self, event: T) -> bool {
-        self.send(event).is_ok()
+    fn buffer_is_empty(&self) -> bool {
+        self.iter().all(|i| i.buffer_is_empty())
+    }
+}
+
+impl<Q> EmitterMut for [Q]
+where
+    Q: EmitterMut,
+    Self::Item: Clone,
+{
+    fn emit<'a>(&mut self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        if self.len() == 1 {
+            self.first_mut().unwrap().emit(event)
+        } else if self.iter_mut().any(|i| i.emit_borrowed(&*event).is_ok()) {
+            Ok(())
+        } else {
+            Err(event)
+        }
+    }
+}
+
+impl<Q: QueueInterfaceCommon> QueueInterfaceCommon for Vec<Q> {
+    type Item = <Q as QueueInterfaceCommon>::Item;
+
+    #[inline]
+    fn buffer_is_empty(&self) -> bool {
+        self.iter().all(|i| i.buffer_is_empty())
+    }
+}
+
+impl<Q> EmitterMut for Vec<Q>
+where
+    Q: EmitterMut,
+    Self::Item: Clone,
+{
+    fn emit<'a>(&mut self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        self.retain_mut(|i| i.emit_borrowed(&*event).is_ok());
+        if self.is_empty() {
+            Err(event)
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<T: Clone> QueueInterfaceCommon for Box<dyn EmitterMut<Item = T>> {
+    type Item = T;
+
+    #[inline]
+    fn buffer_is_empty(&self) -> bool {
+        self.deref().buffer_is_empty()
+    }
+}
+
+impl<T: Clone> EmitterMut for Box<dyn EmitterMut<Item = T>> {
+    #[inline]
+    fn emit<'a>(&mut self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        self.deref_mut().emit(event)
+    }
+}
+
+impl<Q: QueueInterfaceCommon> QueueInterfaceCommon for std::rc::Rc<Q> {
+    type Item = <Q as QueueInterfaceCommon>::Item;
+
+    #[inline(always)]
+    fn buffer_is_empty(&self) -> bool {
+        self.deref().buffer_is_empty()
+    }
+}
+
+impl<Q> Emitter for std::rc::Rc<Q>
+where
+    Q: Emitter,
+    Self::Item: Clone,
+{
+    #[inline(always)]
+    fn emit<'a>(&self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        self.deref().emit(event)
+    }
+}
+
+impl<Q: QueueInterfaceCommon> QueueInterfaceCommon for Arc<Q> {
+    type Item = <Q as QueueInterfaceCommon>::Item;
+
+    #[inline(always)]
+    fn buffer_is_empty(&self) -> bool {
+        self.deref().buffer_is_empty()
+    }
+}
+
+impl<Q> Emitter for Arc<Q>
+where
+    Q: Emitter,
+    Self::Item: Clone,
+{
+    #[inline(always)]
+    fn emit<'a>(&self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        self.deref().emit(event)
+    }
+}
+
+impl<Q: QueueInterfaceCommon> QueueInterfaceCommon for RefCell<Q> {
+    type Item = <Q as QueueInterfaceCommon>::Item;
+
+    #[inline]
+    fn buffer_is_empty(&self) -> bool {
+        self.borrow().buffer_is_empty()
+    }
+}
+
+impl<Q> Emitter for RefCell<Q>
+where
+    Q: EmitterMut,
+    Self::Item: Clone,
+{
+    #[inline]
+    fn emit<'a>(&self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        self.borrow_mut().emit(event)
+    }
+}
+
+impl<Q: QueueInterfaceCommon> QueueInterfaceCommon for RwLock<Q> {
+    type Item = <Q as QueueInterfaceCommon>::Item;
+
+    #[inline]
+    fn buffer_is_empty(&self) -> bool {
+        self.read().map(|i| i.buffer_is_empty()).unwrap_or(true)
+    }
+}
+
+impl<Q> Emitter for RwLock<Q>
+where
+    Q: EmitterMut,
+    Self::Item: Clone,
+{
+    #[inline]
+    fn emit<'a>(&self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
+        if let Ok(mut i) = self.write() {
+            i.emit(event)
+        } else {
+            Err(event)
+        }
+    }
+}
+
+impl<T> QueueInterfaceCommon for mpsc::Sender<T> {
+    type Item = T;
+}
+
+impl<T: Clone> Emitter for mpsc::Sender<T> {
+    #[inline]
+    fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
+        self.send(event.into_owned())
+            .map_err(|mpsc::SendError(x)| Cow::Owned(x))
+    }
+}
+
+impl<T> QueueInterfaceCommon for mpsc::SyncSender<T> {
+    type Item = T;
+}
+
+impl<T: Clone> Emitter for mpsc::SyncSender<T> {
+    #[inline]
+    fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
+        self.send(event.into_owned())
+            .map_err(|mpsc::SendError(x)| Cow::Owned(x))
     }
 }
 
 channels_api! {
-    impl<T> GenericQueueInterface<T> for crossbeam_channel::Sender<T> {
-        #[inline]
-        fn push(&self, event: T) -> bool {
-            self.send(event).is_ok()
-        }
+    impl<T> QueueInterfaceCommon for crossbeam_channel::Sender<T> {
+        type Item = T;
 
         #[inline]
-        fn is_empty(&self) -> bool {
+        fn buffer_is_empty(&self) -> bool {
             crossbeam_channel::Sender::is_empty(self)
+        }
+    }
+
+    impl<T: Clone> Emitter for crossbeam_channel::Sender<T> {
+        #[inline]
+        fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
+            self.send(event.into_owned()).map_err(|crossbeam_channel::SendError(x)| Cow::Owned(x))
         }
     }
 }
 
 #[cfg(feature = "winit")]
-impl<T> GenericQueueInterface<T> for winit::event_loop::EventLoopProxy<T> {
+impl<T> QueueInterfaceCommon for winit::event_loop::EventLoopProxy<T> {
+    type Item = T;
+}
+
+#[cfg(feature = "winit")]
+impl<T: Clone> Emitter for winit::event_loop::EventLoopProxy<T> {
     #[inline]
-    fn push(&self, event: T) -> bool {
-        self.send_event(event).is_ok()
+    fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
+        if self.send_event(event.clone().into_owned()).is_ok() {
+            Ok(())
+        } else {
+            // sadly, EventLoopProxy::send_event doesn't give us the owned event back
+            // if it fails
+            // ref: https://github.com/rust-windowing/winit/issues/1292
+            Err(event)
+        }
     }
 }
 
-#[cfg(all(test, feature = "crossbeam-channel", feature = "winit"))]
+#[cfg(test)]
 mod tests {
+    use crate::traits::EmitterMutExt;
+    use std::{sync::mpsc, time::Duration};
+
+    #[test]
+    fn test_event_listener() {
+        let mut event = Vec::new();
+
+        event.emit_owned(0i32).unwrap_err();
+
+        let (sender, receiver) = mpsc::channel();
+        event.push(sender);
+
+        let data = &[1, 2, 3];
+
+        let h = std::thread::spawn(move || {
+            for i in data {
+                assert_eq!(receiver.recv(), Ok(*i));
+            }
+        });
+
+        for i in data {
+            event.emit_borrowed(i).unwrap();
+        }
+        h.join().unwrap();
+    }
+
+    #[test]
+    fn test_event_cleanup() {
+        let mut event = Vec::new();
+
+        let (sender, subs1) = mpsc::channel();
+        event.push(sender);
+
+        event.emit_owned(10i32).unwrap();
+
+        let (sender, subs2) = mpsc::channel();
+        event.push(sender);
+
+        event.emit_owned(20i32).unwrap();
+
+        let h1 = std::thread::spawn(move || {
+            assert_eq!(subs1.recv(), Ok(10i32));
+            assert_eq!(subs1.recv(), Ok(20i32));
+        });
+        let h2 = std::thread::spawn(move || {
+            assert_eq!(subs2.recv(), Ok(20i32));
+            std::thread::sleep(Duration::from_millis(400));
+            for _i in 0..10 {
+                assert_eq!(subs2.recv(), Ok(30i32));
+            }
+        });
+
+        std::thread::sleep(Duration::from_millis(200));
+
+        for _i in 0..10 {
+            event.emit_owned(30i32).unwrap();
+        }
+
+        h1.join().unwrap();
+        h2.join().unwrap();
+    }
+
+    #[cfg(all(feature = "crossbeam-channel", feature = "winit"))]
     #[allow(dead_code)]
     fn winit_cascade() {
         use crate::cascade::Push;

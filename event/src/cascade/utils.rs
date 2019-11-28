@@ -6,8 +6,8 @@ pub type CleanupIndices = std::collections::HashMap<usize, bool>;
 pub type FinalizeContainer<T> = Option<Box<dyn Fn(Result<(), T>) -> bool + Send + 'static>>;
 
 /// This function is a wrapper around the [`crossbeam-channel::unbounded`]
-/// function, and returns a `(:GenericQueueInterface, :CascadeTrait)` tuple
-pub fn unbounded<T: Send + 'static>() -> (crossbeam_channel::Sender<T>, crate::dchans::Cascade<T>) {
+/// function, and returns a `(:Emitter, :CascadeTrait)` tuple
+pub fn unbounded<T: Clone + Send + 'static>() -> (crossbeam_channel::Sender<T>, crate::dchans::Cascade<T>) {
     let (tx, rx) = crossbeam_channel::unbounded();
     (tx, crate::dchans::Cascade::new(rx))
 }

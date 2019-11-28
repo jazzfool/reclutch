@@ -1,69 +1,15 @@
-mod private_ {
-    pub trait SealedListen {}
+use std::borrow::Cow;
 
-    #[cfg(feature = "crossbeam-channel")]
-    impl<T> SealedListen for crate::chans::Listener<T> {}
-    #[cfg(feature = "crossbeam-channel")]
-    impl<T> SealedListen for crate::dchans::Listener<T> {}
-    impl<T> SealedListen for crate::schans::Listener<T> {}
+/// EmitResult indicates the success or failure of an `event emit`.
+/// * Ok(()) means "delivered".
+/// * Err(x) means "not delivered"/"replaced with () along the way"
+///   and contains the unconsumed `Cow` argument.
+///   Take note that some emit methods might return an always owned
+///   event instead.
+pub type EmitResult<'a, T> = Result<(), Cow<'a, T>>;
 
-    impl<T> SealedListen for crate::nonrc::Listener<'_, T> {}
-    impl<T> SealedListen for crate::nonts::Listener<T> {}
-}
-
-/// Internal glue code to avoid boilerplate and repetition
-pub mod private {
-    use crate::RawEventQueue;
-
-    pub(crate) trait QueueInterface<T>: Default {
-        fn with_inner<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce(&RawEventQueue<T>) -> R;
-
-        fn with_inner_mut<F, R>(&self, f: F) -> R
-        where
-            F: FnOnce(&mut RawEventQueue<T>) -> R;
-    }
-
-    pub trait Listen<T> {
-        fn with_inner_mut<F, R>(&self, f: F) -> Option<R>
-        where
-            F: FnOnce(crate::intern::ListenerKey, &mut RawEventQueue<T>) -> R;
-    }
-
-    #[inline]
-    pub(crate) fn extend<T, EQ, I>(equeue: &EQ, events: I) -> bool
-    where
-        EQ: QueueInterface<T>,
-        I: IntoIterator<Item = T>,
-    {
-        equeue.with_inner_mut(|inner| {
-            if inner.listeners.is_empty() {
-                return false;
-            }
-            inner.events.extend(events);
-            true
-        })
-    }
-}
-
-/// Every supported event queue implements this trait
-pub trait GenericQueueInterface<T> {
-    /// Pushes/emits an event
-    fn push(&self, event: T) -> bool;
-
-    /// Emits multiple events in one go
-    fn extend<I>(&self, events: I) -> bool
-    where
-        I: IntoIterator<Item = T>,
-    {
-        for i in events.into_iter() {
-            if !self.push(i) {
-                return false;
-            }
-        }
-        true
-    }
+pub trait QueueInterfaceCommon {
+    type Item;
 
     /// Checks if any events are currently buffered
     ///
@@ -71,14 +17,47 @@ pub trait GenericQueueInterface<T> {
     /// * `false` if events are currently buffered
     /// * `true` if no events are currently buffered or the event queue doesn't
     ///   support querying this information
-    fn is_empty(&self) -> bool {
+    fn buffer_is_empty(&self) -> bool {
         true
     }
 }
 
+/// Every supported event queue implements this trait, mutable variant
+///
+/// More types implement this trait (including all types which implement
+/// [`Emitter`]), but can't be fully accessed via `Rc`/`Arc`.
+///
+/// This trait should be used as a trait bound if possible
+/// (instead of the non-mut variant).
+pub trait EmitterMut: QueueInterfaceCommon
+where
+    Self::Item: Clone,
+{
+    /// Pushes/emits an event
+    fn emit<'a>(&mut self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item>;
+}
+
+/// Every supported indirect event queue implements this trait
+///
+/// One should always prefer implementing `Emitter` over
+/// [`EmitterMut`] because this trait allows access via `Rc`/`Arc`
+/// and because implementing `Emitter` automatically
+/// provides one with a implementation of `EmitterMut` thanks
+/// to the provided blanket implementation.
+pub trait Emitter: QueueInterfaceCommon
+where
+    Self::Item: Clone,
+{
+    /// Pushes/emits an event
+    fn emit<'a>(&self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item>;
+}
+
 /// Event queues with the ability to create new listeners implement this trait
-pub trait QueueInterface<T>: GenericQueueInterface<T> {
-    type Listener: Listen<T>;
+pub trait QueueInterfaceListable: QueueInterfaceCommon
+where
+    Self::Item: Clone,
+{
+    type Listener: Listen<Item = Self::Item>;
 
     /// Creates a new event
     fn new() -> Self
@@ -92,7 +71,47 @@ pub trait QueueInterface<T>: GenericQueueInterface<T> {
     fn listen(&self) -> Self::Listener;
 }
 
-pub trait Listen<T> {
+pub trait EmitterMutExt: EmitterMut
+where
+    Self::Item: Clone,
+{
+    /// Pushs/emits an event, performing conversion from owned
+    #[inline]
+    fn emit_owned(&mut self, event: Self::Item) -> EmitResult<'static, Self::Item> {
+        self.emit(Cow::Owned(event))
+    }
+
+    /// Pushs/emits an event, performing conversion from borrowed
+    #[inline]
+    fn emit_borrowed<'a>(&mut self, event: &'a Self::Item) -> EmitResult<'a, Self::Item> {
+        self.emit(Cow::Borrowed(event))
+    }
+}
+
+impl<Q: EmitterMut> EmitterMutExt for Q where Self::Item: Clone {}
+
+pub trait EmitterExt: Emitter
+where
+    Self::Item: Clone,
+{
+    /// Pushs/emits an event, performing conversion from owned (convenience method)
+    #[inline]
+    fn emit_owned(&self, event: Self::Item) -> EmitResult<'static, Self::Item> {
+        self.emit(Cow::Owned(event))
+    }
+
+    /// Pushs/emits an event, performing conversion from borrowed (convenience method)
+    #[inline]
+    fn emit_borrowed<'a>(&self, event: &'a Self::Item) -> EmitResult<'a, Self::Item> {
+        self.emit(Cow::Borrowed(event))
+    }
+}
+
+impl<Q: Emitter> EmitterExt for Q where Self::Item: Clone {}
+
+pub trait Listen {
+    type Item;
+
     /// Applies a function to the list of new events since last `with` or `peek`
     /// without cloning T
     ///
@@ -100,10 +119,10 @@ pub trait Listen<T> {
     /// and iterating over the result.
     ///
     /// It holds a lock on the event while called, which means that recursive
-    /// calls to [`QueueInterface`] methods aren't allowed and will deadlock or panic.
+    /// calls to [`QueueInterfaceListable`] methods aren't allowed and will deadlock or panic.
     fn with<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&[T]) -> R;
+        F: FnOnce(&[Self::Item]) -> R;
 
     /// Applies a function to each new event since last `with` or `peek`
     /// without cloning T
@@ -111,34 +130,21 @@ pub trait Listen<T> {
     /// This function is sometimes faster than calling [`with`](Listen::with).
     ///
     /// It holds a lock on the event while called, which means that recursive
-    /// calls to [`QueueInterface`] methods aren't allowed and will deadlock or panic.
+    /// calls to [`QueueInterfaceListable`] methods aren't allowed and will deadlock or panic.
     #[inline]
     fn map<F, R>(&self, mut f: F) -> Vec<R>
     where
-        F: FnMut(&T) -> R,
+        F: FnMut(&Self::Item) -> R,
     {
         self.with(|slc| slc.iter().map(|i| f(i)).collect())
     }
 
     /// Returns a list of new events since last `peek`
     #[inline]
-    fn peek(&self) -> Vec<T>
+    fn peek(&self) -> Vec<Self::Item>
     where
-        T: Clone,
+        Self::Item: Clone,
     {
-        self.with(<[T]>::to_vec)
-    }
-}
-
-impl<T, EL> Listen<T> for EL
-where
-    EL: private::Listen<T> + private_::SealedListen,
-{
-    #[inline]
-    fn with<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&[T]) -> R,
-    {
-        self.with_inner_mut(|key, ev| ev.pull_with(key, f)).unwrap()
+        self.with(<[Self::Item]>::to_vec)
     }
 }

@@ -12,5 +12,5 @@ repository = "http://github.com/jazzfool/reclutch"
 proc-macro = true
 
 [dependencies]
-syn = "1.0.7"
-quote = "1.0.2"
+syn = "1.0"
+quote = "1.0"

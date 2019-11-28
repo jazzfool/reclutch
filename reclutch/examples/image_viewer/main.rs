@@ -1,20 +1,18 @@
-#![allow(unused_imports)]
-
 use {
-    glutin::{
+    glium::glutin::{
         event::{Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
     },
     reclutch::{
         display::{
-            self, Color, CommandGroup, DisplayClip, DisplayCommand, DisplayItem,
-            DisplayListBuilder, Filter, FontInfo, GraphicsDisplay, GraphicsDisplayItem,
-            GraphicsDisplayPaint, GraphicsDisplayStroke, ImageData, Point, Rect, ResourceData,
-            ResourceDescriptor, ResourceReference, SharedData, Size, TextDisplayItem, Vector,
+            self, Color, CommandGroup, DisplayCommand, DisplayListBuilder, Filter, FontInfo,
+            GraphicsDisplay, GraphicsDisplayPaint, GraphicsDisplayStroke, ImageData, Point, Rect,
+            ResourceData, ResourceDescriptor, ResourceReference, SharedData, Size, TextDisplayItem,
+            Vector,
         },
         event::{merge::Merge, RcEventListener, RcEventQueue},
         prelude::*,
-        Widget, WidgetChildren,
+        WidgetChildren,
     },
 };
 
@@ -79,7 +77,7 @@ impl Titlebar {
         global: &mut RcEventQueue<GlobalEvent>,
     ) -> Self {
         Titlebar {
-            move_event: RcEventQueue::new(),
+            move_event: RcEventQueue::default(),
             position,
             cursor_anchor: None,
             global_listener: global.listen(),
@@ -113,19 +111,19 @@ impl Widget for Titlebar {
                     {
                         self.cursor_anchor = Some(position.clone());
                         self.move_event
-                            .push(TitlebarEvent::BeginClick(position.clone()));
+                            .emit_owned(TitlebarEvent::BeginClick(position.clone()));
                     }
                 }
                 GlobalEvent::MouseRelease(_) => {
                     if self.cursor_anchor.is_some() {
                         self.cursor_anchor = None;
-                        self.move_event.push(TitlebarEvent::EndClick);
+                        self.move_event.emit_owned(TitlebarEvent::EndClick);
                     }
                 }
                 GlobalEvent::MouseMove(pos) => {
                     if let Some(ref cursor_anchor) = self.cursor_anchor {
                         self.move_event
-                            .push(TitlebarEvent::Move(pos - *cursor_anchor));
+                            .emit_owned(TitlebarEvent::Move(pos - *cursor_anchor));
                     }
                 }
                 _ => (),
@@ -206,7 +204,7 @@ impl Panel {
         let titlebar_move_listener = titlebar.move_event.listen();
 
         Panel {
-            on_click: RcEventQueue::new(),
+            on_click: RcEventQueue::default(),
             titlebar,
             position_anchor: None,
             position,
@@ -259,7 +257,7 @@ impl Widget for Panel {
             match event {
                 TitlebarEvent::BeginClick(_) => {
                     self.position_anchor = Some(self.position);
-                    self.on_click.push(self as _);
+                    self.on_click.emit_owned(self as _);
                 }
                 TitlebarEvent::Move(delta) => {
                     if let Some(position_anchor) = self.position_anchor {
@@ -281,7 +279,7 @@ impl Widget for Panel {
             match event {
                 GlobalEvent::MouseClick(click) => {
                     if let Some(_) = click.with(|pos| self.bounds().contains(pos.clone())) {
-                        self.on_click.push(self as _);
+                        self.on_click.emit_owned(self as _);
                     }
                 }
                 GlobalEvent::WindowResize => {
@@ -350,12 +348,12 @@ impl PanelContainer {
     }
 }
 
-impl WidgetChildren<Globals> for PanelContainer {
-    fn children(&self) -> Vec<&dyn WidgetChildren<Globals>> {
+impl WidgetChildren for PanelContainer {
+    fn children(&self) -> Vec<&dyn WidgetChildren<Aux = Globals>> {
         self.panels.iter().map(|(ref p, _)| p as _).collect()
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn WidgetChildren<Globals>> {
+    fn children_mut(&mut self) -> Vec<&mut dyn WidgetChildren<Aux = Globals>> {
         self.panels
             .iter_mut()
             .map(|(ref mut p, _)| p as _)
@@ -440,7 +438,7 @@ fn main() {
         .unwrap();
 
     let mut latest_window_size = window_size;
-    let mut global_q = RcEventQueue::new();
+    let mut global_q = RcEventQueue::default();
 
     let mut globals = Globals {
         hidpi_factor: context.window().hidpi_factor(),
@@ -492,7 +490,7 @@ fn main() {
             } => {
                 let position = position.to_physical(globals.hidpi_factor);
                 globals.cursor = Point::new(position.x as _, position.y as _);
-                global_q.push(GlobalEvent::MouseMove(globals.cursor.clone()));
+                global_q.emit_owned(GlobalEvent::MouseMove(globals.cursor.clone()));
             }
             Event::WindowEvent {
                 event:
@@ -504,12 +502,12 @@ fn main() {
                 ..
             } => match state {
                 glutin::event::ElementState::Pressed => {
-                    global_q.push(GlobalEvent::MouseClick(ConsumableEvent::new(
+                    global_q.emit_owned(GlobalEvent::MouseClick(ConsumableEvent::new(
                         globals.cursor.clone(),
                     )));
                 }
                 glutin::event::ElementState::Released => {
-                    global_q.push(GlobalEvent::MouseRelease(globals.cursor.clone()));
+                    global_q.emit_owned(GlobalEvent::MouseRelease(globals.cursor.clone()));
                 }
             },
             Event::WindowEvent {
@@ -526,7 +524,7 @@ fn main() {
                 latest_window_size = (size.width as _, size.height as _);
                 globals.size.width = size.width as _;
                 globals.size.height = size.height as _;
-                global_q.push(GlobalEvent::WindowResize);
+                global_q.emit_owned(GlobalEvent::WindowResize);
             }
             _ => return,
         }

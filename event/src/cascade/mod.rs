@@ -1,4 +1,4 @@
-use crate::traits::GenericQueueInterface;
+use crate::traits::{Emitter, EmitterExt};
 use crossbeam_channel as chan;
 
 pub mod utils;
@@ -32,7 +32,9 @@ pub trait CascadeTrait: 'static + Send {
     fn is_outs_empty(&self) -> bool;
 }
 
-pub trait Push<T>: CascadeTrait + Sized {
+pub trait Push: CascadeTrait + Sized {
+    type Item: Clone + Send + 'static;
+
     /// Append a cascade output filter.
     /// Each event is forwarded (to `ev_out`) if `filter(&event) == true`.
     /// Processing of the event stops after the first matching filter.
@@ -45,8 +47,8 @@ pub trait Push<T>: CascadeTrait + Sized {
     ///   "`filter` which matches no events"
     fn push<O, F>(self, ev_out: O, keep_after_disconnect: bool, filter: F) -> Self
     where
-        O: GenericQueueInterface<T> + Send + 'static,
-        F: Fn(&T) -> bool + Send + 'static;
+        O: Emitter<Item = Self::Item> + Send + 'static,
+        F: Fn(&Self::Item) -> bool + Send + 'static;
 
     /// This function extends the functionality of [`push`](Push::push)
     /// with the ability to cascade event queues with different
@@ -57,22 +59,20 @@ pub trait Push<T>: CascadeTrait + Sized {
     /// * `Err` to keep it in the cascade chain and continue with the next filter
     fn push_map<R, O, F>(self, ev_out: O, keep_after_disconnect: bool, filtmap: F) -> Self
     where
-        R: Send + 'static,
-        O: GenericQueueInterface<R> + Send + 'static,
-        F: Fn(T) -> Result<R, T> + Send + 'static;
+        R: Clone + Send + 'static,
+        O: Emitter<Item = R> + Send + 'static,
+        F: Fn(Self::Item) -> Result<R, Self::Item> + Send + 'static;
 
     /// Append a cascade output as notification queue.
     /// Every event which isn't matched by any preceding filters is cloned and
     /// pushed into the specified event output queue.
     fn push_notify<O>(self, ev_out: O) -> Self
     where
-        T: Clone,
-        O: GenericQueueInterface<T> + Clone + Send + Sync + 'static,
+        O: Emitter<Item = Self::Item> + Clone + Send + Sync + 'static,
     {
         // we need a clonable O to perform the automatic clenaup
         self.push(ev_out.clone(), false, move |event| {
-            ev_out.push((*event).clone());
-            false
+            ev_out.emit_borrowed(event).is_ok()
         })
     }
 
@@ -85,11 +85,11 @@ pub trait Push<T>: CascadeTrait + Sized {
     /// possibily aren't available yet when the token is consumed.
     fn push_notify_via_token<O>(self, ev_out: O) -> Self
     where
-        O: GenericQueueInterface<()> + Clone + Send + Sync + 'static,
+        O: Emitter<Item = ()> + Clone + Send + Sync + 'static,
     {
         // we need a clonable O to perform the automatic clenaup
         self.push_map(ev_out.clone(), false, move |event| {
-            ev_out.push(());
+            let _ = ev_out.emit_owned(());
             Err(event)
         })
     }
@@ -104,7 +104,7 @@ pub trait Push<T>: CascadeTrait + Sized {
     /// The finalizer gets removed from the cascade if it returns false.
     fn set_finalize<F>(self, f: F) -> Self
     where
-        F: Fn(Result<(), T>) -> bool + Send + 'static;
+        F: Fn(Result<(), Self::Item>) -> bool + Send + 'static;
 
     /// Wraps the current instance into a `Box`
     fn wrap(self) -> Box<dyn CascadeTrait> {
@@ -199,8 +199,8 @@ mod tests {
             s.spawn(move |_| run_worker(stop_rx, cascades));
             let sub = ev2.listen_and_subscribe();
             let sub2 = ev3.listen_and_subscribe();
-            ev1.push(2);
-            ev1.push(1);
+            ev1.emit_owned(2).unwrap();
+            ev1.emit_owned(1).unwrap();
             assert_eq!(sub.notifier.recv(), Ok(()));
             assert_eq!(sub.listener.peek(), &[1]);
             assert_eq!(sub2.notifier.recv(), Ok(()));
@@ -212,25 +212,23 @@ mod tests {
 
     #[test]
     fn cascades_dchan() {
-        let ev1 = dchans::Queue::new();
-        let ev2 = dchans::Queue::new();
-        let ev3 = dchans::Queue::new();
+        let (ev1_tx, ev1_rx) = chan::unbounded();
+        let (ev2_tx, ev2_rx) = chan::unbounded();
+        let (ev3_tx, ev3_rx) = chan::unbounded();
         let (stop_tx, stop_rx) = chan::bounded(0);
         let mut cascades = Vec::new();
         cascades.push(
-            ev1.cascade()
-                .push(ev2.clone(), false, |i| i % 2 == 1)
-                .push(ev3.clone(), false, |_| true)
+            dchans::Cascade::new(ev1_rx)
+                .push(ev2_tx, false, |i| i % 2 == 1)
+                .push(ev3_tx, false, |_| true)
                 .wrap(),
         );
         crossbeam_utils::thread::scope(move |s| {
             s.spawn(move |_| run_worker(stop_rx, cascades));
-            let sub = ev2.subscribe();
-            let sub2 = ev3.subscribe();
-            ev1.push(2);
-            ev1.push(1);
-            assert_eq!(sub.recv(), Ok(1));
-            assert_eq!(sub2.recv(), Ok(2));
+            ev1_tx.emit_owned(2).unwrap();
+            ev1_tx.emit_owned(1).unwrap();
+            assert_eq!(ev2_rx.recv(), Ok(1));
+            assert_eq!(ev3_rx.recv(), Ok(2));
             std::mem::drop(stop_tx);
         })
         .unwrap();
@@ -238,51 +236,47 @@ mod tests {
 
     #[test]
     fn runtime_cascade() {
-        let ev1 = dchans::Queue::new();
-        let ev2 = dchans::Queue::new();
-        let ev3 = dchans::Queue::new();
+        let (ev1_tx, ev1_rx) = super::utils::unbounded();
+        let (ev2_tx, ev2_rx) = chan::unbounded();
+        let (ev3_tx, ev3_rx) = chan::unbounded();
         let (ctrl_tx, ctrl_rx) = chan::bounded(0);
         crossbeam_utils::thread::scope(move |s| {
             s.spawn(move |_| run_worker(ctrl_rx, Vec::new()));
             ctrl_tx
                 .send(
-                    ev1.cascade()
-                        .push(ev2.clone(), false, |i| i % 2 == 1)
-                        .push(ev3.clone(), false, |_| true)
+                    ev1_rx
+                        .push(ev2_tx, false, |i| i % 2 == 1)
+                        .push(ev3_tx, false, |_| true)
                         .wrap(),
                 )
                 .unwrap();
-            let sub = ev2.subscribe();
-            let sub2 = ev3.subscribe();
-            ev1.push(2);
-            ev1.push(1);
-            assert_eq!(sub.recv(), Ok(1));
-            assert_eq!(sub2.recv(), Ok(2));
+            ev1_tx.emit_owned(2).unwrap();
+            ev1_tx.emit_owned(1).unwrap();
+            assert_eq!(ev2_rx.recv(), Ok(1));
+            assert_eq!(ev3_rx.recv(), Ok(2));
         })
         .unwrap();
     }
 
     #[test]
     fn cascade_map() {
-        let ev1 = dchans::Queue::new();
-        let ev2 = dchans::Queue::new();
-        let ev3 = dchans::Queue::new();
+        let (ev1_tx, ev1_rx) = super::utils::unbounded();
+        let (ev2_tx, ev2_rx) = chan::unbounded();
+        let (ev3_tx, ev3_rx) = chan::unbounded();
         let (stop_tx, stop_rx) = chan::bounded(0);
         let mut cascades = Vec::new();
         cascades.push(
-            ev1.cascade()
-                .push(ev2.clone(), false, |i| i % 2 == 1)
-                .push_map(ev3.clone(), false, |_| Ok(true))
+            ev1_rx
+                .push(ev2_tx, false, |i| i % 2 == 1)
+                .push_map(ev3_tx, false, |_| Ok(true))
                 .wrap(),
         );
         crossbeam_utils::thread::scope(move |s| {
             s.spawn(move |_| run_worker(stop_rx, cascades));
-            let sub = ev2.subscribe();
-            let sub2 = ev3.subscribe();
-            ev1.push(2);
-            ev1.push(1);
-            assert_eq!(sub.recv(), Ok(1));
-            assert_eq!(sub2.recv(), Ok(true));
+            ev1_tx.emit_owned(2).unwrap();
+            ev1_tx.emit_owned(1).unwrap();
+            assert_eq!(ev2_rx.recv(), Ok(1));
+            assert_eq!(ev3_rx.recv(), Ok(true));
             std::mem::drop(stop_tx);
         })
         .unwrap();
@@ -290,18 +284,18 @@ mod tests {
 
     #[test]
     fn cascade_internal_routing_low() {
-        let ev1 = dchans::Queue::new();
+        let (ev1_tx, ev1_rx) = super::utils::unbounded();
         let (ev2_tx, ev2_rx) = chan::unbounded();
         let (evi_tx, evi_rx) = super::utils::unbounded(); // evi_rx is a cascade
         let mut cascades = Vec::new();
-        cascades.push(ev1.cascade().push(evi_tx, false, |_| true).wrap());
+        cascades.push(ev1_rx.push(evi_tx, false, |_| true).wrap());
         cascades.push(evi_rx.push(ev2_tx, false, |_| true).wrap());
         crossbeam_utils::thread::scope(move |s| {
             let (_stop_tx, stop_rx) = chan::bounded(0);
             s.spawn(move |_| run_worker(stop_rx, cascades));
-            ev1.push(2);
-            ev1.push(1);
-            std::mem::drop(ev1);
+            ev1_tx.emit_owned(2).unwrap();
+            ev1_tx.emit_owned(1).unwrap();
+            std::mem::drop(ev1_tx);
             assert_eq!(ev2_rx.recv(), Ok(2));
             assert_eq!(ev2_rx.recv(), Ok(1));
             // the following only works when the 'evi' cascade is dropped
@@ -312,25 +306,22 @@ mod tests {
 
     #[test]
     fn cascade_internal_routing_high() {
-        let ev1 = dchans::Queue::new();
-        let ev2 = dchans::Queue::new();
-        let evi = dchans::Queue::new();
+        let (ev1_tx, ev1_rx) = super::utils::unbounded();
+        let (ev2_tx, ev2_rx) = chan::unbounded();
+        let (evi_tx, evi_rx) = super::utils::unbounded();
         let mut cascades = Vec::new();
-        cascades.push(ev1.cascade().push(evi.clone(), false, |_| true).wrap());
-        cascades.push(evi.cascade().push(ev2.clone(), false, |_| true).wrap());
-        std::mem::drop(evi);
+        cascades.push(ev1_rx.push(evi_tx, false, |_| true).wrap());
+        cascades.push(evi_rx.push(ev2_tx, false, |_| true).wrap());
         crossbeam_utils::thread::scope(move |s| {
             let (_stop_tx, stop_rx) = chan::bounded(0);
             s.spawn(move |_| run_worker(stop_rx, cascades));
-            let sub = ev2.subscribe();
-            ev1.push(2);
-            ev1.push(1);
-            std::mem::drop(ev1);
-            std::mem::drop(ev2);
-            assert_eq!(sub.recv(), Ok(2));
-            assert_eq!(sub.recv(), Ok(1));
+            ev1_tx.emit_owned(2).unwrap();
+            ev1_tx.emit_owned(1).unwrap();
+            std::mem::drop(ev1_tx);
+            assert_eq!(ev2_rx.recv(), Ok(2));
+            assert_eq!(ev2_rx.recv(), Ok(1));
             // the following only works when the 'evi' cascade is dropped
-            assert_eq!(sub.recv(), Err(chan::RecvError));
+            assert_eq!(ev2_rx.recv(), Err(chan::RecvError));
         })
         .unwrap();
     }

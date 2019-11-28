@@ -157,7 +157,7 @@ impl CommandGroupHandle {
     }
 
     /// Returns the inner ID.
-    pub fn id(&self) -> u64 {
+    pub fn id(self) -> u64 {
         self.0
     }
 }
@@ -165,6 +165,12 @@ impl CommandGroupHandle {
 /// Helper wrapper around [`CommandGroupHandle`](struct.CommandGroupHandle.html).
 #[derive(Clone)]
 pub struct CommandGroup(Option<CommandGroupHandle>, bool);
+
+impl Default for CommandGroup {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl CommandGroup {
     /// Creates a new, empty command group.
@@ -333,7 +339,7 @@ impl GraphicsDisplayItem {
                             0.0
                         },
                     ),
-                    &Angle::radians(2.0 * ((*a - axis_rect_xy).length() / size.height).asin()),
+                    Angle::radians(2.0 * ((*a - axis_rect_xy).length() / size.height).asin()),
                 )
             }
             GraphicsDisplayItem::Rectangle { rect, paint } => match paint {
@@ -364,7 +370,7 @@ impl GraphicsDisplayItem {
                     }
                 }
             }
-            GraphicsDisplayItem::Image { dst, .. } => dst.clone(),
+            GraphicsDisplayItem::Image { dst, .. } => *dst,
         }
     }
 }
@@ -679,7 +685,7 @@ pub enum Filter {
 }
 
 /// Interface to simplify creating a list of display commands.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct DisplayListBuilder {
     display_list: Vec<DisplayCommand>,
 }
@@ -687,9 +693,7 @@ pub struct DisplayListBuilder {
 impl DisplayListBuilder {
     /// Creates a new, empty display list builder.
     pub fn new() -> Self {
-        DisplayListBuilder {
-            display_list: Vec::new(),
-        }
+        Default::default()
     }
 
     /// Creates a new display list builder, initialized with an existing list of display commands.
@@ -853,7 +857,7 @@ impl DisplayListBuilder {
     }
 }
 
-fn rotate_point(p: &Point, center: &Point, angle: &Angle) -> Point {
+fn rotate_point(p: Point, center: Point, angle: Angle) -> Point {
     let (angle_sin, angle_cos) = angle.sin_cos();
     Point::new(
         angle_cos * (p.x - center.x) - angle_sin * (p.y - center.y) + center.x,
@@ -861,7 +865,7 @@ fn rotate_point(p: &Point, center: &Point, angle: &Angle) -> Point {
     )
 }
 
-fn rotated_rectangle_bounds(rect: &Rect, angle: &Angle) -> Rect {
+fn rotated_rectangle_bounds(rect: &Rect, angle: Angle) -> Rect {
     Rect::from_points(
         [
             rect.origin,
@@ -870,7 +874,7 @@ fn rotated_rectangle_bounds(rect: &Rect, angle: &Angle) -> Rect {
             rect.origin + Size::new(0.0, rect.size.height),
         ]
         .iter()
-        .map(|p| rotate_point(p, &rect.center(), angle)),
+        .map(|p| rotate_point(*p, rect.center(), angle)),
     )
 }
 
