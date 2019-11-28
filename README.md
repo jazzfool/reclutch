@@ -77,12 +77,12 @@ struct ExampleWidget {
 Which expands to exactly...
 
 ```rust
-impl reclutch::WidgetChildren<<Self as reclutch::Widget>::Aux> for ExampleWidget {
-    fn children(&self) -> Vec<&dyn reclutch::WidgetChildren<Self::Aux>> {
+impl reclutch::widget::WidgetChildren for ExampleWidget {
+    fn children(&self) -> Vec<&dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
         vec![&self.child]
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn reclutch::WidgetChildren<Self::Aux>> {
+    fn children_mut(&mut self) -> Vec<&mut dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
         vec![&mut self.child]
     }
 }
@@ -116,7 +116,7 @@ struct VisualWidget {
 
 impl Widget for VisualWidget {
     // --snip--
-    
+
     fn update(&mut self, _aux: &mut ()) {
         if self.changed {
             self.command_group.repaint();

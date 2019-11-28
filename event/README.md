@@ -42,12 +42,12 @@ Here's an example of it's usage outside a widget (with manual updating);
 ```rust
 let mut event: RcEventQueue<i32> = RcEventQueue::new();
 
-event.push(10); // no listeners, so this event won't be received by anyone.
+event.emit_owned(10); // no listeners, so this event won't be received by anyone.
 
 let listener = event.listen();
 
-event.push(1);
-event.push(2);
+event.emit_owned(1);
+event.emit_owned(2);
 
 // here is how listeners respond to events.
 for num in listener.peek() {
