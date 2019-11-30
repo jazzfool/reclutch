@@ -11,23 +11,26 @@ repository = "http://github.com/jazzfool/reclutch"
 [features]
 default = ["reclutch_derive"]
 skia = ["skia-safe", "gl", "linked-hash-map"]
-gpu = ["wgpu", "linked-hash-map", "image", "lyon", "nalgebra", "raw-window-handle"]
+gpu = ["wgpu", "linked-hash-map", "image", "lyon", "nalgebra", "raw-window-handle", "wgpu_glyph", "shaderc", "diffs"]
 
 [dependencies]
 reclutch_event = { path = "../event" }
 reclutch_derive = { path = "../derive", optional = true }
-euclid = "0.20.4"
-thiserror = "1.0.6"
-font-kit = "0.4.0"
-palette = "0.5.0"
-skia-safe = { version = "0.19.0", optional = true }
-gl = { version = "0.14.0", optional = true }
-linked-hash-map = { version = "0.5.2", optional = true }
-wgpu = { version = "0.4.0", optional = true }
-raw-window-handle = { version = "0.3.1", optional = true }
-image = { version = "0.22.3", optional = true }
-lyon = { version = "0.14.2", optional = true }
-nalgebra = { version = "0.19.0", optional = true }
+euclid = "0.20"
+thiserror = "1.0"
+font-kit = "0.4"
+palette = "0.5"
+skia-safe = { version = "0.19", optional = true }
+gl = { version = "0.14", optional = true }
+linked-hash-map = { version = "0.5", optional = true }
+wgpu = { version = "0.4", optional = true }
+raw-window-handle = { version = "0.3", optional = true }
+image = { version = "0.22", optional = true }
+lyon = { version = "0.14", optional = true }
+nalgebra = { version = "0.19", optional = true }
+wgpu_glyph = { version = "0.6", optional = true }
+shaderc = { version = "0.6", optional = true }
+diffs = { version = "0.3", optional = true }
 
 [[example]]
 name = "counter"
@@ -44,7 +47,7 @@ name = "shaping"
 [dev-dependencies]
 glium = "0.26.0-alpha3"
 glutin = "0.22.0-alpha3"
-nalgebra = "0.19.0"
-float-cmp = "0.6.0"
-harfbuzz_rs = "1.0.0"
-rusttype = "0.8.2"
+nalgebra = "0.19"
+float-cmp = "0.6"
+harfbuzz_rs = "1.0"
+rusttype = "0.8"
