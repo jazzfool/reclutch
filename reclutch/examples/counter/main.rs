@@ -10,9 +10,9 @@ use {
     },
     reclutch::{
         display::{
-            self, Color, CommandGroup, DisplayListBuilder, FontInfo, GraphicsDisplay,
-            GraphicsDisplayPaint, Point, Rect, ResourceData, ResourceDescriptor, ResourceReference,
-            SharedData, Size, TextDisplayItem,
+            self, Color, CommandGroup, DisplayListBuilder, FontInfo, Gradient, GraphicsDisplay,
+            GraphicsDisplayPaint, GraphicsDisplayStroke, Point, Rect, ResourceData,
+            ResourceDescriptor, ResourceReference, SharedData, Size, StyleColor, TextDisplayItem,
         },
         event::{RcEventListener, RcEventQueue},
         prelude::*,
@@ -193,7 +193,29 @@ impl Widget for Button {
 
         let mut builder = DisplayListBuilder::new();
 
-        builder.push_round_rectangle(bounds, [10.0; 4], GraphicsDisplayPaint::Fill(color.into()));
+        builder.push_round_rectangle(
+            bounds,
+            [5.0; 4],
+            GraphicsDisplayPaint::Fill(StyleColor::LinearGradient(Gradient {
+                start: bounds.origin,
+                end: bounds.origin + Size::new(0.0, bounds.size.height),
+                stops: vec![
+                    (0.0, Color::new(0.20, 0.80, 0.33, 1.0)),
+                    (1.0, Color::new(0.15, 0.65, 0.27, 1.0)),
+                ],
+            })),
+        );
+
+        builder.push_round_rectangle(
+            bounds,
+            [5.0; 4],
+            GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                antialias: true,
+                thickness: 1.5,
+                color: Color::new(0.14, 0.52, 0.23, 1.0).into(),
+                ..Default::default()
+            }),
+        );
 
         builder.push_text(TextDisplayItem {
             text: self.text.clone().into(),
