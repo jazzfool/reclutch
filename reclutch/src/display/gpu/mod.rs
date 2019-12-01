@@ -6,6 +6,8 @@ use {
     std::{collections::HashMap, error::Error},
 };
 
+const SAMPLE_COUNT: u32 = 8;
+
 struct CommandGroupData {
     display: Vec<DisplayCommand>,
     render: Vec<RenderCommand>,
@@ -419,9 +421,9 @@ fn create_pipeline(
                 },
             ],
         }],
-        sample_count: 1,
+        sample_count: SAMPLE_COUNT,
         sample_mask: !0,
-        alpha_to_coverage_enabled: false,
+        alpha_to_coverage_enabled: true,
     })
 }
 
@@ -477,6 +479,52 @@ fn create_render_paint(
             }
         }
     }
+}
+
+fn create_msaa_framebuffer(
+    device: &wgpu::Device,
+    swap_chain_desc: &wgpu::SwapChainDescriptor,
+    sample_count: u32,
+) -> wgpu::TextureView {
+    let size = wgpu::Extent3d {
+        width: swap_chain_desc.width,
+        height: swap_chain_desc.height,
+        depth: 1,
+    };
+
+    let frame_descriptor = &wgpu::TextureDescriptor {
+        size,
+        array_layer_count: 1,
+        mip_level_count: 1,
+        sample_count,
+        dimension: wgpu::TextureDimension::D2,
+        format: swap_chain_desc.format,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+    };
+
+    device
+        .create_texture(frame_descriptor)
+        .create_default_view()
+}
+
+fn upload_to_buffer<T: 'static + Sized + Copy>(
+    device: &wgpu::Device,
+    queue: &mut wgpu::Queue,
+    contents: &[T],
+    buffer: &wgpu::Buffer,
+) {
+    let temp_buf = device
+        .create_buffer_mapped(contents.len(), wgpu::BufferUsage::COPY_SRC)
+        .fill_from_slice(contents);
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+    encoder.copy_buffer_to_buffer(
+        &temp_buf,
+        0,
+        buffer,
+        0,
+        (std::mem::size_of::<T>() * contents.len()) as _,
+    );
+    queue.submit(&[encoder.finish()]);
 }
 
 #[derive(Debug)]
@@ -597,6 +645,7 @@ pub struct GpuGraphicsDisplay {
     swap_chain: wgpu::SwapChain,
     swap_chain_desc: wgpu::SwapChainDescriptor,
     surface: wgpu::Surface,
+    msaa_framebuffer: wgpu::TextureView,
 }
 
 impl GpuGraphicsDisplay {
@@ -629,6 +678,8 @@ impl GpuGraphicsDisplay {
         };
 
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
+
+        let msaa_framebuffer = create_msaa_framebuffer(&device, &swap_chain_desc, SAMPLE_COUNT);
 
         let global_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -779,7 +830,7 @@ impl GpuGraphicsDisplay {
                 layout(location = 0) out vec4 o_color;
 
                 layout(std140) struct Stop {
-                    vec4 pos; // not actually a vec4, more like f32 + 32x4 byte alignment.
+                    vec4 pos; // not actually a vec4, more like f32 + 16 byte alignment.
                     vec4 color;
                 };
 
@@ -846,7 +897,7 @@ impl GpuGraphicsDisplay {
                 layout(location = 0) out vec4 o_color;
 
                 layout(std140) struct Stop {
-                    vec4 pos; // not actually a vec4, more like f32 + 32x4 byte alignment.
+                    vec4 pos; // not actually a vec4, more like f32 + 16 byte alignment.
                     vec4 color;
                 };
 
@@ -967,6 +1018,7 @@ impl GpuGraphicsDisplay {
             swap_chain,
             swap_chain_desc,
             surface,
+            msaa_framebuffer,
         })
     }
 
@@ -977,11 +1029,34 @@ impl GpuGraphicsDisplay {
 
 impl GraphicsDisplay for GpuGraphicsDisplay {
     fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>> {
+        if size.0 == 0 || size.1 == 0 {
+            return Ok(());
+        }
+
         self.swap_chain_desc.width = size.0;
         self.swap_chain_desc.height = size.1;
         self.swap_chain = self
             .device
             .create_swap_chain(&self.surface, &self.swap_chain_desc);
+        self.msaa_framebuffer =
+            create_msaa_framebuffer(&self.device, &self.swap_chain_desc, SAMPLE_COUNT);
+
+        self.globals.ortho = nalgebra::Matrix4::new_orthographic(
+            0.0,
+            self.swap_chain_desc.width as _,
+            0.0,
+            self.swap_chain_desc.height as _,
+            -1.0,
+            1.0,
+        );
+
+        upload_to_buffer(
+            &self.device,
+            &mut self.queue,
+            &[self.globals.clone()],
+            &self.globals_buffer,
+        );
+
         Ok(())
     }
 
@@ -1261,8 +1336,8 @@ impl GraphicsDisplay for GpuGraphicsDisplay {
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
+                    attachment: &self.msaa_framebuffer,
+                    resolve_target: Some(&frame.view),
                     clear_color: wgpu::Color {
                         r: 1.0,
                         g: 1.0,
