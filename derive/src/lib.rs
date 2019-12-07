@@ -73,10 +73,26 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
     {
         quote! {
             impl #impl_generics reclutch::widget::WidgetChildren for #name #ty_generics #where_clause {
-                fn children(&self) -> Vec<&dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
-                        vec![ #(#children),* ]
+                fn children(
+                    &self
+                ) -> Vec<
+                    &dyn reclutch::widget::WidgetChildren<
+                        UpdateAux = Self::UpdateAux,
+                        GraphicalAux = Self::GraphicalAux,
+                        DisplayObject = Self::DisplayObject,
+                    >
+                > {
+                    vec![ #(#children),* ]
                 }
-                fn children_mut(&mut self) -> Vec<&mut dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
+                fn children_mut(
+                    &mut self
+                ) -> Vec<
+                    &mut dyn reclutch::widget::WidgetChildren<
+                        UpdateAux = Self::UpdateAux,
+                        GraphicalAux = Self::GraphicalAux,
+                        DisplayObject = Self::DisplayObject,
+                    >
+                > {
                     vec![ #(#mut_children),* ]
                 }
             }

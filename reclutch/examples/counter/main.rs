@@ -8,9 +8,9 @@ use {
     },
     reclutch::{
         display::{
-            self, Color, CommandGroup, DisplayListBuilder, FontInfo, GraphicsDisplay,
-            GraphicsDisplayPaint, Point, Rect, ResourceData, ResourceDescriptor, ResourceReference,
-            SharedData, Size, TextDisplayItem,
+            self, Color, CommandGroup, DisplayCommand, DisplayListBuilder, FontInfo,
+            GraphicsDisplay, GraphicsDisplayPaint, Point, Rect, ResourceData, ResourceDescriptor,
+            ResourceReference, SharedData, Size, TextDisplayItem,
         },
         event::{RcEventListener, RcEventQueue},
         prelude::*,
@@ -62,7 +62,9 @@ impl Counter {
 }
 
 impl Widget for Counter {
-    type Aux = ();
+    type UpdateAux = ();
+    type GraphicalAux = ();
+    type DisplayObject = DisplayCommand;
 
     fn bounds(&self) -> Rect {
         Rect::new(Point::new(0.0, 0.0), Size::new(100.0, 100.0))
@@ -84,7 +86,7 @@ impl Widget for Counter {
         }
     }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut ()) {
         if self.font.is_none() {
             self.font = display
                 .new_resource(ResourceDescriptor::Font(ResourceData::Data(
@@ -111,7 +113,7 @@ impl Widget for Counter {
         self.command_group.push(display, &builder.build(), None);
 
         for child in self.children_mut() {
-            child.draw(display);
+            child.draw(display, aux);
         }
     }
 }
@@ -147,7 +149,9 @@ impl Button {
 }
 
 impl Widget for Button {
-    type Aux = ();
+    type UpdateAux = ();
+    type GraphicalAux = ();
+    type DisplayObject = DisplayCommand;
 
     fn bounds(&self) -> Rect {
         Rect::new(self.position, Size::new(150.0, 50.0))
@@ -173,7 +177,7 @@ impl Widget for Button {
         }
     }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) {
         if self.font.is_none() {
             self.font = display
                 .new_resource(ResourceDescriptor::Font(ResourceData::Data(
@@ -260,7 +264,7 @@ fn main() {
                         .unwrap();
                 }
 
-                counter.draw(&mut display);
+                counter.draw(&mut display, &mut ());
                 display.present(None).unwrap();
                 context.swap_buffers().unwrap();
             }

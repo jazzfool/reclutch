@@ -97,7 +97,9 @@ impl Titlebar {
 }
 
 impl Widget for Titlebar {
-    type Aux = Globals;
+    type UpdateAux = Globals;
+    type GraphicalAux = ();
+    type DisplayObject = DisplayCommand;
 
     fn bounds(&self) -> Rect {
         Rect::new(self.position, Size::new(self.width, 30.0))
@@ -139,7 +141,7 @@ impl Widget for Titlebar {
         }
     }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) {
         if self.font_resource.is_none() {
             self.font_resource = display
                 .new_resource(ResourceDescriptor::Font(ResourceData::Data(
@@ -250,7 +252,9 @@ impl Panel {
 }
 
 impl Widget for Panel {
-    type Aux = Globals;
+    type UpdateAux = Globals;
+    type GraphicalAux = ();
+    type DisplayObject = DisplayCommand;
 
     fn bounds(&self) -> Rect {
         Rect::new(self.position, self.size)
@@ -301,7 +305,7 @@ impl Widget for Panel {
         }
     }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut ()) {
         if self.image.is_none() {
             self.image = display
                 .new_resource(ResourceDescriptor::Image(ImageData::Encoded(
@@ -336,7 +340,7 @@ impl Widget for Panel {
         self.command_group.push(display, &builder.build(), None);
 
         for child in self.children_mut() {
-            child.draw(display);
+            child.draw(display, aux);
         }
     }
 }
@@ -357,11 +361,23 @@ impl PanelContainer {
 }
 
 impl WidgetChildren for PanelContainer {
-    fn children(&self) -> Vec<&dyn WidgetChildren<Aux = Globals>> {
+    fn children(
+        &self,
+    ) -> Vec<
+        &dyn WidgetChildren<UpdateAux = Globals, GraphicalAux = (), DisplayObject = DisplayCommand>,
+    > {
         self.panels.iter().map(|(ref p, _)| p as _).collect()
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn WidgetChildren<Aux = Globals>> {
+    fn children_mut(
+        &mut self,
+    ) -> Vec<
+        &mut dyn WidgetChildren<
+            UpdateAux = Globals,
+            GraphicalAux = (),
+            DisplayObject = DisplayCommand,
+        >,
+    > {
         self.panels
             .iter_mut()
             .map(|(ref mut p, _)| p as _)
@@ -370,7 +386,9 @@ impl WidgetChildren for PanelContainer {
 }
 
 impl Widget for PanelContainer {
-    type Aux = Globals;
+    type UpdateAux = Globals;
+    type GraphicalAux = ();
+    type DisplayObject = DisplayCommand;
 
     fn update(&mut self, globals: &mut Globals) {
         // propagate back to front so that panels rendered front-most get events first.
@@ -398,9 +416,9 @@ impl Widget for PanelContainer {
         }
     }
 
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut ()) {
         for child in self.children_mut() {
-            child.draw(display);
+            child.draw(display, aux);
         }
     }
 }
@@ -488,7 +506,7 @@ fn main() {
                         .unwrap();
                 }
 
-                panel_container.draw(&mut display);
+                panel_container.draw(&mut display, &mut ());
                 display.present(None).unwrap();
                 context.swap_buffers().unwrap();
             }

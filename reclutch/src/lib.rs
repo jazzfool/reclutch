@@ -7,7 +7,7 @@ on control.
 
 A widget only defines 3 methods; [`bounds`](widget/trait.Widget.html#tymethod.bounds),
 [`update`](widget/trait.Widget.html#tymethod.update), and [`draw`](widget/trait.Widget.html#tymethod.draw).
-It also defines an associated type (`Aux`), discussed in the `update` section.
+It also defines 3 associated types (`UpdateAux`, `GraphicalAux` and `DisplayObject`), discussed in relevant documentation.
 
 When implementing these methods, child widgets must be considered. Therefore
 it is advisable to propagate them;
@@ -18,8 +18,7 @@ for child in self.children_mut() {
     child.draw(display);
 }
 ```
-The above example involves the `WidgetChildren` trait, which will be discussed
-later.
+The above example involves the `WidgetChildren` trait.
 
 # `WidgetChildren`
 
@@ -44,15 +43,37 @@ struct CounterWidget {
 This will resolve down to the following code:
 ```ignore
 impl reclutch::widget::WidgetChildren for CounterWidget {
-    fn children(&self) -> Vec<&dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
+    fn children(
+        &self
+    ) -> Vec<
+        &dyn reclutch::widget::WidgetChildren<
+            UpdateAux = Self::UpdateAux,
+            GraphicalAux = Self::GraphicalAux,
+            DisplayObject = Self::DisplayObject,
+        >
+    > {
         vec![&self.count_label, &self.count_up, &self.count_down]
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
+    fn children_mut(
+        &mut self
+    ) -> Vec<
+        &dyn reclutch::widget::WidgetChildren<
+            UpdateAux = Self::UpdateAux,
+            GraphicalAux = Self::GraphicalAux,
+            DisplayObject = Self::DisplayObject,
+        >
+    > {
         vec![&mut self.count_label, &mut self.count_up, &mut self.count_down]
     }
 }
 ```
+
+It should be noted that `Widget` and `WidgetChildren` aren't in a stable state.
+
+When/if trait specialization become stabilized, `WidgetChildren` can be merged into
+`Widget`. Further, when/if associated type defaults become stabilized, the `Widget`
+associated types will have defaults.
 **/
 
 pub mod display;
@@ -83,10 +104,11 @@ pub mod prelude {
 pub mod widget {
     use crate::display::{GraphicsDisplay, Rect};
 
-    /// Simple widget trait with a render boundary and event updating, with a generic auxiliary type.
-
+    /// Simple widget trait with a render boundary, event updating and rendering.
     pub trait Widget {
-        type Aux;
+        type UpdateAux;
+        type GraphicalAux;
+        type DisplayObject;
 
         /// The bounds method doesn't necessarily have an internal need within Reclutch,
         /// however widget boundaries is crucial data in every GUI, for things such as
@@ -99,7 +121,7 @@ pub mod widget {
         /// to process events, emit events and execute all the side effects attached to such.
         /// Event handling is performed through a focused event system (see the event module).
         ///
-        /// This is also where the [`Aux`](trait.Widget.html#associatedtype.Aux) associated type comes in.
+        /// This is also where the [`UpdateAux`](trait.Widget.html#associatedtype.UpdateAux) associated type comes in.
         /// It allows you to pass mutable data around during updating.
         ///
         /// Here's an example implementation of `update`:
@@ -108,7 +130,9 @@ pub mod widget {
         /// struct Counter { /* fields omitted */ }
         ///
         /// impl Widget for Counter {
-        ///     type Aux = GlobalData;
+        ///     type UpdateAux = GlobalData;
+        ///     type GraphicalAux = /* ... */;
+        ///     type DisplayObject = /* ... */;
         ///
         ///     fn update(&mut self, aux: &mut GlobalData) {
         ///         // propagate to children
@@ -128,10 +152,23 @@ pub mod widget {
         ///     // --snip--
         /// }
         /// ```
-        fn update(&mut self, _aux: &mut Self::Aux) {}
+        fn update(&mut self, _aux: &mut Self::UpdateAux) {}
 
         /// Drawing is renderer-agnostic, however this doesn't mean the API is restrictive.
         /// Generally, drawing is performed through [`CommandGroup`](../display/struct.CommandGroup.html).
+        /// This is also where [`GraphicalAux`](trait.Widget.html#associatedtype.GraphicalAux) and [`DisplayObject`](trait.Widget.html#associatedtype.DisplayObject) come in handy.
+        ///
+        /// `GraphicalAux` allows you to pass extra data around while rendering,
+        /// much like `UpdateAux`. A use case of this could be, for example,
+        /// rendering widgets into smaller displays and compositing them into a
+        /// larger display by attaching the larger display as `GraphicalAux`.
+        ///
+        /// `DisplayObject` is simply the type that is used for `GraphicsDisplay`
+        /// (i.e. it's the form in which the widget visually expresses itself).
+        /// If you're doing regular graphical rendering, then it is strongly
+        /// advised to use `DisplayCommand`, which is the type supported by the
+        /// default rendering back-ends. For more information, see [`GraphicsDisplay`](../display/trait.GraphicsDisplay.html).
+        ///
         /// A simple example of this can be seen below:
         /// ```ignore
         /// struct MyWidget {
@@ -139,9 +176,12 @@ pub mod widget {
         /// }
         ///
         /// impl Widget for MyWidget {
+        ///     type GraphicalAux = ();
+        ///     type DisplayObject = DisplayCommand;
+        ///
         ///     // --snip--
         ///
-        ///     fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+        ///     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) {
         ///         // note that the builder is an optional abstraction which stands in
         ///         // place of creating an array of DisplayCommands by hand, which can be
         ///         // cumbersome.
@@ -153,18 +193,42 @@ pub mod widget {
         ///     }
         /// }
         /// ```
-        fn draw(&mut self, _display: &mut dyn GraphicsDisplay) {}
+        /// Notice that although `DisplayObject` is defined as `DisplayCommand`,
+        /// it needn't be passed to the `display` parameter's type. This is because
+        /// `GraphicsDisplay` defaults the generic to `DisplayCommand` already.
+        fn draw(
+            &mut self,
+            _display: &mut dyn GraphicsDisplay<Self::DisplayObject>,
+            _aux: &mut Self::GraphicalAux,
+        ) {
+        }
     }
 
     /// Interface to get children of a widget as an array of dynamic widgets.
     ///
     /// Ideally, this wouldn't be implemented directly, but rather with `derive(WidgetChildren)`.
     pub trait WidgetChildren: Widget {
-        fn children(&self) -> Vec<&dyn WidgetChildren<Aux = Self::Aux>> {
+        fn children(
+            &self,
+        ) -> Vec<
+            &dyn WidgetChildren<
+                UpdateAux = Self::UpdateAux,
+                GraphicalAux = Self::GraphicalAux,
+                DisplayObject = Self::DisplayObject,
+            >,
+        > {
             Vec::new()
         }
 
-        fn children_mut(&mut self) -> Vec<&mut dyn WidgetChildren<Aux = Self::Aux>> {
+        fn children_mut(
+            &mut self,
+        ) -> Vec<
+            &mut dyn WidgetChildren<
+                UpdateAux = Self::UpdateAux,
+                GraphicalAux = Self::GraphicalAux,
+                DisplayObject = Self::DisplayObject,
+            >,
+        > {
             Vec::new()
         }
     }
@@ -182,7 +246,9 @@ mod tests {
         struct ExampleChild(i8);
 
         impl Widget for ExampleChild {
-            type Aux = ();
+            type UpdateAux = ();
+            type GraphicalAux = ();
+            type DisplayObject = ();
 
             fn bounds(&self) -> Rect {
                 Rect::new(Point::new(self.0 as _, 0.0), Default::default())
@@ -193,7 +259,9 @@ mod tests {
         struct Unnamed(#[widget_child] ExampleChild, #[widget_child] ExampleChild);
 
         impl Widget for Unnamed {
-            type Aux = ();
+            type UpdateAux = ();
+            type GraphicalAux = ();
+            type DisplayObject = ();
         }
 
         #[derive(WidgetChildren)]
@@ -205,7 +273,9 @@ mod tests {
         };
 
         impl Widget for Named {
-            type Aux = ();
+            type UpdateAux = ();
+            type GraphicalAux = ();
+            type DisplayObject = ();
         }
 
         let mut unnamed = Unnamed(ExampleChild(0), ExampleChild(1));

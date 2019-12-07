@@ -20,7 +20,12 @@ pub type Angle = euclid::Angle<f32>;
 ///
 /// In a retained implementation, command groups are persistent in the underlying graphics API (e.g. vertex buffer objects in OpenGL).
 /// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](trait.GraphicsDisplay.html#tymethod.present).
-pub trait GraphicsDisplay {
+///
+/// The generic type parameter is the form in which the implementation can process display commands.
+/// This defaults to `DisplayCommand`, which supports shapes, gradients, backdrop filters, strokes, text, clips, transformation and state saving.
+/// If you have something more specific in mind (e.g. HTML/DOM), it may be beneficial to define your own type,
+/// however this means implementing `GraphicsDisplay` yourself.
+pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
     /// Resizes the underlying surface.
     fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>>;
 
@@ -38,7 +43,7 @@ pub trait GraphicsDisplay {
     /// of clips/transforms, however this can be explicitly disabled by letting `protected` be `false`.
     fn push_command_group(
         &mut self,
-        commands: &[DisplayCommand],
+        commands: &[D],
         protected: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
     /// Returns an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
@@ -47,14 +52,14 @@ pub trait GraphicsDisplay {
     fn modify_command_group(
         &mut self,
         handle: CommandGroupHandle,
-        commands: &[DisplayCommand],
+        commands: &[D],
         protected: Option<bool>,
     );
     /// Refreshes a command group.
     /// Typically this means moving the command group to the front.
     fn maintain_command_group(&mut self, handle: CommandGroupHandle);
     /// Removes a command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
-    fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
+    fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<D>>;
 
     /// Executes pre-exit routines.
     ///
