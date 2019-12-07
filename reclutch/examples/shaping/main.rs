@@ -1,5 +1,6 @@
 use {
     glium::glutin::{
+        self,
         event::{Event as WinitEvent, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
     },

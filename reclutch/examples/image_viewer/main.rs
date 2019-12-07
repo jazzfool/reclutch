@@ -1,5 +1,6 @@
 use {
     glium::glutin::{
+        self,
         event::{Event, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
     },
@@ -111,19 +112,26 @@ impl Widget for Titlebar {
                     {
                         self.cursor_anchor = Some(position.clone());
                         self.move_event
-                            .emit_owned(TitlebarEvent::BeginClick(position.clone()));
+                            .emit_owned(TitlebarEvent::BeginClick(position.clone()))
+                            .ok()
+                            .unwrap();
                     }
                 }
                 GlobalEvent::MouseRelease(_) => {
                     if self.cursor_anchor.is_some() {
                         self.cursor_anchor = None;
-                        self.move_event.emit_owned(TitlebarEvent::EndClick);
+                        self.move_event
+                            .emit_owned(TitlebarEvent::EndClick)
+                            .ok()
+                            .unwrap();
                     }
                 }
                 GlobalEvent::MouseMove(pos) => {
                     if let Some(ref cursor_anchor) = self.cursor_anchor {
                         self.move_event
-                            .emit_owned(TitlebarEvent::Move(pos - *cursor_anchor));
+                            .emit_owned(TitlebarEvent::Move(pos - *cursor_anchor))
+                            .ok()
+                            .unwrap();
                     }
                 }
                 _ => (),
@@ -257,7 +265,7 @@ impl Widget for Panel {
             match event {
                 TitlebarEvent::BeginClick(_) => {
                     self.position_anchor = Some(self.position);
-                    self.on_click.emit_owned(self as _);
+                    self.on_click.emit_owned(self as _).ok().unwrap();
                 }
                 TitlebarEvent::Move(delta) => {
                     if let Some(position_anchor) = self.position_anchor {
@@ -279,7 +287,7 @@ impl Widget for Panel {
             match event {
                 GlobalEvent::MouseClick(click) => {
                     if let Some(_) = click.with(|pos| self.bounds().contains(pos.clone())) {
-                        self.on_click.emit_owned(self as _);
+                        self.on_click.emit_owned(self as _).ok().unwrap();
                     }
                 }
                 GlobalEvent::WindowResize => {
@@ -490,7 +498,10 @@ fn main() {
             } => {
                 let position = position.to_physical(globals.hidpi_factor);
                 globals.cursor = Point::new(position.x as _, position.y as _);
-                global_q.emit_owned(GlobalEvent::MouseMove(globals.cursor.clone()));
+                global_q
+                    .emit_owned(GlobalEvent::MouseMove(globals.cursor.clone()))
+                    .ok()
+                    .unwrap();
             }
             Event::WindowEvent {
                 event:
@@ -502,12 +513,18 @@ fn main() {
                 ..
             } => match state {
                 glutin::event::ElementState::Pressed => {
-                    global_q.emit_owned(GlobalEvent::MouseClick(ConsumableEvent::new(
-                        globals.cursor.clone(),
-                    )));
+                    global_q
+                        .emit_owned(GlobalEvent::MouseClick(ConsumableEvent::new(
+                            globals.cursor.clone(),
+                        )))
+                        .ok()
+                        .unwrap();
                 }
                 glutin::event::ElementState::Released => {
-                    global_q.emit_owned(GlobalEvent::MouseRelease(globals.cursor.clone()));
+                    global_q
+                        .emit_owned(GlobalEvent::MouseRelease(globals.cursor.clone()))
+                        .ok()
+                        .unwrap();
                 }
             },
             Event::WindowEvent {
@@ -524,7 +541,7 @@ fn main() {
                 latest_window_size = (size.width as _, size.height as _);
                 globals.size.width = size.width as _;
                 globals.size.height = size.height as _;
-                global_q.emit_owned(GlobalEvent::WindowResize);
+                global_q.emit_owned(GlobalEvent::WindowResize).ok().unwrap();
             }
             _ => return,
         }

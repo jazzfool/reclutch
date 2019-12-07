@@ -4,6 +4,7 @@ extern crate glium;
 use {
     glium::{
         glutin::{
+            self,
             event::{Event, WindowEvent},
             event_loop::{ControlFlow, EventLoop},
         },
