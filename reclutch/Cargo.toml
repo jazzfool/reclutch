@@ -17,7 +17,7 @@ reclutch_event = { path = "../event" }
 reclutch_derive = { path = "../derive", optional = true }
 euclid = "0.20"
 thiserror = "1.0"
-font-kit = "0.4"
+font-kit = "0.5"
 palette = "0.5"
 skia-safe = { version = "0.19", optional = true }
 gl = { version = "0.14", optional = true }
