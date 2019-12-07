@@ -60,7 +60,7 @@ impl tess::VertexConstructor<tess::FillVertex, Vertex> for VertexCtor {
                 .1
                 .map(|rect| {
                     let rel = vertex.position - rect.origin;
-                    let max = rect.origin + rect.size;
+                    let max = (rect.origin + rect.size) - rect.origin;
                     Point::new(rel.x / max.x, rel.y / max.y).to_array()
                 })
                 .unwrap_or_else(|| [0.0; 2]),
@@ -77,7 +77,7 @@ impl tess::VertexConstructor<tess::StrokeVertex, Vertex> for VertexCtor {
                 .1
                 .map(|rect| {
                     let rel = vertex.position - rect.origin;
-                    let max = rect.origin + rect.size;
+                    let max = (rect.origin + rect.size) - rect.origin;
                     Point::new(rel.x / max.x, rel.y / max.y).to_array()
                 })
                 .unwrap_or_else(|| [0.0; 2]),
@@ -90,7 +90,7 @@ fn create_msaa_framebuffer(
     device: &wgpu::Device,
     swap_chain_desc: &wgpu::SwapChainDescriptor,
     sample_count: u32,
-) -> wgpu::TextureView {
+) -> (wgpu::Texture, wgpu::TextureView) {
     let size = wgpu::Extent3d {
         width: swap_chain_desc.width,
         height: swap_chain_desc.height,
@@ -104,12 +104,12 @@ fn create_msaa_framebuffer(
         sample_count,
         dimension: wgpu::TextureDimension::D2,
         format: swap_chain_desc.format,
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
     };
 
-    device
-        .create_texture(frame_descriptor)
-        .create_default_view()
+    let texture = device.create_texture(frame_descriptor);
+    let view = texture.create_default_view();
+    (texture, view)
 }
 
 pub struct GpuGraphicsDisplay {
@@ -126,7 +126,7 @@ pub struct GpuGraphicsDisplay {
     swap_chain: wgpu::SwapChain,
     swap_chain_desc: wgpu::SwapChainDescriptor,
     surface: wgpu::Surface,
-    msaa_framebuffer: wgpu::TextureView,
+    msaa_framebuffer: (wgpu::Texture, wgpu::TextureView),
 }
 
 impl GpuGraphicsDisplay {
@@ -162,7 +162,7 @@ impl GpuGraphicsDisplay {
 
         let msaa_framebuffer = create_msaa_framebuffer(&device, &swap_chain_desc, SAMPLE_COUNT);
 
-        let global_bind_group_layout =
+        let globals_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 bindings: &[wgpu::BindGroupLayoutBinding {
                     binding: 0,
@@ -225,7 +225,7 @@ impl GpuGraphicsDisplay {
             .fill_from_slice(&[globals]);
 
         let globals_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &global_bind_group_layout,
+            layout: &globals_bind_group_layout,
             bindings: &[wgpu::Binding {
                 binding: 0,
                 resource: wgpu::BindingResource::Buffer {
@@ -295,7 +295,7 @@ impl GpuGraphicsDisplay {
                 swap_chain_desc.format,
                 &device,
             )?,
-            &[&global_bind_group_layout, &locals_bind_group_layout],
+            &[&globals_bind_group_layout, &locals_bind_group_layout],
             &device,
             swap_chain_desc.format,
         );
@@ -359,7 +359,7 @@ impl GpuGraphicsDisplay {
                 &device,
             )?,
             &[
-                &global_bind_group_layout,
+                &globals_bind_group_layout,
                 &locals_bind_group_layout,
                 &gradient_bind_group_layout,
             ],
@@ -422,7 +422,7 @@ impl GpuGraphicsDisplay {
                 &device,
             )?,
             &[
-                &global_bind_group_layout,
+                &globals_bind_group_layout,
                 &locals_bind_group_layout,
                 &gradient_bind_group_layout,
             ],
@@ -434,9 +434,9 @@ impl GpuGraphicsDisplay {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Nearest,
+            mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Linear,
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
             compare_function: wgpu::CompareFunction::Always,
@@ -466,7 +466,7 @@ impl GpuGraphicsDisplay {
                 &device,
             )?,
             &[
-                &global_bind_group_layout,
+                &globals_bind_group_layout,
                 &locals_bind_group_layout,
                 &image_bind_group_layout,
             ],
@@ -489,10 +489,14 @@ impl GpuGraphicsDisplay {
                 image_pipeline,
 
                 globals_bind_group,
+                globals_bind_group_layout,
                 locals_bind_group_layout,
                 image_bind_group_layout,
                 gradient_bind_group_layout,
                 image_sampler,
+
+                vertex_shader,
+                texture_format: swap_chain_desc.format,
             },
             device,
             queue,
@@ -693,7 +697,17 @@ impl GraphicsDisplay for GpuGraphicsDisplay {
         commands: &[DisplayCommand],
         protected: Option<bool>,
     ) {
-        //unimplemented!()
+        if let Some(cmd_group) = self.command_groups.get_mut(&handle.id()) {
+            if let Ok(new_cmds) = CommandGroupData::new(
+                commands,
+                &self.device,
+                &self.pipelines,
+                &self.resources,
+                protected,
+            ) {
+                *cmd_group = new_cmds;
+            }
+        }
     }
 
     fn maintain_command_group(&mut self, handle: CommandGroupHandle) {
@@ -725,35 +739,52 @@ impl GraphicsDisplay for GpuGraphicsDisplay {
 
         let frame = self.swap_chain.get_next_texture();
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let mut cmd_bufs = Vec::new();
 
         {
-            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &self.msaa_framebuffer,
-                    resolve_target: Some(&frame.view),
-                    clear_color: wgpu::Color {
-                        r: 1.0,
-                        g: 1.0,
-                        b: 1.0,
-                        a: 1.0,
-                    },
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                }],
-                depth_stencil_attachment: None,
-            });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-            pass.set_bind_group(0, &self.pipelines.globals_bind_group, &[]);
-
-            for cmd_group in cmds {
-                draw_command_group(cmd_group, &mut pass, &self.pipelines, &mut save_stack)?;
+            {
+                encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &self.msaa_framebuffer.1,
+                        resolve_target: Some(&frame.view),
+                        clear_color: wgpu::Color {
+                            r: 1.0,
+                            g: 1.0,
+                            b: 1.0,
+                            a: 1.0,
+                        },
+                        load_op: wgpu::LoadOp::Clear,
+                        store_op: wgpu::StoreOp::Store,
+                    }],
+                    depth_stencil_attachment: None,
+                });
             }
+
+            cmd_bufs.push(encoder.finish());
         }
 
-        self.queue.submit(&[encoder.finish()]);
+        for cmd_group in cmds {
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+
+            draw_command_group(
+                cmd_group,
+                &self.pipelines,
+                &mut save_stack,
+                &mut encoder,
+                &self.msaa_framebuffer,
+                &frame.view,
+            )?;
+
+            cmd_bufs.push(encoder.finish());
+        }
+
+        self.queue.submit(&cmd_bufs);
 
         Ok(())
     }
@@ -761,17 +792,36 @@ impl GraphicsDisplay for GpuGraphicsDisplay {
 
 fn draw_command_group(
     cmd_group: &CommandGroupData,
-    pass: &mut wgpu::RenderPass,
     pipelines: &PipelineData,
     save_stack: &mut SaveStack<nalgebra::Matrix4<f32>, wgpu::RenderPass>,
+    encoder: &mut wgpu::CommandEncoder,
+    framebuffer: &(wgpu::Texture, wgpu::TextureView),
+    frame: &wgpu::TextureView,
 ) -> Result<(), error::DisplayError> {
-    pass.set_vertex_buffers(0, &[(&cmd_group.vbo, 0)]);
-    pass.set_index_buffer(&cmd_group.ibo, 0);
-    pass.set_bind_group(1, &cmd_group.locals_bind_group, &[]);
-
     for cmd in &cmd_group.render {
         match cmd {
             RenderCommand::DrawMesh { mesh, paint } => {
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &framebuffer.1,
+                        resolve_target: Some(frame),
+                        clear_color: wgpu::Color {
+                            r: 1.0,
+                            g: 1.0,
+                            b: 1.0,
+                            a: 1.0,
+                        },
+                        load_op: wgpu::LoadOp::Load,
+                        store_op: wgpu::StoreOp::Store,
+                    }],
+                    depth_stencil_attachment: None,
+                });
+
+                pass.set_bind_group(0, &pipelines.globals_bind_group, &[]);
+                pass.set_vertex_buffers(0, &[(&cmd_group.vbo, 0)]);
+                pass.set_index_buffer(&cmd_group.ibo, 0);
+                pass.set_bind_group(1, &cmd_group.locals_bind_group, &[]);
+
                 match paint {
                     RenderPaint::Fill => pass.set_pipeline(&pipelines.fill_pipeline),
                     RenderPaint::LinearGradient(ref bind_group) => {
@@ -788,7 +838,68 @@ fn draw_command_group(
                     }
                 }
 
-                pass.draw_indexed(mesh.indices.clone(), mesh.base_vertex as _, 0..1);
+                pass.draw_indexed(mesh.indices_range.clone(), mesh.base_vertex as _, 0..1);
+            }
+            RenderCommand::DrawBackdropFilter {
+                clip,
+                filter_pipe,
+                backdrop_texture,
+                image_bind_group,
+                rect,
+            } => {
+                encoder.copy_texture_to_texture(
+                    wgpu::TextureCopyView {
+                        texture: &framebuffer.0,
+                        mip_level: 0,
+                        array_layer: 0,
+                        origin: wgpu::Origin3d {
+                            x: rect.origin.x,
+                            y: rect.origin.y,
+                            z: 0.0,
+                        },
+                    },
+                    wgpu::TextureCopyView {
+                        texture: &backdrop_texture.0,
+                        mip_level: 0,
+                        array_layer: 0,
+                        origin: wgpu::Origin3d {
+                            x: 0.0,
+                            y: 0.0,
+                            z: 0.0,
+                        },
+                    },
+                    wgpu::Extent3d {
+                        width: rect.size.width as _,
+                        height: rect.size.height as _,
+                        depth: 1,
+                    },
+                );
+
+                let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &framebuffer.1,
+                        resolve_target: Some(frame),
+                        clear_color: wgpu::Color {
+                            r: 1.0,
+                            g: 1.0,
+                            b: 1.0,
+                            a: 1.0,
+                        },
+                        load_op: wgpu::LoadOp::Load,
+                        store_op: wgpu::StoreOp::Store,
+                    }],
+                    depth_stencil_attachment: None,
+                });
+
+                pass.set_bind_group(0, &pipelines.globals_bind_group, &[]);
+                pass.set_vertex_buffers(0, &[(&cmd_group.vbo, 0)]);
+                pass.set_index_buffer(&cmd_group.ibo, 0);
+                pass.set_bind_group(1, &cmd_group.locals_bind_group, &[]);
+
+                pass.set_pipeline(filter_pipe);
+                pass.set_bind_group(2, image_bind_group, &[]);
+
+                pass.draw_indexed(clip.indices_range.clone(), clip.base_vertex as _, 0..1);
             }
             _ => {}
         }

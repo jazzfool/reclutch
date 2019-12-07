@@ -62,6 +62,62 @@ pub(crate) fn create_pipeline(
     })
 }
 
+pub(crate) fn create_filter_pipeline(
+    vs: &wgpu::ShaderModule,
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    bind_group_layouts: &[&wgpu::BindGroupLayout],
+    filter: Filter,
+) -> Result<wgpu::RenderPipeline, error::GpuError> {
+    let mut compiler = shaderc::Compiler::new().ok_or_else(|| {
+        error::GpuError::CompilerError("failed to create shaderc compiler".into())
+    })?;
+
+    Ok(create_pipeline(
+        vs,
+        &load_shader(
+            match filter {
+                Filter::Blur(sigma_x, sigma_y) => {
+                    "
+                    #version 430
+
+                    layout(location = 1) in vec2 f_tex_coord;
+
+                    layout(location = 0) out vec4 o_color;
+
+                    layout(set = 2, binding = 0) uniform texture2D u_texture;
+                    layout(set = 2, binding = 1) uniform sampler u_sampler;
+
+                    void main() {
+                        const float offset[3] = float[](0.0, 1.3846153846, 3.2307692308);
+                        const float weight[3] = float[](0.2270270270, 0.3162162162, 0.0702702703);
+                    
+                        o_color = texture(sampler2D(u_texture, u_sampler), f_tex_coord / 1024.0) * weight[0];
+
+                        for (int i = 1; i < 3; ++i) {
+                            o_color = texture(sampler2D(u_texture, u_sampler), (f_tex_coord + vec2(0.0, offset[i])) / 1024.0) * weight[i];
+                            o_color = texture(sampler2D(u_texture, u_sampler), (f_tex_coord - vec2(0.0, offset[i])) / 1024.0) * weight[i]; 
+                        }
+                    }
+                "
+                }
+                Filter::Invert => "",
+            },
+            match filter {
+                Filter::Blur(_, _) => "blur.glsl",
+                Filter::Invert => "invert.glsl",
+            },
+            shaderc::ShaderKind::Fragment,
+            &mut compiler,
+            format,
+            device,
+        )?,
+        bind_group_layouts,
+        device,
+        format,
+    ))
+}
+
 pub(crate) fn load_shader(
     shader: &str,
     filename: &str,
@@ -88,10 +144,14 @@ pub(crate) struct PipelineData {
     pub image_pipeline: wgpu::RenderPipeline,
 
     pub globals_bind_group: wgpu::BindGroup,
+    pub globals_bind_group_layout: wgpu::BindGroupLayout,
     pub locals_bind_group_layout: wgpu::BindGroupLayout,
     pub gradient_bind_group_layout: wgpu::BindGroupLayout,
     pub image_bind_group_layout: wgpu::BindGroupLayout,
     pub image_sampler: wgpu::Sampler,
+
+    pub vertex_shader: wgpu::ShaderModule,
+    pub texture_format: wgpu::TextureFormat,
 }
 
 #[derive(Debug, Clone, Copy)]

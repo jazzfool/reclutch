@@ -22,8 +22,23 @@ pub(crate) fn upload_to_buffer<T: 'static + Sized + Copy>(
     queue.submit(&[encoder.finish()]);
 }
 
-fn clip_to_gd_item(clip: &DisplayClip) -> GraphicsDisplayItem {
-    unimplemented!()
+fn clip_to_gd_item(clip: DisplayClip) -> GraphicsDisplayItem {
+    match clip {
+        DisplayClip::Rectangle { rect, .. } => GraphicsDisplayItem::Rectangle {
+            rect,
+            paint: GraphicsDisplayPaint::Fill(Color::new(0.0, 0.0, 0.0, 1.0).into()),
+        },
+        DisplayClip::RoundRectangle { rect, radii } => GraphicsDisplayItem::RoundRectangle {
+            rect,
+            radii,
+            paint: GraphicsDisplayPaint::Fill(Color::new(0.0, 0.0, 0.0, 1.0).into()),
+        },
+        DisplayClip::Ellipse { center, radii } => GraphicsDisplayItem::Ellipse {
+            center,
+            radii,
+            paint: GraphicsDisplayPaint::Fill(Color::new(0.0, 0.0, 0.0, 1.0).into()),
+        },
+    }
 }
 
 fn convert_stroke(stroke: GraphicsDisplayStroke) -> tess::StrokeOptions {
@@ -61,7 +76,7 @@ fn tessellate(gd_item: &GraphicsDisplayItem) -> (Vec<Vertex>, Vec<u16>) {
                 &Default::default(),
                 &mut tess::BuffersBuilder::new(
                     &mut buffer,
-                    VertexCtor(color.color_or_black(), None),
+                    VertexCtor(color.color_or_black(), Some(*rect)),
                 ),
             ),
             GraphicsDisplayPaint::Stroke(stroke) => shapes::stroke_rectangle(
@@ -276,6 +291,195 @@ impl<T: std::fmt::Debug, L: std::fmt::Debug> SaveStack<T, L> {
     }
 }
 
+fn display_to_render(
+    cmd: &DisplayCommand,
+    device: &wgpu::Device,
+    pipelines: &PipelineData,
+    resources: &ResourceMap,
+    vertices: &mut Vec<Vertex>,
+    indices: &mut Vec<u16>,
+    save_count: &mut u32,
+) -> Result<RenderCommand, Box<dyn Error>> {
+    match cmd {
+        DisplayCommand::Item(item) => match item {
+            DisplayItem::Graphics(gd_item) => {
+                let paint = create_render_paint(gd_item, device, pipelines, resources)
+                    .map_err(|err| Box::new(err))?
+                    .0;
+
+                let (mesh_vertices, mesh_indices) = tessellate(gd_item);
+
+                let mesh = Mesh {
+                    base_vertex: vertices.len() as _,
+                    indices_range: indices.len() as _..(indices.len() + mesh_indices.len()) as _,
+
+                    vertices: mesh_vertices.clone(),
+                    indices: mesh_indices.clone(),
+                };
+
+                vertices.extend(mesh_vertices.into_iter());
+                indices.extend(mesh_indices.into_iter());
+
+                Ok(RenderCommand::DrawMesh { mesh, paint })
+            }
+            DisplayItem::Text(td_item) => Ok(RenderCommand::DrawText),
+        },
+        DisplayCommand::BackdropFilter(clip, filter) => {
+            let (mesh_vertices, mesh_indices) = tessellate(&clip_to_gd_item(*clip));
+
+            let mesh = Mesh {
+                base_vertex: vertices.len() as _,
+                indices_range: indices.len() as _..(indices.len() + mesh_indices.len()) as _,
+
+                vertices: mesh_vertices.clone(),
+                indices: mesh_indices.clone(),
+            };
+
+            vertices.extend(mesh_vertices.into_iter());
+            indices.extend(mesh_indices.into_iter());
+
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                size: wgpu::Extent3d {
+                    width: 500,
+                    height: 500,
+                    depth: 1,
+                },
+                array_layer_count: 1,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: pipelines.texture_format,
+                usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+            });
+
+            let texture_view = texture.create_default_view();
+
+            let image_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &pipelines.image_bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&texture_view),
+                    },
+                    wgpu::Binding {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&pipelines.image_sampler),
+                    },
+                ],
+            });
+
+            Ok(RenderCommand::DrawBackdropFilter {
+                clip: mesh,
+                filter_pipe: create_filter_pipeline(
+                    &pipelines.vertex_shader,
+                    device,
+                    pipelines.texture_format,
+                    &[
+                        &pipelines.globals_bind_group_layout,
+                        &pipelines.locals_bind_group_layout,
+                        &pipelines.image_bind_group_layout,
+                    ],
+                    *filter,
+                )
+                .map_err(|err| Box::new(err))?,
+                backdrop_texture: (texture, texture_view),
+                image_bind_group,
+                rect: cmd.bounds().map_err(|err| Box::new(err))?.unwrap(),
+            })
+        }
+        DisplayCommand::Clip(clip) => {
+            let (mesh_vertices, mesh_indices) = tessellate(&clip_to_gd_item(*clip));
+
+            let mesh = Mesh {
+                base_vertex: vertices.len() as _,
+                indices_range: indices.len() as _..(indices.len() + mesh_indices.len()) as _,
+
+                vertices: mesh_vertices.clone(),
+                indices: mesh_indices.clone(),
+            };
+
+            vertices.extend(mesh_vertices.into_iter());
+            indices.extend(mesh_indices.into_iter());
+
+            Ok(RenderCommand::DrawMeshToStencil { mesh })
+        }
+        DisplayCommand::Save => {
+            *save_count += 1;
+            Ok(RenderCommand::Save)
+        }
+        DisplayCommand::SaveLayer(opacity) => {
+            *save_count += 1;
+            Ok(RenderCommand::SaveTexture(*opacity))
+        }
+        DisplayCommand::Restore => {
+            if *save_count > 0 {
+                *save_count -= 1;
+                Ok(RenderCommand::Restore)
+            } else {
+                panic!()
+            }
+        }
+        DisplayCommand::Translate(offset) => Ok(RenderCommand::Translate(*offset)),
+        DisplayCommand::Scale(scale) => Ok(RenderCommand::Scale(*scale)),
+        DisplayCommand::Rotate(angle) => Ok(RenderCommand::Rotate(*angle)),
+        DisplayCommand::Clear(color) => Ok(RenderCommand::Clear(*color)),
+    }
+}
+
+fn style_color_eq(a: &StyleColor, b: &StyleColor) -> bool {
+    match (a, b) {
+        (StyleColor::Color(color_a), StyleColor::Color(color_b)) => *color_a == *color_b,
+        (StyleColor::LinearGradient(gradient_a), StyleColor::LinearGradient(gradient_b))
+        | (StyleColor::RadialGradient(gradient_a), StyleColor::RadialGradient(gradient_b)) => {
+            let mut stops_eq = true;
+
+            if gradient_a.stops.len() != gradient_b.stops.len() {
+                stops_eq = false;
+            } else {
+                for ((pos_a, color_a), (pos_b, color_b)) in
+                    gradient_a.stops.iter().zip(gradient_b.stops.iter())
+                {
+                    stops_eq = pos_a == pos_b && color_a == color_b
+                }
+            }
+
+            gradient_a.start == gradient_b.start && gradient_a.end == gradient_b.end && stops_eq
+        }
+        _ => false,
+    }
+}
+
+fn stroke_eq(a: &GraphicsDisplayStroke, b: &GraphicsDisplayStroke) -> bool {
+    style_color_eq(&a.color, &b.color)
+        && a.thickness == b.thickness
+        && a.cap == b.cap
+        && a.join == b.join
+        && a.miter_limit == b.miter_limit
+}
+
+fn paint_color(paint: &GraphicsDisplayPaint) -> StyleColor {
+    match paint {
+        GraphicsDisplayPaint::Fill(color)
+        | GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke { color, .. }) => color.clone(),
+    }
+}
+
+fn paint_eq(a: &GraphicsDisplayPaint, b: &GraphicsDisplayPaint) -> bool {
+    let mut variant_eq = true;
+
+    let stroke = match (a, b) {
+        (GraphicsDisplayPaint::Stroke(stroke_a), GraphicsDisplayPaint::Stroke(stroke_b)) => {
+            stroke_eq(stroke_a, stroke_b)
+        }
+        _ => {
+            variant_eq = false;
+            true
+        }
+    };
+
+    variant_eq && style_color_eq(&paint_color(a), &paint_color(b))
+}
+
 pub(crate) struct CommandGroupData {
     pub display: Vec<DisplayCommand>,
     pub render: Vec<RenderCommand>,
@@ -288,14 +492,15 @@ pub(crate) struct CommandGroupData {
     pub ubo: wgpu::Buffer,
 
     pub locals_bind_group: wgpu::BindGroup,
+    locals: Locals,
 }
 
 impl CommandGroupData {
     pub fn new(
         commands: &[DisplayCommand],
         device: &wgpu::Device,
-        pipelines: &super::pipe::PipelineData,
-        resources: &super::pipe::ResourceMap,
+        pipelines: &PipelineData,
+        resources: &ResourceMap,
         protected: Option<bool>,
     ) -> Result<Self, Box<dyn Error>> {
         let mut vertices = Vec::new();
@@ -309,44 +514,15 @@ impl CommandGroupData {
         let mut save_count = 0;
 
         for cmd in commands {
-            match cmd {
-                DisplayCommand::Item(item) => match item {
-                    DisplayItem::Graphics(gd_item) => {
-                        let paint = create_render_paint(gd_item, device, pipelines, resources)
-                            .map_err(|err| Box::new(err))?
-                            .0;
-
-                        let (mesh_vertices, mesh_indices) = tessellate(gd_item);
-
-                        let mesh = Mesh {
-                            base_vertex: vertices.len() as _,
-                            indices: indices.len() as _..(indices.len() + mesh_indices.len()) as _,
-                        };
-
-                        vertices.extend(mesh_vertices.into_iter());
-                        indices.extend(mesh_indices.into_iter());
-
-                        render.push(RenderCommand::DrawMesh { mesh, paint });
-                    }
-                    DisplayItem::Text(td_item) => {}
-                },
-                DisplayCommand::BackdropFilter(clip, filter) => {}
-                DisplayCommand::Save => {
-                    save_count += 1;
-                    render.push(RenderCommand::Save);
-                }
-                DisplayCommand::SaveLayer(opacity) => {
-                    save_count += 1;
-                    render.push(RenderCommand::SaveTexture(*opacity));
-                }
-                DisplayCommand::Restore => {
-                    if save_count > 0 {
-                        save_count -= 1;
-                        render.push(RenderCommand::Restore);
-                    } // else error?
-                }
-                _ => (),
-            }
+            render.push(display_to_render(
+                cmd,
+                device,
+                pipelines,
+                resources,
+                &mut vertices,
+                &mut indices,
+                &mut save_count,
+            )?);
         }
 
         if protected.unwrap_or(true) {
@@ -381,16 +557,18 @@ impl CommandGroupData {
                 .fill_from_slice(&indices),
             ubo,
             locals_bind_group,
+            locals,
         })
     }
-
-    pub fn modify(&mut self, new_cmds: &[DisplayCommand]) {}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Mesh {
     pub base_vertex: u32,
-    pub indices: std::ops::Range<u32>,
+    pub indices_range: std::ops::Range<u32>,
+
+    vertices: Vec<Vertex>,
+    indices: Vec<u16>,
 }
 
 #[derive(Debug)]
@@ -402,17 +580,32 @@ pub(crate) enum RenderCommand {
     DrawBackdropFilter {
         clip: Mesh,
         filter_pipe: wgpu::RenderPipeline,
+        backdrop_texture: (wgpu::Texture, wgpu::TextureView),
+        image_bind_group: wgpu::BindGroup,
+        rect: Rect,
     },
     DrawMeshToStencil {
         mesh: Mesh,
     },
+    DrawText,
     Save,
     SaveTexture(f32),
     Restore,
-    Translate,
-    Scale,
-    Rotate,
-    Clear,
+    Translate(Vector),
+    Scale(Vector),
+    Rotate(Angle),
+    Clear(Color),
+}
+
+impl RenderCommand {
+    pub fn try_get_mesh(&mut self) -> Option<&mut Mesh> {
+        match self {
+            RenderCommand::DrawMesh { mesh, .. }
+            | RenderCommand::DrawMeshToStencil { mesh, .. }
+            | RenderCommand::DrawBackdropFilter { clip: mesh, .. } => Some(mesh),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]

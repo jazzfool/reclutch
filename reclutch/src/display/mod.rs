@@ -144,7 +144,12 @@ pub fn ok_or_push(
             display.modify_command_group(*handle, commands, protected.into());
         }
         None => {
-            *handle = display.push_command_group(commands, protected.into()).ok();
+            *handle = Some(
+                display
+                    .push_command_group(commands, protected.into())
+                    .unwrap(),
+            );
+            //*handle = display.push_command_group(commands, protected.into()).ok();
         }
     }
 }

@@ -9,16 +9,16 @@ homepage = "http://github.com/jazzfool/reclutch"
 repository = "http://github.com/jazzfool/reclutch"
 
 [features]
-default = ["reclutch_derive"]
+default = ["reclutch_derive", "gpu"]
 skia = ["skia-safe", "gl", "linked-hash-map"]
-gpu = ["wgpu", "linked-hash-map", "image", "lyon", "nalgebra", "raw-window-handle", "wgpu_glyph", "shaderc", "diffs"]
+gpu = ["wgpu", "linked-hash-map", "image", "lyon", "nalgebra", "raw-window-handle", "wgpu_glyph", "shaderc"]
 
 [dependencies]
 reclutch_event = { path = "../event" }
 reclutch_derive = { path = "../derive", optional = true }
 euclid = "0.20"
 thiserror = "1.0"
-font-kit = "0.4"
+font-kit = "0.5"
 palette = "0.5"
 skia-safe = { version = "0.19", optional = true }
 gl = { version = "0.14", optional = true }
@@ -30,7 +30,6 @@ lyon = { version = "0.14", optional = true }
 nalgebra = { version = "0.19", optional = true }
 wgpu_glyph = { version = "0.6", optional = true }
 shaderc = { version = "0.6", optional = true }
-diffs = { version = "0.3", optional = true }
 
 [[example]]
 name = "counter"
