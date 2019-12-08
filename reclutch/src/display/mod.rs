@@ -590,8 +590,8 @@ impl DisplayClip {
 /// Describes all possible display commands.
 #[derive(Clone)]
 pub enum DisplayCommand {
-    /// Display an item
-    Item(DisplayItem),
+    /// Display an item with an optional filter.
+    Item(DisplayItem, Option<Filter>),
     /// Applies a filter onto the frame with a mask.
     BackdropFilter(DisplayClip, Filter),
     /// Pushes a clip onto the draw state.
@@ -619,7 +619,7 @@ impl DisplayCommand {
     /// Somewhat unorthodox function, since most variants aren't directly graphically expressible.
     pub fn bounds(&self) -> Result<Option<Rect>, error::FontError> {
         Ok(match self {
-            DisplayCommand::Item(item) => Some(item.bounds()?),
+            DisplayCommand::Item(item, _) => Some(item.bounds()?),
             DisplayCommand::BackdropFilter(item, _) => Some(item.bounds()),
             DisplayCommand::Clip(clip) => Some(clip.bounds()),
             _ => None,
@@ -632,7 +632,7 @@ pub fn display_list_bounds(display_list: &[DisplayCommand]) -> Result<Rect, erro
     Ok(display_list
         .iter()
         .filter_map(|disp| {
-            if let DisplayCommand::Item(item) = disp {
+            if let DisplayCommand::Item(item, _) = disp {
                 Some(item.bounds())
             } else {
                 None
@@ -709,19 +709,30 @@ impl DisplayListBuilder {
     }
 
     /// Pushes a stroked line, spanning from `a` to `b`.
-    pub fn push_line(&mut self, a: Point, b: Point, stroke: GraphicsDisplayStroke) {
-        self.display_list
-            .push(DisplayCommand::Item(DisplayItem::Graphics(
-                GraphicsDisplayItem::Line { a, b, stroke },
-            )));
+    pub fn push_line(
+        &mut self,
+        a: Point,
+        b: Point,
+        stroke: GraphicsDisplayStroke,
+        filter: Option<Filter>,
+    ) {
+        self.display_list.push(DisplayCommand::Item(
+            DisplayItem::Graphics(GraphicsDisplayItem::Line { a, b, stroke }),
+            filter,
+        ));
     }
 
     /// Pushes a filled/stroked rectangle.
-    pub fn push_rectangle(&mut self, rect: Rect, paint: GraphicsDisplayPaint) {
-        self.display_list
-            .push(DisplayCommand::Item(DisplayItem::Graphics(
-                GraphicsDisplayItem::Rectangle { rect, paint },
-            )));
+    pub fn push_rectangle(
+        &mut self,
+        rect: Rect,
+        paint: GraphicsDisplayPaint,
+        filter: Option<Filter>,
+    ) {
+        self.display_list.push(DisplayCommand::Item(
+            DisplayItem::Graphics(GraphicsDisplayItem::Rectangle { rect, paint }),
+            filter,
+        ));
     }
 
     /// Pushes a filled/stroked rectangle, with rounded corners.
@@ -730,23 +741,30 @@ impl DisplayListBuilder {
         rect: Rect,
         radii: [f32; 4],
         paint: GraphicsDisplayPaint,
+        filter: Option<Filter>,
     ) {
-        self.display_list
-            .push(DisplayCommand::Item(DisplayItem::Graphics(
-                GraphicsDisplayItem::RoundRectangle { rect, radii, paint },
-            )));
+        self.display_list.push(DisplayCommand::Item(
+            DisplayItem::Graphics(GraphicsDisplayItem::RoundRectangle { rect, radii, paint }),
+            filter,
+        ));
     }
 
     /// Pushes a filled/stroked ellipse.
-    pub fn push_ellipse(&mut self, center: Point, radii: Vector, paint: GraphicsDisplayPaint) {
-        self.display_list
-            .push(DisplayCommand::Item(DisplayItem::Graphics(
-                GraphicsDisplayItem::Ellipse {
-                    center,
-                    radii,
-                    paint,
-                },
-            )));
+    pub fn push_ellipse(
+        &mut self,
+        center: Point,
+        radii: Vector,
+        paint: GraphicsDisplayPaint,
+        filter: Option<Filter>,
+    ) {
+        self.display_list.push(DisplayCommand::Item(
+            DisplayItem::Graphics(GraphicsDisplayItem::Ellipse {
+                center,
+                radii,
+                paint,
+            }),
+            filter,
+        ));
     }
 
     /// Pushes an image.
@@ -755,21 +773,22 @@ impl DisplayListBuilder {
         src: impl Into<Option<Rect>>,
         dst: Rect,
         image: ResourceReference,
+        filter: Option<Filter>,
     ) {
-        self.display_list
-            .push(DisplayCommand::Item(DisplayItem::Graphics(
-                GraphicsDisplayItem::Image {
-                    src: src.into(),
-                    dst,
-                    resource: image,
-                },
-            )));
+        self.display_list.push(DisplayCommand::Item(
+            DisplayItem::Graphics(GraphicsDisplayItem::Image {
+                src: src.into(),
+                dst,
+                resource: image,
+            }),
+            filter,
+        ));
     }
 
     /// Pushes a line of text.
-    pub fn push_text(&mut self, text: TextDisplayItem) {
+    pub fn push_text(&mut self, text: TextDisplayItem, filter: Option<Filter>) {
         self.display_list
-            .push(DisplayCommand::Item(DisplayItem::Text(text)));
+            .push(DisplayCommand::Item(DisplayItem::Text(text), filter));
     }
 
     /// Pushes a rectangle which applies a filter on everything behind it.

@@ -411,8 +411,36 @@ fn convert_line_join(join: LineJoin) -> sk::PaintJoin {
     }
 }
 
-fn convert_paint(gdpaint: &GraphicsDisplayPaint) -> Result<sk::Paint, error::SkiaError> {
+fn apply_filter_to_paint(paint: &mut sk::Paint, filter: Option<Filter>) {
+    if let Some(filter) = filter {
+        match filter {
+            Filter::Blur(sigma_x, sigma_y) => {
+                paint.set_image_filter(sk::image_filters::blur(
+                    (sigma_x, sigma_y),
+                    sk::TileMode::Decal,
+                    None,
+                    None,
+                ));
+            }
+            Filter::Invert => {
+                let mut color_matrix = sk::ColorMatrix::default();
+                color_matrix.set_20(&[
+                    -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0,
+                    1.0, 1.0, 1.0, 1.0, 0.0,
+                ]);
+
+                paint.set_color_filter(sk::ColorFilters::matrix(&color_matrix));
+            }
+        }
+    }
+}
+
+fn convert_paint(
+    gdpaint: &GraphicsDisplayPaint,
+    filter: Option<Filter>,
+) -> Result<sk::Paint, error::SkiaError> {
     let mut paint = sk::Paint::default();
+
     match gdpaint {
         GraphicsDisplayPaint::Fill(ref color) => {
             paint.set_anti_alias(true);
@@ -431,6 +459,8 @@ fn convert_paint(gdpaint: &GraphicsDisplayPaint) -> Result<sk::Paint, error::Ski
             paint.set_stroke_miter(stroke.miter_limit);
         }
     }
+
+    apply_filter_to_paint(&mut paint, filter);
 
     Ok(paint)
 }
@@ -518,22 +548,25 @@ fn draw_command_group(
 ) -> Result<(), error::DisplayError> {
     for cmd in cmds {
         match cmd {
-            DisplayCommand::Item(item) => match item {
+            DisplayCommand::Item(item, filter) => match item {
                 DisplayItem::Graphics(ref item) => match item {
                     GraphicsDisplayItem::Line { a, b, stroke } => {
-                        let paint = convert_paint(&GraphicsDisplayPaint::Stroke((*stroke).clone()))
-                            .map_err(|e| error::DisplayError::InternalError(e.into()))?;
+                        let paint = convert_paint(
+                            &GraphicsDisplayPaint::Stroke((*stroke).clone()),
+                            *filter,
+                        )
+                        .map_err(|e| error::DisplayError::InternalError(e.into()))?;
                         surface
                             .canvas()
                             .draw_line(convert_point(*a), convert_point(*b), &paint);
                     }
                     GraphicsDisplayItem::Rectangle { rect, paint } => {
-                        let paint = convert_paint(paint)
+                        let paint = convert_paint(paint, *filter)
                             .map_err(|e| error::DisplayError::InternalError(e.into()))?;
                         surface.canvas().draw_rect(&convert_rect(rect), &paint);
                     }
                     GraphicsDisplayItem::RoundRectangle { rect, radii, paint } => {
-                        let paint = convert_paint(paint)
+                        let paint = convert_paint(paint, *filter)
                             .map_err(|e| error::DisplayError::InternalError(e.into()))?;
                         surface.canvas().draw_rrect(
                             sk::RRect::new_rect_radii(
@@ -551,7 +584,7 @@ fn draw_command_group(
                     GraphicsDisplayItem::Ellipse { paint, .. } => {
                         surface.canvas().draw_oval(
                             convert_rect(&item.bounds()),
-                            &convert_paint(paint)
+                            &convert_paint(paint, *filter)
                                 .map_err(|e| error::DisplayError::InternalError(e.into()))?,
                         );
                     }
@@ -561,8 +594,20 @@ fn draw_command_group(
                                 .get(id)
                                 .ok_or(error::DisplayError::InvalidResource(*id))?
                             {
+                                surface.canvas().save();
+
                                 let mut paint = sk::Paint::default();
                                 paint.set_filter_quality(sk::FilterQuality::Medium); // TODO(jazzfool): perhaps we can expose the image filter quality?
+
+                                apply_filter_to_paint(&mut paint, *filter);
+
+                                apply_clip(
+                                    surface.canvas(),
+                                    &DisplayClip::Rectangle {
+                                        rect: *dst,
+                                        antialias: true,
+                                    },
+                                );
 
                                 let o_src = src.map(|src_rect| convert_rect(&src_rect));
                                 surface.canvas().draw_image_rect(
@@ -573,6 +618,8 @@ fn draw_command_group(
                                     &convert_rect(dst),
                                     &paint,
                                 );
+
+                                surface.canvas().restore();
                             }
                         } else {
                             return Err(error::DisplayError::MismatchedResource(resource.id()));
@@ -585,9 +632,11 @@ fn draw_command_group(
                             .get(id)
                             .ok_or(error::DisplayError::InvalidResource(*id))?
                         {
-                            let paint =
-                                convert_paint(&GraphicsDisplayPaint::Fill(item.color.clone()))
-                                    .map_err(|e| error::DisplayError::InternalError(e.into()))?;
+                            let paint = convert_paint(
+                                &GraphicsDisplayPaint::Fill(item.color.clone()),
+                                *filter,
+                            )
+                            .map_err(|e| error::DisplayError::InternalError(e.into()))?;
 
                             surface.canvas().draw_text_blob(
                                 &convert_display_text(

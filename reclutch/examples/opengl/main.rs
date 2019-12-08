@@ -239,6 +239,7 @@ fn main() {
             rect,
             [20.0; 4],
             GraphicsDisplayPaint::Fill(Color::new(0.0, 0.0, 0.0, 0.2).into()),
+            None,
         );
 
         display.push_command_group(&builder.build(), None).unwrap();

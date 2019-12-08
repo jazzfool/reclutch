@@ -101,14 +101,17 @@ impl Widget for Counter {
 
         builder.push_clear(Color::new(1.0, 1.0, 1.0, 1.0));
 
-        builder.push_text(TextDisplayItem {
-            text: format!("Count: {}", self.count).into(),
-            font: self.font.as_ref().unwrap().clone(),
-            font_info: self.font_info.clone(),
-            size: 23.0,
-            bottom_left: bounds.origin.add_size(&Size::new(10.0, 22.0)),
-            color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
-        });
+        builder.push_text(
+            TextDisplayItem {
+                text: format!("Count: {}", self.count).into(),
+                font: self.font.as_ref().unwrap().clone(),
+                font_info: self.font_info.clone(),
+                size: 23.0,
+                bottom_left: bounds.origin.add_size(&Size::new(10.0, 22.0)),
+                color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
+            },
+            None,
+        );
 
         self.command_group.push(display, &builder.build(), None);
 
@@ -195,18 +198,26 @@ impl Widget for Button {
 
         let mut builder = DisplayListBuilder::new();
 
-        builder.push_round_rectangle(bounds, [10.0; 4], GraphicsDisplayPaint::Fill(color.into()));
+        builder.push_round_rectangle(
+            bounds,
+            [10.0; 4],
+            GraphicsDisplayPaint::Fill(color.into()),
+            None,
+        );
 
-        builder.push_text(TextDisplayItem {
-            text: self.text.clone().into(),
-            font: self.font.as_ref().unwrap().clone(),
-            font_info: self.font_info.clone(),
-            size: 22.0,
-            bottom_left: bounds
-                .origin
-                .add_size(&Size::new(10.0, bounds.size.height / 2.0)),
-            color: Color::new(1.0, 1.0, 1.0, 1.0).into(),
-        });
+        builder.push_text(
+            TextDisplayItem {
+                text: self.text.clone().into(),
+                font: self.font.as_ref().unwrap().clone(),
+                font_info: self.font_info.clone(),
+                size: 22.0,
+                bottom_left: bounds
+                    .origin
+                    .add_size(&Size::new(10.0, bounds.size.height / 2.0)),
+                color: Color::new(1.0, 1.0, 1.0, 1.0).into(),
+            },
+            None,
+        );
 
         self.command_group.push(display, &builder.build(), None);
     }

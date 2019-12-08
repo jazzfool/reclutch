@@ -159,6 +159,7 @@ impl Widget for Titlebar {
         builder.push_rectangle(
             bounds,
             GraphicsDisplayPaint::Fill(Color::new(1.0, 1.0, 1.0, 0.6).into()),
+            None,
         );
 
         builder.push_line(
@@ -172,16 +173,20 @@ impl Widget for Titlebar {
                 antialias: false,
                 ..Default::default()
             },
+            None,
         );
 
-        builder.push_text(TextDisplayItem {
-            text: self.text.clone().into(),
-            font: self.font_resource.as_ref().unwrap().clone(),
-            font_info: self.font.clone(),
-            size: 22.0,
-            bottom_left: bounds.origin + Size::new(5.0, 22.0),
-            color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
-        });
+        builder.push_text(
+            TextDisplayItem {
+                text: self.text.clone().into(),
+                font: self.font_resource.as_ref().unwrap().clone(),
+                font_info: self.font.clone(),
+                size: 22.0,
+                bottom_left: bounds.origin + Size::new(5.0, 22.0),
+                color: Color::new(0.0, 0.0, 0.0, 1.0).into(),
+            },
+            None,
+        );
 
         self.command_group.push(display, &builder.build(), None);
     }
@@ -323,9 +328,10 @@ impl Widget for Panel {
         builder.push_rectangle(
             bounds,
             GraphicsDisplayPaint::Fill(Color::new(0.9, 0.9, 0.9, 0.5).into()),
+            None,
         );
 
-        builder.push_image(None, bounds, self.image.clone().unwrap());
+        builder.push_image(None, bounds, self.image.clone().unwrap(), None);
 
         builder.push_rectangle(
             bounds.inflate(0.0, 0.5),
@@ -335,6 +341,7 @@ impl Widget for Panel {
                 antialias: false,
                 ..Default::default()
             }),
+            None,
         );
 
         self.command_group.push(display, &builder.build(), None);

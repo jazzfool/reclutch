@@ -138,8 +138,9 @@ fn main() {
                 bbox,
                 [5.0; 4],
                 display::GraphicsDisplayPaint::Fill(Color::new(0.0, 0.4, 1.0, 0.25).into()),
+                None,
             );
-            builder.push_text(text_blob);
+            builder.push_text(text_blob, None);
         }
 
         display.push_command_group(&builder.build(), None).unwrap();
