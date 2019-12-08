@@ -2,7 +2,7 @@ extern crate proc_macro;
 
 use {proc_macro::TokenStream, quote::quote};
 
-#[proc_macro_derive(WidgetChildren, attributes(widget_child))]
+#[proc_macro_derive(WidgetChildren, attributes(widget_child, widget_children_trait))]
 pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
 
@@ -29,6 +29,30 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
         String(String),
         Int(usize),
     }
+
+    let trait_type = if let Some(attr) = ast.attrs.iter().find(|attr| {
+        attr.path
+            .segments
+            .first()
+            .map(|i| i.ident == "widget_children_trait")
+            .unwrap_or(false)
+    }) {
+        let mut out = None;
+        for token in attr.tokens.clone().into_iter() {
+            match token {
+                proc_macro2::TokenTree::Group(grp) => {
+                    out = Some(grp.stream());
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        out
+    } else {
+        None
+    }
+    .unwrap_or(quote! { reclutch::widget::WidgetChildren });
 
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     let name = &ast.ident;
@@ -72,11 +96,11 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
 
     {
         quote! {
-            impl #impl_generics reclutch::widget::WidgetChildren for #name #ty_generics #where_clause {
+            impl #impl_generics #trait_type for #name #ty_generics #where_clause {
                 fn children(
                     &self
                 ) -> Vec<
-                    &dyn reclutch::widget::WidgetChildren<
+                    &dyn #trait_type<
                         UpdateAux = Self::UpdateAux,
                         GraphicalAux = Self::GraphicalAux,
                         DisplayObject = Self::DisplayObject,
@@ -87,7 +111,7 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
                 fn children_mut(
                     &mut self
                 ) -> Vec<
-                    &mut dyn reclutch::widget::WidgetChildren<
+                    &mut dyn #trait_type<
                         UpdateAux = Self::UpdateAux,
                         GraphicalAux = Self::GraphicalAux,
                         DisplayObject = Self::DisplayObject,
@@ -97,5 +121,6 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
                 }
             }
         }
-    }.into()
+    }
+    .into()
 }

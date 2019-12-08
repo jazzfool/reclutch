@@ -41,7 +41,9 @@ impl Button {
 }
 
 impl Widget for Button {
-    type Aux = ();
+    type UpdateAux = ();
+    type GraphicalAux = ();
+    type DisplayObject = DisplayCommand;
 
     pub fn bounds(&self) -> Rect { /* --snip-- */ }
 
@@ -54,7 +56,7 @@ impl Widget for Button {
         }
     }
 
-    pub fn draw(&mut self, display: &mut dyn GraphicsDisplay) { /* --snip-- */ }
+    pub fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) { /* --snip-- */ }
 }
 ```
 
@@ -78,11 +80,27 @@ Which expands to exactly...
 
 ```rust
 impl reclutch::widget::WidgetChildren for ExampleWidget {
-    fn children(&self) -> Vec<&dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
+    fn children(
+        &self,
+    ) -> Vec<
+        &dyn WidgetChildren<
+            UpdateAux = Self::UpdateAux,
+            GraphicalAux = Self::GraphicalAux,
+            DisplayObject = Self::DisplayObject,
+        >,
+    > {
         vec![&self.child]
     }
 
-    fn children_mut(&mut self) -> Vec<&mut dyn reclutch::widget::WidgetChildren<Aux = Self::Aux>> {
+    fn children_mut(
+        &mut self,
+    ) -> Vec<
+        &mut dyn WidgetChildren<
+            UpdateAux = Self::UpdateAux,
+            GraphicalAux = Self::GraphicalAux,
+            DisplayObject = Self::DisplayObject,
+        >,
+    > {
         vec![&mut self.child]
     }
 }
@@ -99,6 +117,54 @@ fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
         child.draw(display);
     }
 }
+```
+
+You can also create your own `WidgetChildren` type with extra bounds and use it with the same derive functionality:
+```rust
+trait CustomWidgetChildren: Widget + ThemeableWidget {
+    fn children(
+        &self,
+    ) -> Vec<
+        &dyn WidgetChildren<
+            UpdateAux = Self::UpdateAux,
+            GraphicalAux = Self::GraphicalAux,
+            DisplayObject = Self::DisplayObject,
+        >,
+    > {
+        Vec::new()
+    }
+
+    // ... children_mut ...
+}
+
+impl<T> reclutch::widget::WidgetChildren for T
+where
+    T: CustomWidgetChildren
+{
+    // delegate to CustomWidgetChildren
+}
+
+// then...
+
+#[derive(WidgetChildren)]
+#[widget_children_trait(CustomWidgetChildren)]
+struct WidgetA {
+    #[widget_child]
+    child: WidgetB,
+}
+
+// and now, assuming for example that ThemeableWidget has a method called
+// `change_theme` implemented on both WidgetA and WidgetB,
+
+fn main() {
+    let widget_a = WidgetA::new();
+    for themeable in widget_a.children_mut() {
+        themeable.change_theme(ColorfulTheme::new());
+    }
+}
+
+// is now possible. Further, any pre-existing code pertaining to `WidgetChildren`
+// remains valid.
 ```
 
 **Note:** `WidgetChildren` requires that `Widget` is implemented.
@@ -124,7 +190,7 @@ impl Widget for VisualWidget {
     }
 
     // Draws a nice red rectangle.
-    fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) {
         // Only pushes/modifies command group if a repaint is needed.
         self.command_group.push(display, &[
             DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Rectangle {
@@ -144,12 +210,12 @@ impl Widget for VisualWidget {
 
 The `update` method on widgets is an opportunity for widgets to update layout, animations, etc. and more importantly handle events that have been emitted since the last `update`.
 
-Widgets have an associated type; `Aux` which allows for a global object to be passed around during updating. This is useful for things like updating a layout.
+Widgets have an associated type; `UpdateAux` which allows for a global object to be passed around during updating. This is useful for things like updating a layout.
 
 Here's a simple example;
 
 ```rust
-type Aux = Globals;
+type UpdateAux = Globals;
 
 fn update(&mut self, aux: &mut Globals) {
     if aux.layout.node_is_dirty(self.layout_node) {
