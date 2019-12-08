@@ -106,6 +106,8 @@ impl reclutch::widget::WidgetChildren for ExampleWidget {
 }
 ```
 
+(Note: you can switch out the `reclutch::widget::WidgetChildren`s above with your own trait using `#[widget_children_trait(...)]`)
+
 Then all the other functions (`draw`, `update`, maybe even `bounds` for parent clipping) are propagated manually (or your API can have a function which automatically and recursively invokes for both parent and child);
 
 ```rust
@@ -117,54 +119,6 @@ fn draw(&mut self, display: &mut dyn GraphicsDisplay) {
         child.draw(display);
     }
 }
-```
-
-You can also create your own `WidgetChildren` type with extra bounds and use it with the same derive functionality:
-```rust
-trait CustomWidgetChildren: Widget + ThemeableWidget {
-    fn children(
-        &self,
-    ) -> Vec<
-        &dyn WidgetChildren<
-            UpdateAux = Self::UpdateAux,
-            GraphicalAux = Self::GraphicalAux,
-            DisplayObject = Self::DisplayObject,
-        >,
-    > {
-        Vec::new()
-    }
-
-    // ... children_mut ...
-}
-
-impl<T> reclutch::widget::WidgetChildren for WidgetBox<T>
-where
-    T: CustomWidgetChildren
-{
-    // delegate to CustomWidgetChildren
-}
-
-// then...
-
-#[derive(WidgetChildren)]
-#[widget_children_trait(CustomWidgetChildren)]
-struct WidgetA {
-    #[widget_child]
-    child: WidgetB,
-}
-
-// and now, assuming for example that ThemeableWidget has a method called
-// `change_theme` implemented on both WidgetA and WidgetB,
-
-fn main() {
-    let widget_a = WidgetA::new();
-    for themeable in widget_a.children_mut() {
-        themeable.change_theme(ColorfulTheme::new());
-    }
-}
-
-// is now possible. Further, any pre-existing code pertaining to `WidgetChildren`
-// remains valid.
 ```
 
 **Note:** `WidgetChildren` requires that `Widget` is implemented.
