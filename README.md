@@ -137,7 +137,7 @@ trait CustomWidgetChildren: Widget + ThemeableWidget {
     // ... children_mut ...
 }
 
-impl<T> reclutch::widget::WidgetChildren for T
+impl<T> reclutch::widget::WidgetChildren for WidgetBox<T>
 where
     T: CustomWidgetChildren
 {
