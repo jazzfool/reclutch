@@ -47,7 +47,7 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
         protected: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
     /// Returns an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
-    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]>;
+    fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[D]>;
     /// Overwrites an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
     fn modify_command_group(
         &mut self,
