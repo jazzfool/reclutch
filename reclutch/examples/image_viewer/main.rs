@@ -85,7 +85,7 @@ impl Titlebar {
             command_group: CommandGroup::new(),
             width,
             text,
-            font: FontInfo::from_name("Segoe UI", &["SF Display", "Arial"]).unwrap(),
+            font: FontInfo::from_name("Segoe UI", &["SF Display", "Arial"], None).unwrap(),
             font_resource: None,
         }
     }

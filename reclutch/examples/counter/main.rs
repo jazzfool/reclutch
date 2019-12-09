@@ -54,8 +54,12 @@ impl Counter {
             button_increase_press_listener,
             button_decrease_press_listener,
             command_group: CommandGroup::new(),
-            font_info: FontInfo::from_name("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"])
-                .unwrap(),
+            font_info: FontInfo::from_name(
+                "Arial",
+                &["Helvetica", "Segoe UI", "Lucida Grande"],
+                None,
+            )
+            .unwrap(),
             font: None,
         }
     }
@@ -144,8 +148,12 @@ impl Button {
             hover: false,
             global_listener: global.listen(),
             command_group: CommandGroup::new(),
-            font_info: FontInfo::from_name("Arial", &["Helvetica", "Segoe UI", "Lucida Grande"])
-                .unwrap(),
+            font_info: FontInfo::from_name(
+                "Arial",
+                &["Helvetica", "Segoe UI", "Lucida Grande"],
+                None,
+            )
+            .unwrap(),
             font: None,
         }
     }
