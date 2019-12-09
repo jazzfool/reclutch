@@ -1,12 +1,54 @@
 use std::borrow::Cow;
 
 /// EmitResult indicates the success or failure of an `event emit`.
-/// * Ok(()) means "delivered".
-/// * Err(x) means "not delivered"/"replaced with () along the way"
+/// * `Delivered` means the event was emitted with possible listeners present.
+/// * `Undelivered` means replaced with `()` along the way
 ///   and contains the unconsumed `Cow` argument.
 ///   Take note that some emit methods might return an always owned
 ///   event instead.
-pub type EmitResult<'a, T> = Result<(), Cow<'a, T>>;
+#[derive(Debug, Clone)]
+pub enum EmitResult<'a, T: Clone> {
+    Delivered,
+    Undelivered(Cow<'a, T>),
+}
+
+impl<'a, T: Clone> EmitResult<'a, T> {
+    pub fn was_delivered(&self) -> bool {
+        match self {
+            EmitResult::Delivered => true,
+            EmitResult::Undelivered(_) => false,
+        }
+    }
+
+    pub fn was_undelivered(&self) -> bool {
+        match self {
+            EmitResult::Delivered => false,
+            EmitResult::Undelivered(_) => true,
+        }
+    }
+
+    pub fn into_result(self) -> Result<(), Cow<'a, T>> {
+        self.into()
+    }
+}
+
+impl<'a, T: Clone> From<Result<(), Cow<'a, T>>> for EmitResult<'a, T> {
+    fn from(result: Result<(), Cow<'a, T>>) -> Self {
+        match result {
+            Result::Ok(_) => EmitResult::Delivered,
+            Result::Err(x) => EmitResult::Undelivered(x),
+        }
+    }
+}
+
+impl<'a, T: Clone> Into<Result<(), Cow<'a, T>>> for EmitResult<'a, T> {
+    fn into(self) -> Result<(), Cow<'a, T>> {
+        match self {
+            EmitResult::Delivered => Result::Ok(()),
+            EmitResult::Undelivered(x) => Result::Err(x),
+        }
+    }
+}
 
 pub trait QueueInterfaceCommon {
     type Item;

@@ -32,7 +32,7 @@ impl<T> QueueInterfaceCommon for std::marker::PhantomData<T> {
 impl<T: Clone> Emitter for std::marker::PhantomData<T> {
     #[inline(always)]
     fn emit<'a>(&self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
-        Err(event)
+        EmitResult::Undelivered(event)
     }
 }
 
@@ -53,10 +53,13 @@ where
     fn emit<'a>(&mut self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
         if self.len() == 1 {
             self.first_mut().unwrap().emit(event)
-        } else if self.iter_mut().any(|i| i.emit_borrowed(&*event).is_ok()) {
-            Ok(())
+        } else if self
+            .iter_mut()
+            .any(|i| i.emit_borrowed(&*event).was_delivered())
+        {
+            EmitResult::Delivered
         } else {
-            Err(event)
+            EmitResult::Undelivered(event)
         }
     }
 }
@@ -76,11 +79,11 @@ where
     Self::Item: Clone,
 {
     fn emit<'a>(&mut self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
-        self.retain_mut(|i| i.emit_borrowed(&*event).is_ok());
+        self.retain_mut(|i| i.emit_borrowed(&*event).was_delivered());
         if self.is_empty() {
-            Err(event)
+            EmitResult::Undelivered(event)
         } else {
-            Ok(())
+            EmitResult::Delivered
         }
     }
 }
@@ -180,7 +183,7 @@ where
         if let Ok(mut i) = self.write() {
             i.emit(event)
         } else {
-            Err(event)
+            EmitResult::Undelivered(event)
         }
     }
 }
@@ -194,6 +197,7 @@ impl<T: Clone> Emitter for mpsc::Sender<T> {
     fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
         self.send(event.into_owned())
             .map_err(|mpsc::SendError(x)| Cow::Owned(x))
+            .into()
     }
 }
 
@@ -206,6 +210,7 @@ impl<T: Clone> Emitter for mpsc::SyncSender<T> {
     fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
         self.send(event.into_owned())
             .map_err(|mpsc::SendError(x)| Cow::Owned(x))
+            .into()
     }
 }
 
@@ -256,7 +261,7 @@ mod tests {
     fn test_event_listener() {
         let mut event = Vec::new();
 
-        event.emit_owned(0i32).unwrap_err();
+        event.emit_owned(0i32).into_result().unwrap_err();
 
         let (sender, receiver) = mpsc::channel();
         event.push(sender);
@@ -270,7 +275,7 @@ mod tests {
         });
 
         for i in data {
-            event.emit_borrowed(i).unwrap();
+            event.emit_borrowed(i).into_result().unwrap();
         }
         h.join().unwrap();
     }
@@ -282,12 +287,14 @@ mod tests {
         let (sender, subs1) = mpsc::channel();
         event.push(sender);
 
-        event.emit_owned(10i32).unwrap();
+        event.emit_owned(10i32).into_result
+        
+        ().unwrap();
 
         let (sender, subs2) = mpsc::channel();
         event.push(sender);
 
-        event.emit_owned(20i32).unwrap();
+        event.emit_owned(20i32).into_result().unwrap();
 
         let h1 = std::thread::spawn(move || {
             assert_eq!(subs1.recv(), Ok(10i32));
@@ -304,7 +311,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(200));
 
         for _i in 0..10 {
-            event.emit_owned(30i32).unwrap();
+            event.emit_owned(30i32).into_result().unwrap();
         }
 
         h1.join().unwrap();
