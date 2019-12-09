@@ -609,8 +609,11 @@ impl TextDisplayItem {
 
     /// Sets the top-left position of this text item, using the font baseline as an anchor.
     pub fn set_top_left(&mut self, top_left: Point) {
+        let metrics = self.font_info.font.metrics();
+
         self.bottom_left.x = top_left.x;
-        self.bottom_left.y = top_left.y + self.font_info.font.metrics().ascent;
+        self.bottom_left.y =
+            top_left.y + (metrics.ascent / metrics.units_per_em as f32 * self.size);
     }
 }
 
