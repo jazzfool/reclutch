@@ -175,7 +175,7 @@ impl Widget for Button {
             match event {
                 GlobalEvent::Click(pt) => {
                     if bounds.contains(pt) {
-                        self.press_event.emit_owned(pt).ok().unwrap();
+                        self.press_event.emit_owned(pt);
                     }
                 }
                 GlobalEvent::MouseMove(pt) => {
@@ -294,10 +294,7 @@ fn main() {
                 let position = position.to_physical(context.window().hidpi_factor());
                 cursor = Point::new(position.x as _, position.y as _);
 
-                window_q
-                    .emit_owned(GlobalEvent::MouseMove(cursor))
-                    .ok()
-                    .unwrap();
+                window_q.emit_owned(GlobalEvent::MouseMove(cursor));
             }
             WinitEvent::WindowEvent {
                 event:
@@ -308,10 +305,7 @@ fn main() {
                     },
                 ..
             } => {
-                window_q
-                    .emit_owned(GlobalEvent::Click(cursor))
-                    .ok()
-                    .unwrap();
+                window_q.emit_owned(GlobalEvent::Click(cursor));
             }
             WinitEvent::WindowEvent {
                 event: WindowEvent::CloseRequested,
