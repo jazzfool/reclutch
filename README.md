@@ -84,7 +84,7 @@ impl reclutch::widget::WidgetChildren for ExampleWidget {
     fn children(
         &self,
     ) -> Vec<
-        &dyn WidgetChildren<
+        &dyn reclutch::widget::WidgetChildren<
             UpdateAux = Self::UpdateAux,
             GraphicalAux = Self::GraphicalAux,
             DisplayObject = Self::DisplayObject,
@@ -96,7 +96,7 @@ impl reclutch::widget::WidgetChildren for ExampleWidget {
     fn children_mut(
         &mut self,
     ) -> Vec<
-        &mut dyn WidgetChildren<
+        &mut dyn reclutch::widget::WidgetChildren<
             UpdateAux = Self::UpdateAux,
             GraphicalAux = Self::GraphicalAux,
             DisplayObject = Self::DisplayObject,
