@@ -641,6 +641,15 @@ pub fn center_horizontally(inner: Rect, outer: Rect) -> Point {
     )
 }
 
+/// Various properties of a font (italics, boldness, etc).
+pub type FontProperties = font_kit::properties::Properties;
+/// "Style" of the font; upright, italics or oblique.
+pub type FontStyle = font_kit::properties::Style;
+/// Weight of the font; regular, bold, light, etc.
+pub type FontWeight = font_kit::properties::Weight;
+// Stretching of the font; condensed, extra-condensed etc.
+pub type FontStretch = font_kit::properties::Stretch;
+
 /// Represents a single font.
 #[derive(Debug, Clone)]
 pub struct FontInfo {
@@ -650,8 +659,12 @@ pub struct FontInfo {
 }
 
 impl FontInfo {
-    /// Creates a new font reference, matched to the font `name`, with optional `fallbacks`.
-    pub fn from_name(name: &str, fallbacks: &[&str]) -> Result<Self, error::FontError> {
+    /// Creates a new font reference, matched to the font `name`, with optional `fallbacks` and `properties`.
+    pub fn from_name(
+        name: &str,
+        fallbacks: &[&str],
+        properties: Option<FontProperties>,
+    ) -> Result<Self, error::FontError> {
         let mut names = vec![font_kit::family_name::FamilyName::Title(name.to_string())];
         names.append(
             &mut fallbacks
@@ -661,7 +674,7 @@ impl FontInfo {
         );
 
         let font = font_kit::source::SystemSource::new()
-            .select_best_match(&names, &font_kit::properties::Properties::default())?
+            .select_best_match(&names, &properties.unwrap_or_default())?
             .load()?;
 
         Ok(Self {
