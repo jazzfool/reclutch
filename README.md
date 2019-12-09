@@ -13,6 +13,7 @@
 - Retained-mode rendering.
 - Object-oriented widgets in idiomatic Rust.
 - Renderer-agnostic.
+- Text utilities (line-wrapping, support for text shaping).
 
 There is an (optional) OpenGL Skia implementation for the renderer.
 

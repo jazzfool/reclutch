@@ -382,23 +382,90 @@ impl GraphicsDisplayItem {
 
 /// A single shaped glyph.
 /// This should be generated from the output of a shaping engine.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ShapedGlyph {
     pub codepoint: u32,
     pub advance: Vector,
     pub offset: Vector,
 }
 
+/// The single-character version of [`DisplayText`](enum.DisplayText.html).
+///
+/// This is only ever officially used in the [`retain`](enum.DisplayText.html#tymethod.retain) method.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DisplayCharacter {
+    Character(char),
+    Glyph(ShapedGlyph),
+}
+
 /// Render-able text, either as a simple string or pre-shaped glyphs (via a library such as HarfBuzz).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DisplayText {
     Simple(String),
     Shaped(Vec<ShapedGlyph>),
 }
 
+impl DisplayText {
+    /// Returns the length of text, either as n-characters or n-glyphs.
+    pub fn len(&self) -> usize {
+        match self {
+            DisplayText::Simple(text) => text.len(),
+            DisplayText::Shaped(glyphs) => glyphs.len(),
+        }
+    }
+
+    /// Returns a sub-range of the text.
+    ///
+    /// # Example
+    /// ```
+    /// use reclutch::display::DisplayText;
+    ///
+    /// let text = DisplayText::Simple("Hello, world!".to_string());
+    /// assert_eq!(text.subtext(7..12), DisplayText::Simple("world".to_string()));
+    /// ```
+    ///
+    /// # Panics
+    /// Panics if `range` is out-of-bounds. This essentially implies that `range`
+    /// should be within `0..len()`.
+    pub fn subtext(&self, range: std::ops::Range<usize>) -> DisplayText {
+        match self {
+            DisplayText::Simple(text) => DisplayText::Simple(text[range].to_string()),
+            DisplayText::Shaped(glyphs) => DisplayText::Shaped(glyphs[range].to_vec()),
+        }
+    }
+
+    /// Filters characters/glyphs based on a predicate.
+    pub fn filter<F>(&mut self, mut f: F)
+    where
+        F: FnMut(DisplayCharacter) -> bool,
+    {
+        match self {
+            DisplayText::Simple(text) => {
+                *text = text
+                    .chars()
+                    .filter(|c| f(DisplayCharacter::Character(*c)))
+                    .collect()
+            }
+            DisplayText::Shaped(glyphs) => {
+                *glyphs = glyphs
+                    .clone()
+                    .into_iter()
+                    .filter(|glyph| f(DisplayCharacter::Glyph(*glyph)))
+                    .collect()
+            }
+        }
+    }
+}
+
 impl From<String> for DisplayText {
     fn from(text: String) -> Self {
         DisplayText::Simple(text)
+    }
+}
+
+impl From<Vec<ShapedGlyph>> for DisplayText {
+    fn from(glyphs: Vec<ShapedGlyph>) -> Self {
+        DisplayText::Shaped(glyphs)
     }
 }
 
@@ -422,6 +489,16 @@ impl TextDisplayItem {
     ///
     /// The bounding box is identical to that of a browser's.
     pub fn bounds(&self) -> Result<Rect, error::FontError> {
+        self.limited_bounds(match &self.text {
+            DisplayText::Simple(text) => text.len(),
+            DisplayText::Shaped(glyphs) => glyphs.len(),
+        })
+    }
+
+    /// Returns the boundaries of the text, up to the n-th character (`limit`).
+    ///
+    /// For more information, see [`bounds`](struct.TextDisplayItem.html#tymethod.bounds).
+    pub fn limited_bounds(&self, limit: usize) -> Result<Rect, error::FontError> {
         let metrics = self.font_info.font.metrics();
         let units_per_em = metrics.units_per_em as f32;
 
@@ -437,7 +514,7 @@ impl TextDisplayItem {
 
         let width = match self.text {
             DisplayText::Simple(ref text) => {
-                text.as_bytes().iter().try_fold(
+                text.as_bytes()[0..limit].iter().try_fold(
                     0.0,
                     |width, &character| -> Result<f32, error::FontError> {
                         Ok(width
@@ -455,16 +532,110 @@ impl TextDisplayItem {
                 )? / units_per_em
                     * self.size
             }
-            DisplayText::Shaped(ref glyphs) => glyphs
+            DisplayText::Shaped(ref glyphs) => glyphs[0..limit]
                 .iter()
                 .fold(0.0, |width, glyph| width + glyph.advance.x),
         };
 
-        Ok(
-            Rect::new(Point::new(self.bottom_left.x, y), Size::new(width, height))
-                .inflate(self.size / 8.0, 0.0),
-        )
+        Ok(Rect::new(
+            Point::new(self.bottom_left.x, y),
+            Size::new(width, height),
+        ))
     }
+
+    /// Breaks the text based on a bounding box using the standard Unicode line
+    /// breaking algorithm.
+    pub fn linebreak(
+        mut self,
+        rect: Rect,
+        line_height: f32,
+        remove_newlines: bool,
+    ) -> Result<Vec<TextDisplayItem>, error::FontError> {
+        let text = match &self.text {
+            DisplayText::Simple(text) => text.clone(),
+            DisplayText::Shaped(glyphs) => glyphs.iter().fold(String::new(), |mut text, glyph| {
+                // FIXME(jazzfool): yeah... I don't think this is the best way to convert Unicode code-points
+                text.push(glyph.codepoint as u8 as char);
+                text
+            }),
+        };
+
+        let mut next = None;
+
+        for (offset, hard) in xi_unicode::LineBreakIterator::new(&text) {
+            if hard || self.limited_bounds(offset)?.max_x() > rect.max_x() {
+                let next_text = TextDisplayItem {
+                    text: self.text.subtext(offset..self.text.len()),
+                    font: self.font.clone(),
+                    font_info: self.font_info.clone(),
+                    size: self.size,
+                    bottom_left: self.bottom_left + Size::new(0.0, line_height),
+                    color: self.color.clone(),
+                };
+
+                if next_text.text.len() == 0 {
+                    continue;
+                }
+
+                next = Some((next_text, offset));
+
+                break;
+            }
+        }
+
+        let mut out = Vec::new();
+
+        if let Some((next, offset)) = next {
+            self.text = self.text.subtext(0..offset);
+            self.text.filter(|character| match character {
+                DisplayCharacter::Character(c) => c != '\n',
+                DisplayCharacter::Glyph(glyph) => glyph.codepoint as u8 as char != '\n',
+            });
+
+            if self.text.len() > 0 {
+                out.push(self);
+            }
+
+            out.extend(
+                next.linebreak(rect, line_height, remove_newlines)?
+                    .into_iter(),
+            );
+        } else {
+            out.push(self);
+        }
+
+        Ok(out)
+    }
+
+    /// Sets the top-left position of this text item, using the font baseline as an anchor.
+    pub fn set_top_left(&mut self, top_left: Point) {
+        self.bottom_left.x = top_left.x;
+        self.bottom_left.y = top_left.y + self.font_info.font.metrics().ascent;
+    }
+}
+
+/// Centers an un-positioned rectangle (`Size`) within a rectangle.
+pub fn center(inner: Size, outer: Rect) -> Point {
+    Point::new(
+        outer.origin.x + ((outer.size.width - inner.width) / 2.0),
+        outer.origin.y + ((outer.size.height - inner.height) / 2.0),
+    )
+}
+
+/// Vertically centers a rectangle within another rectangle.
+pub fn center_vertically(inner: Rect, outer: Rect) -> Point {
+    Point::new(
+        inner.origin.x,
+        outer.origin.y + ((outer.size.height - inner.size.height) / 2.0),
+    )
+}
+
+/// Vertically centers a rectangle within another rectangle.
+pub fn center_horizontally(inner: Rect, outer: Rect) -> Point {
+    Point::new(
+        outer.origin.x + ((outer.size.width - inner.size.width) / 2.0),
+        inner.origin.y,
+    )
 }
 
 /// Represents a single font.
