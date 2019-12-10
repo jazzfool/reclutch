@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-/// EmitResult indicates the success or failure of an `event emit`.
+/// `EmitResult` indicates the success or failure of an `event emit`.
 /// * `Delivered` means the event was emitted with possible listeners present.
 /// * `Undelivered` means replaced with `()` along the way
 ///   and contains the unconsumed `Cow` argument.
@@ -13,6 +13,7 @@ pub enum EmitResult<'a, T: Clone> {
 }
 
 impl<'a, T: Clone> EmitResult<'a, T> {
+    /// Returns true if the result is `Delivered`, otherwise false.
     pub fn was_delivered(&self) -> bool {
         match self {
             EmitResult::Delivered => true,
@@ -20,6 +21,7 @@ impl<'a, T: Clone> EmitResult<'a, T> {
         }
     }
 
+    /// Returns true if the result is `Undelivered`, otherwise false.
     pub fn was_undelivered(&self) -> bool {
         match self {
             EmitResult::Delivered => false,
@@ -27,7 +29,8 @@ impl<'a, T: Clone> EmitResult<'a, T> {
         }
     }
 
-    pub fn into_result(self) -> Result<(), Cow<'a, T>> {
+    /// Converts this `EmitResult` into `std::result::Result`.
+    pub fn to_result(self) -> Result<(), Cow<'a, T>> {
         self.into()
     }
 }

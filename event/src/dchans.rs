@@ -43,7 +43,7 @@ impl<T: Clone + Send + 'static> crate::cascade::Push for Cascade<T> {
             Box::new(move |x: T, drop_if_match: bool| -> CascadeResultIntern<T> {
                 if !filter(&x) {
                     CascadeResultIntern::Kept(x)
-                } else if drop_if_match || ev_out.emit_owned(x).is_ok() {
+                } else if drop_if_match || ev_out.emit_owned(x).was_delivered() {
                     CascadeResultIntern::Forwarded
                 } else if keep_after_disconnect {
                     CascadeResultIntern::ChangeToBlackhole
@@ -64,7 +64,7 @@ impl<T: Clone + Send + 'static> crate::cascade::Push for Cascade<T> {
     {
         self.outs.push((
             Box::new(move |x: T, drop_if_match: bool| -> CascadeResultIntern<T> {
-                match filtmap(x).map(|i| drop_if_match || ev_out.emit_owned(i).is_ok()) {
+                match filtmap(x).map(|i| drop_if_match || ev_out.emit_owned(i).was_delivered()) {
                     Err(x) => CascadeResultIntern::Kept(x),
                     Ok(true) => CascadeResultIntern::Forwarded,
                     Ok(false) => {
@@ -144,8 +144,8 @@ impl<T: Send + 'static> CascadeTrait for Cascade<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use crate::traits::EmitterMutExt;
+    use std::time::Duration;
 
     #[test]
     fn test_event_listener() {
@@ -157,9 +157,9 @@ mod tests {
             }
         });
 
-        event.emit_owned(1).unwrap();
-        event.emit_owned(2).unwrap();
-        event.emit_owned(3).unwrap();
+        event.emit_owned(1).to_result().unwrap();
+        event.emit_owned(2).to_result().unwrap();
+        event.emit_owned(3).to_result().unwrap();
         h.join().unwrap();
     }
 
@@ -170,12 +170,12 @@ mod tests {
         let (sender, subs1) = chan::unbounded();
         event.push(sender);
 
-        event.emit_owned(10i32).unwrap();
+        event.emit_owned(10i32).to_result().unwrap();
 
         let (sender, subs2) = chan::unbounded();
         event.push(sender);
 
-        event.emit_owned(20i32).unwrap();
+        event.emit_owned(20i32).to_result().unwrap();
 
         let h1 = std::thread::spawn(move || {
             assert_eq!(subs1.recv(), Ok(10i32));
@@ -192,7 +192,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(200));
 
         for _i in 0..10 {
-            event.emit_owned(30i32).unwrap();
+            event.emit_owned(30i32).to_result().unwrap();
         }
 
         h1.join().unwrap();
@@ -204,8 +204,8 @@ mod tests {
         let (event1, subs1) = chan::unbounded();
         let (event2, subs2) = chan::unbounded();
 
-        event1.emit_owned(20i32).unwrap();
-        event2.emit_owned(10i32).unwrap();
+        event1.emit_owned(20i32).to_result().unwrap();
+        event2.emit_owned(10i32).to_result().unwrap();
 
         chan::select! {
             recv(subs1) -> msg => {

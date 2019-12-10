@@ -1,6 +1,6 @@
 use crate::{
     cascade::{utils::CleanupIndices, CascadeTrait},
-    traits::{Emitter},
+    traits::Emitter,
     *,
 };
 use crossbeam_channel as chan;
@@ -138,6 +138,7 @@ impl<T: Clone> crate::traits::Emitter for Queue<T> {
                 Ok(())
             }
         })
+        .into()
     }
 }
 
@@ -205,7 +206,11 @@ impl<T: Clone + Send + Sync + 'static> crate::cascade::Push for Cascade<T> {
                         .into_iter()
                         .partition(|x| filter(x));
                     *x = keep;
-                    if drop_if_match || forward.into_iter().all(|i| ev_out.emit_owned(i).is_ok()) {
+                    if drop_if_match
+                        || forward
+                            .into_iter()
+                            .all(|i| ev_out.emit_owned(i).was_delivered())
+                    {
                         Ok(())
                     } else {
                         Err(keep_after_disconnect)
@@ -238,7 +243,11 @@ impl<T: Clone + Send + Sync + 'static> crate::cascade::Push for Cascade<T> {
 
                     *x = keep;
 
-                    if drop_if_match || forward.into_iter().all(|i| ev_out.emit_owned(i).is_ok()) {
+                    if drop_if_match
+                        || forward
+                            .into_iter()
+                            .all(|i| ev_out.emit_owned(i).was_delivered())
+                    {
                         Ok(())
                     } else {
                         Err(keep_after_disconnect)
@@ -343,7 +352,7 @@ mod tests {
     fn test_event_listener() {
         let event = Queue::new();
 
-        event.emit_owned(0i32).unwrap_err();
+        event.emit_owned(0i32).to_result().unwrap_err();
 
         let suls = event.listen_and_subscribe();
         let data = &[1, 2, 3];
@@ -355,7 +364,7 @@ mod tests {
         });
 
         for i in data.into_iter() {
-            event.emit_borrowed(i).unwrap();
+            event.emit_borrowed(i).to_result().unwrap();
         }
         h.join().unwrap();
     }
@@ -366,13 +375,13 @@ mod tests {
 
         let suls1 = event.listen_and_subscribe();
 
-        event.emit_owned(10).unwrap();
+        event.emit_owned(10).to_result().unwrap();
 
         assert!(!event.buffer_is_empty());
 
         let suls2 = event.listen_and_subscribe();
 
-        event.emit_owned(20).unwrap();
+        event.emit_owned(20).to_result().unwrap();
 
         let h1 = std::thread::spawn(move || {
             assert_eq!(suls1.notifier.recv(), Ok(()));
@@ -392,7 +401,7 @@ mod tests {
         assert!(event.buffer_is_empty());
 
         for _i in 0..10 {
-            event.emit_owned(30).unwrap();
+            event.emit_owned(30).to_result().unwrap();
         }
 
         h1.join().unwrap();
@@ -409,8 +418,8 @@ mod tests {
         let suls1 = event1.listen_and_subscribe();
         let suls2 = event2.listen_and_subscribe();
 
-        event1.emit_owned(20).unwrap();
-        event2.emit_owned(10).unwrap();
+        event1.emit_owned(20).to_result().unwrap();
+        event2.emit_owned(10).to_result().unwrap();
 
         chan::select! {
             recv(suls1.notifier) -> _msg => {

@@ -149,13 +149,13 @@ mod tests {
     fn test_event_listener() {
         let mut event = Queue::new();
 
-        event.emit_owned(0).into_result().unwrap_err();
+        event.emit_owned(0).to_result().unwrap_err();
 
         let listener = event.create_listener();
 
-        event.emit_owned(1).into_result().unwrap();
-        event.emit_owned(2).into_result().unwrap();
-        event.emit_owned(3).into_result().unwrap();
+        event.emit_owned(1).to_result().unwrap();
+        event.emit_owned(2).to_result().unwrap();
+        event.emit_owned(3).to_result().unwrap();
 
         event.pull_with(listener, |x| assert_eq!(x, &[1, 2, 3]));
 
@@ -168,13 +168,13 @@ mod tests {
 
         let listener_1 = event.create_listener();
 
-        event.emit_owned(10).into_result().unwrap();
+        event.emit_owned(10).to_result().unwrap();
 
         assert_eq!(event.events_len(), 1);
 
         let listener_2 = event.create_listener();
 
-        event.emit_owned(20).into_result().unwrap();
+        event.emit_owned(20).to_result().unwrap();
 
         event.pull_with(listener_1, |x| assert_eq!(x, &[10, 20]));
         event.pull_with(listener_2, |x| assert_eq!(x, &[20]));
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(event.events_len(), 0);
 
         for _i in 0..10 {
-            event.emit_owned(30).into_result().unwrap();
+            event.emit_owned(30).to_result().unwrap();
         }
 
         event.pull_with(listener_2, |x| assert_eq!(x, &[30; 10]));

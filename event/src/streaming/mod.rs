@@ -56,6 +56,6 @@ impl<T: Clone> crate::traits::EmitterMut for WakerWrapper<T> {
     #[inline]
     fn emit<'a>(&mut self, event: Cow<'a, T>) -> EmitResult<'a, T> {
         self.wake();
-        Err(event)
+        EmitResult::Undelivered(event)
     }
 }
