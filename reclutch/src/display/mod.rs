@@ -185,7 +185,8 @@ impl CommandGroup {
 
     /// Pushes a list of commands if the repaint flag is set, and resets repaint flag if so.
     ///
-    /// See [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group)
+    /// See [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
+    /// Also see [`push_with`](struct.CommandGroup.html#tymethod.push_with), which is more efficient.
     pub fn push(
         &mut self,
         display: &mut dyn GraphicsDisplay,
@@ -195,6 +196,27 @@ impl CommandGroup {
         if self.1 {
             self.1 = false;
             ok_or_push(&mut self.0, display, commands, protected);
+        } else {
+            display.maintain_command_group(self.0.unwrap());
+        }
+    }
+
+    /// Almost identical to [`push`](struct.CommandGroup.html#tymethod.push), however
+    /// instead of discarding the unused commands, it only invokes the provided
+    /// function when needed, so as to avoid commands that are expensive to build.
+    ///
+    /// As a general rule, use this where possible.
+    pub fn push_with<F>(
+        &mut self,
+        display: &mut dyn GraphicsDisplay,
+        f: F,
+        protected: impl Into<Option<bool>>,
+    ) where
+        F: FnOnce() -> Vec<DisplayCommand>,
+    {
+        if self.1 {
+            self.1 = false;
+            ok_or_push(&mut self.0, display, &f(), protected);
         } else {
             display.maintain_command_group(self.0.unwrap());
         }
