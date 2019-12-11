@@ -19,7 +19,7 @@ pub type Angle = euclid::Angle<f32>;
 /// A trait to process display commands.
 ///
 /// In a retained implementation, command groups are persistent in the underlying graphics API (e.g. vertex buffer objects in OpenGL).
-/// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](trait.GraphicsDisplay.html#tymethod.present).
+/// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](trait.GraphicsDisplay.html#method.present).
 ///
 /// The generic type parameter is the form in which the implementation can process display commands.
 /// This defaults to `DisplayCommand`, which supports shapes, gradients, backdrop filters, strokes, text, clips, transformation and state saving.
@@ -46,9 +46,9 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
         commands: &[D],
         protected: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
-    /// Returns an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
+    /// Returns an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[D]>;
-    /// Overwrites an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
+    /// Overwrites an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
     fn modify_command_group(
         &mut self,
         handle: CommandGroupHandle,
@@ -58,7 +58,7 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
     /// Refreshes a command group.
     /// Typically this means moving the command group to the front.
     fn maintain_command_group(&mut self, handle: CommandGroupHandle);
-    /// Removes a command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
+    /// Removes a command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
     fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<D>>;
 
     /// Executes pre-exit routines.
@@ -101,16 +101,16 @@ pub struct RasterImageInfo {
     pub format: RasterImageFormat,
 }
 
-/// Contains information required to load a resource through [`new_resource`](trait.GraphicsDisplay.html#tymethod.new_resource).
+/// Contains information required to load a resource through [`new_resource`](trait.GraphicsDisplay.html#method.new_resource).
 #[derive(Debug, Clone)]
 pub enum ResourceDescriptor {
     Image(ImageData),
     Font(ResourceData),
 }
 
-/// Contains a tagged ID to an existing resource, created through [`new_resource`](trait.GraphicsDisplay.html#tymethod.new_resource).
+/// Contains a tagged ID to an existing resource, created through [`new_resource`](trait.GraphicsDisplay.html#method.new_resource).
 ///
-/// This is used to references resources in draw commands and to remove resources through [`remove_resource`](trait.GraphicsDisplay.html#tymethod.remove_resource).
+/// This is used to references resources in draw commands and to remove resources through [`remove_resource`](trait.GraphicsDisplay.html#method.remove_resource).
 #[derive(Debug, Clone)]
 pub enum ResourceReference {
     Image(u64),
@@ -134,7 +134,7 @@ pub enum SharedData {
 }
 
 /// Pushes or modifies a command group, depending on whether `handle` contains a value or not.
-/// This means that if `handle` did not contain a value, [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group) will be called and `handle` will be assigned to the returned handle.
+/// This means that if `handle` did not contain a value, [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group) will be called and `handle` will be assigned to the returned handle.
 pub fn ok_or_push(
     handle: &mut Option<CommandGroupHandle>,
     display: &mut dyn GraphicsDisplay,
@@ -185,8 +185,8 @@ impl CommandGroup {
 
     /// Pushes a list of commands if the repaint flag is set, and resets repaint flag if so.
     ///
-    /// See [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
-    /// Also see [`push_with`](struct.CommandGroup.html#tymethod.push_with), which is more efficient.
+    /// See [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
+    /// Also see [`push_with`](struct.CommandGroup.html#method.push_with), which is more efficient.
     pub fn push(
         &mut self,
         display: &mut dyn GraphicsDisplay,
@@ -201,7 +201,7 @@ impl CommandGroup {
         }
     }
 
-    /// Almost identical to [`push`](struct.CommandGroup.html#tymethod.push), however
+    /// Almost identical to [`push`](struct.CommandGroup.html#method.push), however
     /// instead of discarding the unused commands, it only invokes the provided
     /// function when needed, so as to avoid commands that are expensive to build.
     ///
@@ -222,12 +222,12 @@ impl CommandGroup {
         }
     }
 
-    /// Sets the repaint flag so that next time [`push`](struct.CommandGroup.html#tymethod.push) is called the commands will be pushed.
+    /// Sets the repaint flag so that next time [`push`](struct.CommandGroup.html#method.push) is called the commands will be pushed.
     pub fn repaint(&mut self) {
         self.1 = true;
     }
 
-    /// Returns flag indicating whether next [`push`](struct.CommandGroup.html#tymethod.push) will skip or not.
+    /// Returns flag indicating whether next [`push`](struct.CommandGroup.html#method.push) will skip or not.
     pub fn will_repaint(&self) -> bool {
         self.1
     }
@@ -413,7 +413,7 @@ pub struct ShapedGlyph {
 
 /// The single-character version of [`DisplayText`](enum.DisplayText.html).
 ///
-/// This is only ever officially used in the [`retain`](enum.DisplayText.html#tymethod.retain) method.
+/// This is only ever officially used in the [`retain`](enum.DisplayText.html#method.retain) method.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DisplayCharacter {
     Character(char),
@@ -505,9 +505,9 @@ pub struct TextDisplayItem {
 impl TextDisplayItem {
     /// Returns the maximum boundaries for the text.
     ///
-    /// The height of the bounding box is conservative; it doesn't change based on the contents of
-    /// [`text`](struct.TextDisplayItem.html#structfield.text), is defined on a per-font basis, and is "worst-case" (as in it represents the largest
-    /// height value in the font).
+    /// The height of the bounding box is conservative; it doesn't change based
+    /// on the contents of [`text`](struct.TextDisplayItem.html#structfield.text), is defined on a per-font basis,
+    /// and is "worst-case" (as in it represents the largest height value in the font).
     ///
     /// The bounding box is identical to that of a browser's.
     pub fn bounds(&self) -> Result<Rect, error::FontError> {
@@ -519,7 +519,7 @@ impl TextDisplayItem {
 
     /// Returns the boundaries of the text, up to the n-th character (`limit`).
     ///
-    /// For more information, see [`bounds`](struct.TextDisplayItem.html#tymethod.bounds).
+    /// For more information, see [`bounds`](struct.TextDisplayItem.html#method.bounds).
     pub fn limited_bounds(&self, limit: usize) -> Result<Rect, error::FontError> {
         let metrics = self.font_info.font.metrics();
         let units_per_em = metrics.units_per_em as f32;
@@ -682,6 +682,8 @@ pub struct FontInfo {
 
 impl FontInfo {
     /// Creates a new font reference, matched to the font `name`, with optional `fallbacks` and `properties`.
+    ///
+    /// See [`from_postscript_name`](struct.FontInfo.html#method.from_postscript_name).
     pub fn from_name(
         name: &str,
         fallbacks: &[&str],
@@ -699,7 +701,34 @@ impl FontInfo {
             .select_best_match(&names, &properties.unwrap_or_default())?
             .load()?;
 
-        Ok(Self {
+        Ok(FontInfo {
+            name: font.full_name(),
+            font: Arc::new(font),
+        })
+    }
+
+    /// Creates a new font reference, matched to the PostScript `name`, with optional `fallbacks`.
+    ///
+    /// If the exact desired font is known, this constructor is more appropriate than [`from_name`](struct.FontInfo.html#method.from_name).
+    pub fn from_postscript_name(name: &str, fallbacks: &[&str]) -> Result<Self, error::FontError> {
+        let mut names = vec![name.to_string()];
+        names.append(&mut fallbacks.iter().map(|name| name.to_string()).collect());
+
+        let mut font = None;
+
+        for name in names {
+            font = font_kit::source::SystemSource::new()
+                .select_by_postscript_name(&name)
+                .ok();
+        }
+
+        let font = font
+            .ok_or_else(|| {
+                error::FontError::MatchingError(font_kit::error::SelectionError::NotFound)
+            })?
+            .load()?;
+
+        Ok(FontInfo {
             name: font.full_name(),
             font: Arc::new(font),
         })
@@ -714,18 +743,18 @@ impl FontInfo {
     ) -> Result<Self, error::FontError> {
         let font = font_kit::font::Font::from_path(path, font_index)?;
 
-        Ok(Self {
+        Ok(FontInfo {
             name: font.full_name(),
             font: Arc::new(font),
         })
     }
 
     /// Creates a new font reference from font data.
-    /// Similar to [`from_path`](struct.FontInfo.html#tymethod.from_path), however as bytes rather than a path to a file.
+    /// Similar to [`from_path`](struct.FontInfo.html#method.from_path), however as bytes rather than a path to a file.
     pub fn from_data(data: Arc<Vec<u8>>, font_index: u32) -> Result<Self, error::FontError> {
         let font = font_kit::font::Font::from_bytes(data, font_index)?;
 
-        Ok(Self {
+        Ok(FontInfo {
             name: font.full_name(),
             font: Arc::new(font),
         })
