@@ -1,8 +1,8 @@
-<p align="left">
+<p align="center">
     <img src=".media/reclutch.png" width="256px"/>
 </p>
 
-## Gain control of your UI again
+## <p align="center">Gain control of your UI again</p>
 
 [![Build Status](https://travis-ci.com/jazzfool/reclutch.svg?branch=master)](https://travis-ci.com/jazzfool/reclutch)
 
