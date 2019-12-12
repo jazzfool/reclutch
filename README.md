@@ -193,3 +193,14 @@ fn update(&mut self, aux: &mut Globals) {
     }
 }
 ```
+
+## License
+
+Reclutch is licensed under either
+
+- [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0)
+- [MIT](http://opensource.org/licenses/MIT)
+
+at your choosing.
+
+This license also applies to all "sub-projects" (`event` and `derive`).
