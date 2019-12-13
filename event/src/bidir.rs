@@ -15,7 +15,7 @@ pub struct Queue<Tp, Ts>(pub(crate) Rc<RefCell<(VecDeque<Tp>, VecDeque<Ts>)>>);
 
 /// The "other" end of the bidirectional [`Queue`]
 #[derive(Clone, Debug)]
-pub struct Secondary<'a, Tp, Ts>(&'a Queue<Tp, Ts>);
+pub struct Secondary<Tp, Ts>(Queue<Tp, Ts>);
 
 impl<Tp, Ts> Default for Queue<Tp, Ts> {
     fn default() -> Self {
@@ -34,8 +34,8 @@ impl<Tp, Ts> Queue<Tp, Ts> {
     /// NOTE: multiple calls to this method on the same queue
     /// return wrapped references to the same [`Secondary`].
     #[inline]
-    pub const fn secondary(&self) -> Secondary<'_, Tp, Ts> {
-        Secondary(self)
+    pub fn secondary(&self) -> Secondary<Tp, Ts> {
+        Secondary(Queue(Rc::clone(&self.0)))
     }
 
     /// This function iterates over the input event queue
@@ -62,7 +62,7 @@ impl<Tp, Ts> Queue<Tp, Ts> {
     }
 }
 
-impl<Tp, Ts> Secondary<'_, Tp, Ts> {
+impl<Tp, Ts> Secondary<Tp, Ts> {
     /// Function which iterates over the input event queue
     /// and optionally schedules items to be put into the
     /// outgoing event queue
@@ -96,7 +96,7 @@ impl<Tp, Ts> traits::QueueInterfaceCommon for Queue<Tp, Ts> {
     }
 }
 
-impl<Tp, Ts> traits::QueueInterfaceCommon for Secondary<'_, Tp, Ts> {
+impl<Tp, Ts> traits::QueueInterfaceCommon for Secondary<Tp, Ts> {
     type Item = Tp;
 
     #[inline]
@@ -113,7 +113,7 @@ impl<Tp, Ts: Clone> traits::Emitter for Queue<Tp, Ts> {
     }
 }
 
-impl<Tp: Clone, Ts> traits::Emitter for Secondary<'_, Tp, Ts> {
+impl<Tp: Clone, Ts> traits::Emitter for Secondary<Tp, Ts> {
     #[inline]
     fn emit<'a>(&self, event: Cow<'a, Tp>) -> EmitResult<'a, Tp> {
         (self.0).0.borrow_mut().0.push_back(event.into_owned());
@@ -146,7 +146,7 @@ impl<Tp: Clone, Ts> traits::Listen for Queue<Tp, Ts> {
     }
 }
 
-impl<'a, Tp, Ts: Clone> traits::Listen for Secondary<'a, Tp, Ts> {
+impl<Tp, Ts: Clone> traits::Listen for Secondary<Tp, Ts> {
     type Item = Ts;
 
     #[inline]
