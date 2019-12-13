@@ -1,7 +1,7 @@
 use crate::traits::{self, EmitResult};
-use std::{borrow::Cow, cell::RefCell, collections::VecDeque};
+use std::{borrow::Cow, cell::RefCell, collections::VecDeque, rc::Rc};
 
-/// Non-thread-safe, non-reference-counted,
+/// Non-thread-safe, reference-counted,
 /// bidirectional event queue,
 /// designed for `1:1` communication,
 /// thus, it doesn't support multicasting.
@@ -10,16 +10,16 @@ use std::{borrow::Cow, cell::RefCell, collections::VecDeque};
 /// events which the primary peer receives,
 /// the second type parameter describes the
 /// events which the secondary peer receives.
-#[derive(Debug)]
-pub struct Queue<Tp, Ts>(pub(crate) RefCell<(VecDeque<Tp>, VecDeque<Ts>)>);
+#[derive(Clone, Debug)]
+pub struct Queue<Tp, Ts>(pub(crate) Rc<RefCell<(VecDeque<Tp>, VecDeque<Ts>)>>);
 
 /// The "other" end of the bidirectional [`Queue`]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Secondary<'a, Tp, Ts>(&'a Queue<Tp, Ts>);
 
 impl<Tp, Ts> Default for Queue<Tp, Ts> {
     fn default() -> Self {
-        Queue(RefCell::new((VecDeque::new(), VecDeque::new())))
+        Queue(Rc::new(RefCell::new((VecDeque::new(), VecDeque::new()))))
     }
 }
 
