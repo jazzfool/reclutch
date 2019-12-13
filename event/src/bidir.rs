@@ -23,6 +23,9 @@ impl<Tp, Ts> Default for Queue<Tp, Ts> {
     }
 }
 
+// TODO(zserik): introduce some kind of QueueProxy which transparently
+// swaps Tp & Ts to avoid code duplication between [`Queue`] and [`Secondary`].
+
 impl<Tp, Ts> Queue<Tp, Ts> {
     #[inline]
     pub fn new() -> Self {
@@ -137,12 +140,12 @@ impl<Tp: Clone, Ts> traits::Listen for Queue<Tp, Ts> {
     where
         F: FnMut(&Self::Item) -> R,
     {
-        std::mem::replace(&mut (self.0).borrow_mut().0, VecDeque::new()).iter().map(f).collect()
+        std::mem::replace(&mut self.0.borrow_mut().0, VecDeque::new()).iter().map(f).collect()
     }
 
     #[inline]
     fn peek(&self) -> Vec<Self::Item> {
-        self.map(Clone::clone)
+        std::mem::replace(&mut self.0.borrow_mut().0, VecDeque::new()).into_iter().collect()
     }
 }
 
@@ -167,7 +170,7 @@ impl<Tp, Ts: Clone> traits::Listen for Secondary<Tp, Ts> {
 
     #[inline]
     fn peek(&self) -> Vec<Self::Item> {
-        self.map(Clone::clone)
+        std::mem::replace(&mut (self.0).0.borrow_mut().1, VecDeque::new()).into_iter().collect()
     }
 }
 
