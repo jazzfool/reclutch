@@ -609,10 +609,13 @@ impl TextDisplayItem {
 
         if let Some((next, offset)) = next {
             self.text = self.text.subtext(0..offset);
-            self.text.filter(|character| match character {
-                DisplayCharacter::Character(c) => c != '\n',
-                DisplayCharacter::Glyph(glyph) => glyph.codepoint as u8 as char != '\n',
-            });
+
+            if remove_newlines {
+                self.text.filter(|character| match character {
+                    DisplayCharacter::Character(c) => c != '\n',
+                    DisplayCharacter::Glyph(glyph) => glyph.codepoint as u8 as char != '\n',
+                });
+            }
 
             if self.text.len() > 0 {
                 out.push(self);
