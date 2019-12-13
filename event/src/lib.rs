@@ -59,6 +59,8 @@ mod intern;
 mod macros;
 mod traits;
 
+pub mod bidir;
+
 channels_api! {
     /// Contains a thread-safe event-cascading API based upon the
     /// subscribable thread-safe APIs.
