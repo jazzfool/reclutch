@@ -38,7 +38,7 @@ impl<Tp, Ts> Queue<Tp, Ts> {
         Secondary(self)
     }
 
-    /// Function which iterates over the input event queue
+    /// This function iterates over the input event queue
     /// and optionally schedules items to be put into the
     /// outgoing event queue
     pub fn bounce<F>(&self, f: F)
@@ -53,6 +53,12 @@ impl<Tp, Ts> Queue<Tp, Ts> {
                 .into_iter()
                 .flat_map(f),
         )
+    }
+
+    /// This function retrieves the newest event from
+    /// the event queue and drops the rest.
+    pub fn retrieve_newest(&self) -> Option<Tp> {
+        self.0.borrow_mut().0.drain(..).last()
     }
 }
 
@@ -72,6 +78,12 @@ impl<Tp, Ts> Secondary<'_, Tp, Ts> {
                 .into_iter()
                 .flat_map(f),
         )
+    }
+
+    /// This function retrieves the newest event from
+    /// the event queue and drops the rest.
+    pub fn retrieve_newest(&self) -> Option<Ts> {
+        (self.0).0.borrow_mut().1.drain(..).last()
     }
 }
 
