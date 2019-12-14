@@ -59,6 +59,12 @@ mod intern;
 mod macros;
 mod traits;
 
+/// Contains an bidirectional `1:1`, non-thread-safe, reference-counted API
+pub mod bidir;
+
+/// Like `bidir`, but each direction can only save one event at a time
+pub mod bidir_single;
+
 channels_api! {
     /// Contains a thread-safe event-cascading API based upon the
     /// subscribable thread-safe APIs.
