@@ -20,6 +20,7 @@ pub type Angle = euclid::Angle<f32>;
 ///
 /// In a retained implementation, command groups are persistent in the underlying graphics API (e.g. vertex buffer objects in OpenGL).
 /// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](trait.GraphicsDisplay.html#method.present).
+/// An unmaintained command group ([`maintain_command_group`](trait.GraphicsDisplay.html#method.maintain_command_group)) is removed.
 ///
 /// The generic type parameter is the form in which the implementation can process display commands.
 /// This defaults to `DisplayCommand`, which supports shapes, gradients, backdrop filters, strokes, text, clips, transformation and state saving.
@@ -34,6 +35,7 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
         &mut self,
         descriptor: ResourceDescriptor,
     ) -> Result<ResourceReference, error::ResourceError>;
+
     /// Removes an existing resource.
     fn remove_resource(&mut self, reference: ResourceReference);
 
@@ -41,25 +43,32 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
     ///
     /// Normally [`Save`](enum.DisplayCommand.html#variant.Save) and [`Restore`](enum.DisplayCommand.html#variant.Restore) (more specifically an internal `RestoreToCount`) is invoked between command group execution to prevent any leaking
     /// of clips/transforms, however this can be explicitly disabled by letting `protected` be `false`.
+    ///
+    /// `always_alive` means that the command group is not subjective to maintenance. This means the only way to make it go away is to remove it directly.
     fn push_command_group(
         &mut self,
         commands: &[D],
         protected: Option<bool>,
+        always_alive: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
+
     /// Returns an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[D]>;
+
     /// Overwrites an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
     fn modify_command_group(
         &mut self,
         handle: CommandGroupHandle,
         commands: &[D],
         protected: Option<bool>,
+        always_alive: Option<bool>,
     );
-    /// Refreshes a command group.
-    /// Typically this means moving the command group to the front.
+
+    /// Removes an existing command group.
+    fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
+
+    /// Keeps a command group alive, additionally possibly moving it to the front (depending on implementation).
     fn maintain_command_group(&mut self, handle: CommandGroupHandle);
-    /// Removes a command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
-    fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<D>>;
 
     /// Executes pre-exit routines.
     ///
@@ -140,13 +149,14 @@ pub fn ok_or_push(
     display: &mut dyn GraphicsDisplay,
     commands: &[DisplayCommand],
     protected: impl Into<Option<bool>>,
+    always_alive: impl Into<Option<bool>>,
 ) {
-    match handle {
+    match handle/*.and_then(|ref handle| display.get_command_group(*handle).map(|_| handle.clone()))*/ {
         Some(ref handle) => {
-            display.modify_command_group(*handle, commands, protected.into());
+            display.modify_command_group(*handle, commands, protected.into(), always_alive.into());
         }
         None => {
-            *handle = display.push_command_group(commands, protected.into()).ok();
+            *handle = display.push_command_group(commands, protected.into(), always_alive.into()).ok();
         }
     }
 }
@@ -192,10 +202,11 @@ impl CommandGroup {
         display: &mut dyn GraphicsDisplay,
         commands: &[DisplayCommand],
         protected: impl Into<Option<bool>>,
+        always_alive: impl Into<Option<bool>>,
     ) {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, commands, protected);
+            ok_or_push(&mut self.0, display, commands, protected, always_alive);
         } else {
             display.maintain_command_group(self.0.unwrap());
         }
@@ -211,12 +222,13 @@ impl CommandGroup {
         display: &mut dyn GraphicsDisplay,
         f: F,
         protected: impl Into<Option<bool>>,
+        always_alive: impl Into<Option<bool>>,
     ) where
         F: FnOnce() -> Vec<DisplayCommand>,
     {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, &f(), protected);
+            ok_or_push(&mut self.0, display, &f(), protected, always_alive);
         } else {
             display.maintain_command_group(self.0.unwrap());
         }

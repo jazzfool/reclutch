@@ -143,7 +143,9 @@ fn main() {
             builder.push_text(text_blob, None);
         }
 
-        display.push_command_group(&builder.build(), None).unwrap();
+        display
+            .push_command_group(&builder.build(), None, Some(false))
+            .unwrap();
     }
 
     event_loop.run(move |event, _, control_flow| {

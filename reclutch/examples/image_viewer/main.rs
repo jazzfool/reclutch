@@ -181,7 +181,8 @@ impl Widget for Titlebar {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), None);
+        self.command_group
+            .push(display, &builder.build(), None, None);
     }
 }
 
@@ -337,7 +338,8 @@ impl Widget for Panel {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), None);
+        self.command_group
+            .push(display, &builder.build(), None, None);
 
         for child in self.children_mut() {
             child.draw(display, aux);
@@ -460,6 +462,7 @@ fn main() {
         .push_command_group(
             &[DisplayCommand::Clear(Color::new(1.0, 1.0, 1.0, 1.0))],
             None,
+            Some(false),
         )
         .unwrap();
 

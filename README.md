@@ -152,7 +152,7 @@ impl Widget for VisualWidget {
                 rect: Rect::new(Point::new(10.0, 10.0), Size::new(30.0, 50.0)),
                 paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::new(1.0, 0.0, 0.0, 1.0))),
             })),
-        ]);
+        ], None, true);
 
         draw_children();
     }

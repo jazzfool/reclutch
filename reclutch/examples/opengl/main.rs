@@ -242,7 +242,9 @@ fn main() {
             None,
         );
 
-        display.push_command_group(&builder.build(), None).unwrap();
+        display
+            .push_command_group(&builder.build(), None, Some(false))
+            .unwrap();
     }
 
     let mut latest_window_size = window_size;

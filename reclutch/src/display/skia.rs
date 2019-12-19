@@ -33,7 +33,8 @@ pub struct SkiaGraphicsDisplay {
     surface: sk::Surface,
     surface_type: SurfaceType,
     context: sk::gpu::Context,
-    command_groups: linked_hash_map::LinkedHashMap<u64, (Vec<DisplayCommand>, Rect, bool)>,
+    command_groups:
+        linked_hash_map::LinkedHashMap<u64, (Vec<DisplayCommand>, Rect, bool, Option<bool>)>,
     next_command_group_id: u64,
     resources: HashMap<u64, Resource>,
     next_resource_id: u64,
@@ -251,6 +252,7 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         &mut self,
         commands: &[DisplayCommand],
         protected: Option<bool>,
+        always_alive: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>> {
         let id = self.next_command_group_id;
 
@@ -260,6 +262,11 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
                 commands.to_owned(),
                 display_list_bounds(commands)?,
                 protected.unwrap_or(true),
+                if always_alive.unwrap_or(true) {
+                    Some(true)
+                } else {
+                    None
+                },
             ),
         );
 
@@ -280,22 +287,33 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         handle: CommandGroupHandle,
         commands: &[DisplayCommand],
         protected: Option<bool>,
+        always_alive: Option<bool>,
     ) {
         if self.command_groups.contains_key(&handle.id()) {
             if let Ok(bounds) = display_list_bounds(commands) {
                 self.command_groups.insert(
                     handle.id(),
-                    (commands.to_owned(), bounds, protected.unwrap_or(true)),
+                    (
+                        commands.to_owned(),
+                        bounds,
+                        protected.unwrap_or(true),
+                        if always_alive.unwrap_or(true) {
+                            Some(true)
+                        } else {
+                            None
+                        },
+                    ),
                 );
             }
         }
     }
 
     fn maintain_command_group(&mut self, handle: CommandGroupHandle) {
-        self.command_groups.get_refresh(&handle.id());
+        if let Some(cmd_group) = self.command_groups.get_refresh(&handle.id()) {
+            cmd_group.3 = cmd_group.3.map(|_| true);
+        }
     }
 
-    #[inline]
     fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>> {
         Some(self.command_groups.remove(&handle.id())?.0)
     }
@@ -306,12 +324,22 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
     }
 
     fn present(&mut self, cull: Option<Rect>) -> Result<(), error::DisplayError> {
+        let mut processed = Vec::new();
         let cmds = self
             .command_groups
-            .values()
-            .map(|cmds| (&cmds.0, &cmds.1, &cmds.2))
-            .filter_map(|(cmd_group, bounds, protected)| {
+            .iter()
+            .map(|(id, cmds)| (&cmds.0, &cmds.1, &cmds.2, &cmds.3, *id))
+            .filter_map(|(cmd_group, bounds, protected, maintained, id)| {
                 if cull.map(|cull| cull.intersects(bounds)).unwrap_or(true) {
+                    if let Some(maintained) = *maintained {
+                        if maintained {
+                            processed.push((true, id));
+                        } else {
+                            processed.push((false, id));
+                            return None;
+                        }
+                    }
+
                     Some((cmd_group, protected))
                 } else {
                     None
@@ -335,6 +363,14 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         }
 
         surface.flush();
+
+        for (ok, id) in processed {
+            if ok {
+                self.command_groups.get_mut(&id).unwrap().3 = Some(false);
+            } else {
+                self.command_groups.remove(&id);
+            }
+        }
 
         Ok(())
     }
