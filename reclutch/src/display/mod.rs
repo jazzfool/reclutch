@@ -151,7 +151,7 @@ pub fn ok_or_push(
     protected: impl Into<Option<bool>>,
     always_alive: impl Into<Option<bool>>,
 ) {
-    match handle/*.and_then(|ref handle| display.get_command_group(*handle).map(|_| handle.clone()))*/ {
+    match handle {
         Some(ref handle) => {
             display.modify_command_group(*handle, commands, protected.into(), always_alive.into());
         }
