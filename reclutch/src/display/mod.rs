@@ -156,7 +156,9 @@ pub fn ok_or_push(
             display.modify_command_group(*handle, commands, protected.into(), always_alive.into());
         }
         None => {
-            *handle = display.push_command_group(commands, protected.into(), always_alive.into()).ok();
+            *handle = display
+                .push_command_group(commands, protected.into(), always_alive.into())
+                .ok();
         }
     }
 }
@@ -235,11 +237,13 @@ impl CommandGroup {
     }
 
     /// Sets the repaint flag so that next time [`push`](struct.CommandGroup.html#method.push) is called the commands will be pushed.
+    #[inline(always)]
     pub fn repaint(&mut self) {
         self.1 = true;
     }
 
     /// Returns flag indicating whether next [`push`](struct.CommandGroup.html#method.push) will skip or not.
+    #[inline(always)]
     pub fn will_repaint(&self) -> bool {
         self.1
     }

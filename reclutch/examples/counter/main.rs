@@ -117,7 +117,8 @@ impl Widget for Counter {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), None, None);
+        self.command_group
+            .push(display, &builder.build(), None, None);
 
         for child in self.children_mut() {
             child.draw(display, aux);
