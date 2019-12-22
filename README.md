@@ -21,6 +21,8 @@ There is an (optional) OpenGL Skia implementation for the renderer.
     <img src=".media/showcase.png" width="90%"/>
 </p>
 
+For a widget toolkit built on Reclutch, see [Reui](https://github.com/jazzfool/reui), which in the regards of events also provides a more traditional closure-centric abstraction for event queue handling.
+
 ## Example
 
 All rendering details have been excluded for simplicity.
