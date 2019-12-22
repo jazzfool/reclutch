@@ -236,11 +236,14 @@ pub mod widget {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "derive")]
+    #[cfg(feature = "reclutch_derive")]
     #[test]
     fn test_widget_derive() {
         use crate as reclutch;
-        use reclutch::{display::Point, prelude::*};
+        use reclutch::{
+            display::{Point, Rect},
+            prelude::*,
+        };
 
         #[derive(WidgetChildren)]
         struct ExampleChild(i8);
@@ -256,7 +259,11 @@ mod tests {
         }
 
         #[derive(WidgetChildren)]
-        struct Unnamed(#[widget_child] ExampleChild, #[widget_child] ExampleChild);
+        struct Unnamed(
+            #[widget_child] ExampleChild,
+            #[widget_child] ExampleChild,
+            #[vec_widget_child] Vec<ExampleChild>,
+        );
 
         impl Widget for Unnamed {
             type UpdateAux = ();
@@ -270,6 +277,8 @@ mod tests {
             a: ExampleChild,
             #[widget_child]
             b: ExampleChild,
+            #[vec_widget_child]
+            c: Vec<ExampleChild>,
         };
 
         impl Widget for Named {
@@ -278,16 +287,19 @@ mod tests {
             type DisplayObject = ();
         }
 
-        let mut unnamed = Unnamed(ExampleChild(0), ExampleChild(1));
+        let mut unnamed = Unnamed(ExampleChild(0), ExampleChild(1), vec![ExampleChild(2)]);
         let mut named = Named {
             a: ExampleChild(2),
             b: ExampleChild(3),
+            c: vec![ExampleChild(4)],
         };
 
         assert_eq!(unnamed.children()[0].bounds().origin.x, 0.0);
         assert_eq!(unnamed.children_mut()[1].bounds().origin.x, 1.0);
+        assert_eq!(unnamed.children()[2].bounds().origin.x, 2.0);
 
         assert_eq!(named.children_mut()[0].bounds().origin.x, 2.0);
         assert_eq!(named.children()[1].bounds().origin.x, 3.0);
+        assert_eq!(named.children_mut()[2].bounds().origin.x, 4.0);
     }
 }

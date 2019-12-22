@@ -74,6 +74,8 @@ Children are stored manually by the implementing widget type.
 struct ExampleWidget {
     #[widget_child]
     child: AnotherWidget,
+    #[vec_widget_child]
+    children: Vec<AnotherWidget>,
 }
 ```
 
@@ -90,7 +92,12 @@ impl reclutch::widget::WidgetChildren for ExampleWidget {
             DisplayObject = Self::DisplayObject,
         >,
     > {
-        vec![&self.child]
+        let mut children = Vec::with_capacity(1 + self.children.len());
+        children.push(&self.child as _);
+        for child in &self.children {
+            children.push(child as _);
+        }
+        children
     }
 
     fn children_mut(
@@ -102,7 +109,12 @@ impl reclutch::widget::WidgetChildren for ExampleWidget {
             DisplayObject = Self::DisplayObject,
         >,
     > {
-        vec![&mut self.child]
+        let mut children = Vec::with_capacity(1 + self.children.len());
+        children.push(&mut self.child as _);
+        for child in &mut self.children {
+            children.push(child as _);
+        }
+        children
     }
 }
 ```
@@ -140,19 +152,21 @@ impl Widget for VisualWidget {
 
     fn update(&mut self, _aux: &mut ()) {
         if self.changed {
+            // This simply sets an internal boolean to "true", so don't be afraid to call it multiple times during updating.
             self.command_group.repaint();
         }
     }
 
     // Draws a nice red rectangle.
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) {
-        // Only pushes/modifies command group if a repaint is needed.
-        self.command_group.push(display, &[
-            DisplayCommand::Item(DisplayItem::Graphics(GraphicsDisplayItem::Rectangle {
-                rect: Rect::new(Point::new(10.0, 10.0), Size::new(30.0, 50.0)),
-                paint: GraphicsDisplayPaint::Fill(StyleColor::Color(Color::new(1.0, 0.0, 0.0, 1.0))),
-            })),
-        ], None, true);
+        let mut builder = DisplayListBuilder::new();
+        builder.push_rectangle(
+            Rect::new(Point::new(10.0, 10.0), Size::new(30.0, 50.0)),
+            GraphicsDisplayPaint::Fill(Color::new(1.0, 0.0, 0.0, 1.0).into()),
+            None);
+
+        // Only pushes/modifies the command group if a repaint is needed.
+        self.command_group.push(display, &builder.build(), None, true);
 
         draw_children();
     }

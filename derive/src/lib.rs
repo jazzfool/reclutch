@@ -2,14 +2,33 @@ extern crate proc_macro;
 
 use {proc_macro::TokenStream, quote::quote};
 
-#[proc_macro_derive(WidgetChildren, attributes(widget_child, widget_children_trait))]
+#[proc_macro_derive(
+    WidgetChildren,
+    attributes(widget_child, vec_widget_child, widget_children_trait)
+)]
 pub fn widget_macro_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
 
     impl_widget_macro(&ast)
 }
 
-fn chk_attrs_is_child(attrs: &[syn::Attribute]) -> bool {
+enum ChildAttr {
+    None,
+    WidgetChild,
+    VecWidgetChild,
+}
+
+enum StringOrInt {
+    String(String),
+    Int(usize),
+}
+
+enum ChildReference {
+    Single(StringOrInt),
+    Vec(StringOrInt),
+}
+
+fn chk_attrs_is_child(attrs: &[syn::Attribute]) -> ChildAttr {
     for attr in attrs {
         if attr
             .path
@@ -18,18 +37,21 @@ fn chk_attrs_is_child(attrs: &[syn::Attribute]) -> bool {
             .map(|i| i.ident == "widget_child")
             .unwrap_or(false)
         {
-            return true;
+            return ChildAttr::WidgetChild;
+        } else if attr
+            .path
+            .segments
+            .first()
+            .map(|i| i.ident == "vec_widget_child")
+            .unwrap_or(false)
+        {
+            return ChildAttr::VecWidgetChild;
         }
     }
-    false
+    ChildAttr::None
 }
 
 fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
-    enum StringOrInt {
-        String(String),
-        Int(usize),
-    }
-
     let trait_type = if let Some(attr) = ast.attrs.iter().find(|attr| {
         attr.path
             .segments
@@ -58,21 +80,40 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
     let mut children = Vec::new();
 
+    let mut capacity = 0;
     if let syn::Data::Struct(ref data) = &ast.data {
         match &data.fields {
             syn::Fields::Named(fields) => {
                 for field in fields.named.iter() {
                     if let Some(ref ident) = field.ident {
-                        if chk_attrs_is_child(&field.attrs) {
-                            children.push(StringOrInt::String(ident.to_string()));
+                        match chk_attrs_is_child(&field.attrs) {
+                            ChildAttr::None => continue,
+                            ChildAttr::WidgetChild => {
+                                capacity += 1;
+                                children.push(ChildReference::Single(StringOrInt::String(
+                                    ident.to_string(),
+                                )));
+                            }
+                            ChildAttr::VecWidgetChild => {
+                                children.push(ChildReference::Vec(StringOrInt::String(
+                                    ident.to_string(),
+                                )));
+                            }
                         }
                     }
                 }
             }
             syn::Fields::Unnamed(fields) => {
                 for (i, field) in fields.unnamed.iter().enumerate() {
-                    if chk_attrs_is_child(&field.attrs) {
-                        children.push(StringOrInt::Int(i));
+                    match chk_attrs_is_child(&field.attrs) {
+                        ChildAttr::None => continue,
+                        ChildAttr::WidgetChild => {
+                            capacity += 1;
+                            children.push(ChildReference::Single(StringOrInt::Int(i)));
+                        }
+                        ChildAttr::VecWidgetChild => {
+                            children.push(ChildReference::Vec(StringOrInt::Int(i)));
+                        }
                     }
                 }
             }
@@ -80,19 +121,46 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
         }
     }
 
-    let (children, mut_children): (Vec<_>, Vec<_>) = children
-        .iter()
-        .map(|child| match child {
-            StringOrInt::String(child) => {
-                let ident = quote::format_ident!("{}", child);
-                (quote! { &self.#ident }, quote! { &mut self.#ident })
-            }
-            StringOrInt::Int(child) => {
-                let ident = syn::Index::from(*child);
-                (quote! { &self.#ident }, quote! { &mut self.#ident })
-            }
-        })
-        .unzip();
+    let mut push_children = Vec::new();
+    let mut push_children_mut = Vec::new();
+    let mut capacities = Vec::new();
+
+    for child in children {
+        match child {
+            ChildReference::Single(ident) => match ident {
+                StringOrInt::String(child) => {
+                    let ident = quote::format_ident!("{}", child);
+                    push_children.push(quote! { children.push(&self.#ident as _); });
+                    push_children_mut.push(quote! { children.push(&mut self.#ident as _); });
+                }
+                StringOrInt::Int(child) => {
+                    let ident = syn::Index::from(child);
+                    push_children.push(quote! { children.push(&self.#ident as _); });
+                    push_children_mut.push(quote! { children.push(&mut self.#ident as _); });
+                }
+            },
+            ChildReference::Vec(ident) => match ident {
+                StringOrInt::String(child) => {
+                    let ident = quote::format_ident!("{}", child);
+                    push_children
+                        .push(quote! { for child in &self.#ident { children.push(child as _); } });
+                    push_children_mut.push(
+                        quote! { for child in &mut self.#ident { children.push(child as _); } },
+                    );
+                    capacities.push(quote! { + self.#ident.len() });
+                }
+                StringOrInt::Int(child) => {
+                    let ident = syn::Index::from(child);
+                    push_children
+                        .push(quote! { for child in &self.#ident { children.push(child as _); } });
+                    push_children_mut.push(
+                        quote! { for child in &mut self.#ident { children.push(child as _); } },
+                    );
+                    capacities.push(quote! { + self.#ident.len() });
+                }
+            },
+        }
+    }
 
     {
         quote! {
@@ -106,7 +174,9 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
                         DisplayObject = Self::DisplayObject,
                     >
                 > {
-                    vec![ #(#children),* ]
+                    let mut children = Vec::with_capacity(#capacity as usize #(#capacities)*);
+                    #(#push_children)*
+                    children
                 }
                 fn children_mut(
                     &mut self
@@ -117,7 +187,9 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
                         DisplayObject = Self::DisplayObject,
                     >
                 > {
-                    vec![ #(#mut_children),* ]
+                    let mut children = Vec::with_capacity(#capacity as usize #(#capacities)*);
+                    #(#push_children_mut)*
+                    children
                 }
             }
         }

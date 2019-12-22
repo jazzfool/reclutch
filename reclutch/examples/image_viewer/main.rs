@@ -347,43 +347,25 @@ impl Widget for Panel {
     }
 }
 
+#[derive(WidgetChildren)]
 struct PanelContainer {
-    panels: Vec<(Panel, RcEventListener<*const Panel>)>,
+    #[vec_widget_child]
+    panels: Vec<Panel>,
+    listeners: Vec<RcEventListener<*const Panel>>,
 }
 
 impl PanelContainer {
     fn new() -> Self {
-        PanelContainer { panels: Vec::new() }
+        PanelContainer {
+            panels: Vec::new(),
+            listeners: Vec::new(),
+        }
     }
 
     fn add_panel(&mut self, panel: Panel) {
         let on_click_listener = panel.on_click.listen();
-        self.panels.push((panel, on_click_listener));
-    }
-}
-
-impl WidgetChildren for PanelContainer {
-    fn children(
-        &self,
-    ) -> Vec<
-        &dyn WidgetChildren<UpdateAux = Globals, GraphicalAux = (), DisplayObject = DisplayCommand>,
-    > {
-        self.panels.iter().map(|(ref p, _)| p as _).collect()
-    }
-
-    fn children_mut(
-        &mut self,
-    ) -> Vec<
-        &mut dyn WidgetChildren<
-            UpdateAux = Globals,
-            GraphicalAux = (),
-            DisplayObject = DisplayCommand,
-        >,
-    > {
-        self.panels
-            .iter_mut()
-            .map(|(ref mut p, _)| p as _)
-            .collect()
+        self.panels.push(panel);
+        self.listeners.push(on_click_listener);
     }
 }
 
@@ -401,15 +383,12 @@ impl Widget for PanelContainer {
         {
             // collect all the panel events into a single vec
             let mut panel_events = Vec::new();
-            for panel in &self.panels {
-                panel.1.extend_other(&mut panel_events);
+            for listener in &self.listeners {
+                listener.extend_other(&mut panel_events);
             }
 
             for event in panel_events {
-                if let Some(panel_idx) = self
-                    .panels
-                    .iter()
-                    .position(|(ref p, _)| p as *const Panel == event)
+                if let Some(panel_idx) = self.panels.iter().position(|p| p as *const Panel == event)
                 {
                     let last = self.panels.len() - 1;
                     self.panels.swap(panel_idx, last);
