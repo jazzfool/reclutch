@@ -34,10 +34,7 @@ pub struct WakerWrapper<T> {
 impl<T> WakerWrapper<T> {
     #[inline]
     pub fn new(cx: Context<'_>) -> Self {
-        Self {
-            waker: Some(cx.waker().clone()),
-            _phantom: PhantomData,
-        }
+        Self { waker: Some(cx.waker().clone()), _phantom: PhantomData }
     }
 
     #[inline]

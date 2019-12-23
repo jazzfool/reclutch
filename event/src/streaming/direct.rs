@@ -24,20 +24,14 @@ pub struct Ref<'parent, T> {
 impl<T> Clone for Queue<T> {
     #[inline]
     fn clone(&self) -> Self {
-        Self {
-            eq: Arc::clone(&self.eq),
-            wakers: Arc::clone(&self.wakers),
-        }
+        Self { eq: Arc::clone(&self.eq), wakers: Arc::clone(&self.wakers) }
     }
 }
 
 impl<T> Default for Queue<T> {
     #[inline]
     fn default() -> Self {
-        Self {
-            eq: Default::default(),
-            wakers: Arc::new(Mutex::new(Vec::new())),
-        }
+        Self { eq: Default::default(), wakers: Arc::new(Mutex::new(Vec::new())) }
     }
 }
 
@@ -62,10 +56,7 @@ impl<T: Clone> QueueInterfaceListable for Queue<T> {
     type Listener = Listener<T>;
 
     fn listen(&self) -> Self::Listener {
-        Listener {
-            inner: Arc::new(self.eq.listen()),
-            wakers: Arc::downgrade(&self.wakers),
-        }
+        Listener { inner: Arc::new(self.eq.listen()), wakers: Arc::downgrade(&self.wakers) }
     }
 }
 
@@ -111,10 +102,7 @@ impl<T> IndirectRef<T> {
         Ref<'_, T>,
         std::sync::PoisonError<std::sync::RwLockReadGuard<'_, crate::RawEventQueue<T>>>,
     > {
-        self.0.eq.read().map(|eq| Ref {
-            eq,
-            key: self.0.key,
-        })
+        self.0.eq.read().map(|eq| Ref { eq, key: self.0.key })
     }
 }
 

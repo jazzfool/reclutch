@@ -93,9 +93,9 @@ impl Widget for Counter {
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut ()) {
         if self.font.is_none() {
             self.font = display
-                .new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                    SharedData::RefCount(std::sync::Arc::new(self.font_info.data().unwrap())),
-                )))
+                .new_resource(ResourceDescriptor::Font(ResourceData::Data(SharedData::RefCount(
+                    std::sync::Arc::new(self.font_info.data().unwrap()),
+                ))))
                 .ok();
         }
 
@@ -117,8 +117,7 @@ impl Widget for Counter {
             None,
         );
 
-        self.command_group
-            .push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), None, None);
 
         for child in self.children_mut() {
             child.draw(display, aux);
@@ -192,9 +191,9 @@ impl Widget for Button {
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) {
         if self.font.is_none() {
             self.font = display
-                .new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                    SharedData::RefCount(std::sync::Arc::new(self.font_info.data().unwrap())),
-                )))
+                .new_resource(ResourceDescriptor::Font(ResourceData::Data(SharedData::RefCount(
+                    std::sync::Arc::new(self.font_info.data().unwrap()),
+                ))))
                 .ok();
         }
 
@@ -220,16 +219,13 @@ impl Widget for Button {
                 font: self.font.as_ref().unwrap().clone(),
                 font_info: self.font_info.clone(),
                 size: 22.0,
-                bottom_left: bounds
-                    .origin
-                    .add_size(&Size::new(10.0, bounds.size.height / 2.0)),
+                bottom_left: bounds.origin.add_size(&Size::new(10.0, bounds.size.height / 2.0)),
                 color: Color::new(1.0, 1.0, 1.0, 1.0).into(),
             },
             None,
         );
 
-        self.command_group
-            .push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), None, None);
     }
 }
 
@@ -238,17 +234,14 @@ fn main() {
 
     let event_loop = EventLoop::new();
 
-    let wb = glutin::window::WindowBuilder::new()
-        .with_title("Counter with Reclutch")
-        .with_inner_size(
+    let wb =
+        glutin::window::WindowBuilder::new().with_title("Counter with Reclutch").with_inner_size(
             glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
                 .to_logical(event_loop.primary_monitor().hidpi_factor()),
         );
 
-    let context = glutin::ContextBuilder::new()
-        .with_vsync(true)
-        .build_windowed(wb, &event_loop)
-        .unwrap();
+    let context =
+        glutin::ContextBuilder::new().with_vsync(true).build_windowed(wb, &event_loop).unwrap();
 
     let context = unsafe { context.make_current().unwrap() };
 
@@ -273,16 +266,11 @@ fn main() {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            WinitEvent::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            WinitEvent::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
                 if display.size().0 != latest_window_size.0 as _
                     || display.size().1 != latest_window_size.1 as _
                 {
-                    display
-                        .resize((latest_window_size.0 as _, latest_window_size.1 as _))
-                        .unwrap();
+                    display.resize((latest_window_size.0 as _, latest_window_size.1 as _)).unwrap();
                 }
 
                 counter.draw(&mut display, &mut ());
@@ -290,8 +278,7 @@ fn main() {
                 context.swap_buffers().unwrap();
             }
             WinitEvent::WindowEvent {
-                event: WindowEvent::CursorMoved { position, .. },
-                ..
+                event: WindowEvent::CursorMoved { position, .. }, ..
             } => {
                 let position = position.to_physical(context.window().hidpi_factor());
                 cursor = Point::new(position.x as _, position.y as _);
@@ -309,16 +296,10 @@ fn main() {
             } => {
                 window_q.emit_owned(GlobalEvent::Click(cursor));
             }
-            WinitEvent::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
+            WinitEvent::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 *control_flow = ControlFlow::Exit;
             }
-            WinitEvent::WindowEvent {
-                event: WindowEvent::Resized(size),
-                ..
-            } => {
+            WinitEvent::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 let size = size.to_physical(context.window().hidpi_factor());
                 latest_window_size = (size.width as _, size.height as _);
             }

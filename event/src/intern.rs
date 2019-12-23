@@ -9,10 +9,7 @@ pub struct Queue<T> {
 
 impl<T> Default for Queue<T> {
     fn default() -> Self {
-        Self {
-            listeners: Default::default(),
-            events: Vec::new(),
-        }
+        Self { listeners: Default::default(), events: Vec::new() }
     }
 }
 

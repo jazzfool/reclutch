@@ -156,9 +156,8 @@ pub fn ok_or_push(
             display.modify_command_group(*handle, commands, protected.into(), always_alive.into());
         }
         None => {
-            *handle = display
-                .push_command_group(commands, protected.into(), always_alive.into())
-                .ok();
+            *handle =
+                display.push_command_group(commands, protected.into(), always_alive.into()).ok();
         }
     }
 }
@@ -376,11 +375,7 @@ impl GraphicsDisplayItem {
                 rotated_rectangle_bounds(
                     &Rect::new(axis_rect_xy, size).inflate(
                         stroke.thickness / 2.0,
-                        if stroke.cap != LineCap::Flat {
-                            stroke.thickness / 2.0
-                        } else {
-                            0.0
-                        },
+                        if stroke.cap != LineCap::Flat { stroke.thickness / 2.0 } else { 0.0 },
                     ),
                     Angle::radians(2.0 * ((*a - axis_rect_xy).length() / size.height).asin()),
                 )
@@ -397,11 +392,7 @@ impl GraphicsDisplayItem {
                     rect.inflate(stroke.thickness / 2.0, stroke.thickness / 2.0)
                 }
             },
-            GraphicsDisplayItem::Ellipse {
-                center,
-                radii,
-                paint,
-            } => {
+            GraphicsDisplayItem::Ellipse { center, radii, paint } => {
                 let rect = Rect::new(
                     (center.x - radii.x, center.y - radii.y).into(),
                     (radii.x * 2.0, radii.y * 2.0).into(),
@@ -479,10 +470,7 @@ impl DisplayText {
     {
         match self {
             DisplayText::Simple(text) => {
-                *text = text
-                    .chars()
-                    .filter(|c| f(DisplayCharacter::Character(*c)))
-                    .collect()
+                *text = text.chars().filter(|c| f(DisplayCharacter::Character(*c))).collect()
             }
             DisplayText::Shaped(glyphs) => {
                 *glyphs = glyphs
@@ -541,11 +529,8 @@ impl TextDisplayItem {
         let units_per_em = metrics.units_per_em as f32;
 
         let font_height = metrics.ascent - metrics.descent;
-        let line_height = if font_height > units_per_em {
-            font_height
-        } else {
-            font_height + metrics.line_gap
-        };
+        let line_height =
+            if font_height > units_per_em { font_height } else { font_height + metrics.line_gap };
         let height = line_height / units_per_em * self.size;
 
         let y = self.bottom_left.y - metrics.ascent / units_per_em * self.size;
@@ -570,15 +555,12 @@ impl TextDisplayItem {
                 )? / units_per_em
                     * self.size
             }
-            DisplayText::Shaped(ref glyphs) => glyphs[0..limit]
-                .iter()
-                .fold(0.0, |width, glyph| width + glyph.advance.x),
+            DisplayText::Shaped(ref glyphs) => {
+                glyphs[0..limit].iter().fold(0.0, |width, glyph| width + glyph.advance.x)
+            }
         };
 
-        Ok(Rect::new(
-            Point::new(self.bottom_left.x, y),
-            Size::new(width, height),
-        ))
+        Ok(Rect::new(Point::new(self.bottom_left.x, y), Size::new(width, height)))
     }
 
     /// Breaks the text based on a bounding box using the standard Unicode line
@@ -637,10 +619,7 @@ impl TextDisplayItem {
                 out.push(self);
             }
 
-            out.extend(
-                next.linebreak(rect, line_height, remove_newlines)?
-                    .into_iter(),
-            );
+            out.extend(next.linebreak(rect, line_height, remove_newlines)?.into_iter());
         } else {
             out.push(self);
         }
@@ -668,18 +647,12 @@ pub fn center(inner: Size, outer: Rect) -> Point {
 
 /// Vertically centers a rectangle within another rectangle.
 pub fn center_vertically(inner: Rect, outer: Rect) -> Point {
-    Point::new(
-        inner.origin.x,
-        outer.origin.y + ((outer.size.height - inner.size.height) / 2.0),
-    )
+    Point::new(inner.origin.x, outer.origin.y + ((outer.size.height - inner.size.height) / 2.0))
 }
 
 /// Vertically centers a rectangle within another rectangle.
 pub fn center_horizontally(inner: Rect, outer: Rect) -> Point {
-    Point::new(
-        outer.origin.x + ((outer.size.width - inner.size.width) / 2.0),
-        inner.origin.y,
-    )
+    Point::new(outer.origin.x + ((outer.size.width - inner.size.width) / 2.0), inner.origin.y)
 }
 
 /// Various properties of a font (italics, boldness, etc).
@@ -720,10 +693,7 @@ impl FontInfo {
             .select_best_match(&names, &properties.unwrap_or_default())?
             .load()?;
 
-        Ok(FontInfo {
-            name: font.full_name(),
-            font: Arc::new(font),
-        })
+        Ok(FontInfo { name: font.full_name(), font: Arc::new(font) })
     }
 
     /// Creates a new font reference, matched to the PostScript `name`, with optional `fallbacks`.
@@ -736,9 +706,7 @@ impl FontInfo {
         let mut font = None;
 
         for name in names {
-            font = font_kit::source::SystemSource::new()
-                .select_by_postscript_name(&name)
-                .ok();
+            font = font_kit::source::SystemSource::new().select_by_postscript_name(&name).ok();
         }
 
         let font = font
@@ -747,10 +715,7 @@ impl FontInfo {
             })?
             .load()?;
 
-        Ok(FontInfo {
-            name: font.full_name(),
-            font: Arc::new(font),
-        })
+        Ok(FontInfo { name: font.full_name(), font: Arc::new(font) })
     }
 
     /// Creates a new font reference from a font file located at `path`.
@@ -762,10 +727,7 @@ impl FontInfo {
     ) -> Result<Self, error::FontError> {
         let font = font_kit::font::Font::from_path(path, font_index)?;
 
-        Ok(FontInfo {
-            name: font.full_name(),
-            font: Arc::new(font),
-        })
+        Ok(FontInfo { name: font.full_name(), font: Arc::new(font) })
     }
 
     /// Creates a new font reference from font data.
@@ -773,10 +735,7 @@ impl FontInfo {
     pub fn from_data(data: Arc<Vec<u8>>, font_index: u32) -> Result<Self, error::FontError> {
         let font = font_kit::font::Font::from_bytes(data, font_index)?;
 
-        Ok(FontInfo {
-            name: font.full_name(),
-            font: Arc::new(font),
-        })
+        Ok(FontInfo { name: font.full_name(), font: Arc::new(font) })
     }
 
     /// Returns the final unique name of the loaded font.
@@ -833,10 +792,7 @@ impl DisplayClip {
         match self {
             DisplayClip::Rectangle { ref rect, .. }
             | DisplayClip::RoundRectangle { ref rect, .. } => (*rect),
-            DisplayClip::Ellipse {
-                ref center,
-                ref radii,
-            } => Rect::new(
+            DisplayClip::Ellipse { ref center, ref radii } => Rect::new(
                 (center.x - radii.x, center.y - radii.y).into(),
                 (radii.x * 2.0, radii.y * 2.0).into(),
             ),
@@ -960,9 +916,7 @@ impl DisplayListBuilder {
 
     /// Creates a new display list builder, initialized with an existing list of display commands.
     pub fn from_commands(commands: &[DisplayCommand]) -> Self {
-        DisplayListBuilder {
-            display_list: commands.to_vec(),
-        }
+        DisplayListBuilder { display_list: commands.to_vec() }
     }
 
     /// Pushes a stroked line, spanning from `a` to `b`.
@@ -1015,11 +969,7 @@ impl DisplayListBuilder {
         filter: Option<Filter>,
     ) {
         self.display_list.push(DisplayCommand::Item(
-            DisplayItem::Graphics(GraphicsDisplayItem::Ellipse {
-                center,
-                radii,
-                paint,
-            }),
+            DisplayItem::Graphics(GraphicsDisplayItem::Ellipse { center, radii, paint }),
             filter,
         ));
     }
@@ -1044,8 +994,7 @@ impl DisplayListBuilder {
 
     /// Pushes a line of text.
     pub fn push_text(&mut self, text: TextDisplayItem, filter: Option<Filter>) {
-        self.display_list
-            .push(DisplayCommand::Item(DisplayItem::Text(text), filter));
+        self.display_list.push(DisplayCommand::Item(DisplayItem::Text(text), filter));
     }
 
     /// Pushes a rectangle which applies a filter on everything behind it.
@@ -1066,34 +1015,23 @@ impl DisplayListBuilder {
 
     /// Pushes an ellipse which applies a filter on everything behind it.
     pub fn push_ellipse_backdrop(&mut self, center: Point, radii: Vector, filter: Filter) {
-        self.display_list.push(DisplayCommand::BackdropFilter(
-            DisplayClip::Ellipse { center, radii },
-            filter,
-        ));
+        self.display_list
+            .push(DisplayCommand::BackdropFilter(DisplayClip::Ellipse { center, radii }, filter));
     }
 
     /// Pushes a rectangle which clips proceeding display commands.
     pub fn push_rectangle_clip(&mut self, rect: Rect, antialias: bool) {
-        self.display_list
-            .push(DisplayCommand::Clip(DisplayClip::Rectangle {
-                rect,
-                antialias,
-            }));
+        self.display_list.push(DisplayCommand::Clip(DisplayClip::Rectangle { rect, antialias }));
     }
 
     /// Pushes a rectangle with rounded corners which clips proceeding display commands.
     pub fn push_round_rectangle_clip(&mut self, rect: Rect, radii: [f32; 4]) {
-        self.display_list
-            .push(DisplayCommand::Clip(DisplayClip::RoundRectangle {
-                rect,
-                radii,
-            }));
+        self.display_list.push(DisplayCommand::Clip(DisplayClip::RoundRectangle { rect, radii }));
     }
 
     /// Pushes an ellipse which clips proceeding display commands.
     pub fn push_ellipse_clip(&mut self, center: Point, radii: Vector) {
-        self.display_list
-            .push(DisplayCommand::Clip(DisplayClip::Ellipse { center, radii }));
+        self.display_list.push(DisplayCommand::Clip(DisplayClip::Ellipse { center, radii }));
     }
 
     /// Saves the current draw state (clip, transformation, layers).
@@ -1113,8 +1051,7 @@ impl DisplayListBuilder {
 
     /// Pushes translation (offset) to the transformation matrix.
     pub fn push_translation(&mut self, translation: Vector) {
-        self.display_list
-            .push(DisplayCommand::Translate(translation));
+        self.display_list.push(DisplayCommand::Translate(translation));
     }
 
     /// Pushes scaling to the transformation matrix.
@@ -1168,18 +1105,8 @@ mod tests {
     fn epsilon_rect(a: &Rect, b: &Rect) {
         assert!(approx_eq!(f32, a.origin.x, b.origin.x, epsilon = TOLERANCE));
         assert!(approx_eq!(f32, a.origin.y, b.origin.y, epsilon = TOLERANCE));
-        assert!(approx_eq!(
-            f32,
-            a.size.width,
-            b.size.width,
-            epsilon = TOLERANCE
-        ));
-        assert!(approx_eq!(
-            f32,
-            a.size.height,
-            b.size.height,
-            epsilon = TOLERANCE
-        ));
+        assert!(approx_eq!(f32, a.size.width, b.size.width, epsilon = TOLERANCE));
+        assert!(approx_eq!(f32, a.size.height, b.size.height, epsilon = TOLERANCE));
     }
 
     // Tolerance for what is determined to be a correct boundary.
@@ -1191,10 +1118,7 @@ mod tests {
             &GraphicsDisplayItem::Line {
                 a: Point::new(64.0, 32.0),
                 b: Point::new(128.0, 64.0),
-                stroke: GraphicsDisplayStroke {
-                    thickness: 16.0,
-                    ..Default::default()
-                },
+                stroke: GraphicsDisplayStroke { thickness: 16.0, ..Default::default() },
             }
             .bounds(),
             &Rect::new(Point::new(60.0, 24.0), Size::new(71.0, 47.0)),

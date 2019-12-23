@@ -288,11 +288,7 @@ mod tests {
         }
 
         let mut unnamed = Unnamed(ExampleChild(0), ExampleChild(1), vec![ExampleChild(2)]);
-        let mut named = Named {
-            a: ExampleChild(2),
-            b: ExampleChild(3),
-            c: vec![ExampleChild(4)],
-        };
+        let mut named = Named { a: ExampleChild(2), b: ExampleChild(3), c: vec![ExampleChild(4)] };
 
         assert_eq!(unnamed.children()[0].bounds().origin.x, 0.0);
         assert_eq!(unnamed.children_mut()[1].bounds().origin.x, 1.0);

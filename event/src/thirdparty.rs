@@ -53,10 +53,7 @@ where
     fn emit<'a>(&mut self, event: Cow<'a, Self::Item>) -> EmitResult<'a, Self::Item> {
         if self.len() == 1 {
             self.first_mut().unwrap().emit(event)
-        } else if self
-            .iter_mut()
-            .any(|i| i.emit_borrowed(&*event).was_delivered())
-        {
+        } else if self.iter_mut().any(|i| i.emit_borrowed(&*event).was_delivered()) {
             EmitResult::Delivered
         } else {
             EmitResult::Undelivered(event)
@@ -195,9 +192,7 @@ impl<T> QueueInterfaceCommon for mpsc::Sender<T> {
 impl<T: Clone> Emitter for mpsc::Sender<T> {
     #[inline]
     fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
-        self.send(event.into_owned())
-            .map_err(|mpsc::SendError(x)| Cow::Owned(x))
-            .into()
+        self.send(event.into_owned()).map_err(|mpsc::SendError(x)| Cow::Owned(x)).into()
     }
 }
 
@@ -208,9 +203,7 @@ impl<T> QueueInterfaceCommon for mpsc::SyncSender<T> {
 impl<T: Clone> Emitter for mpsc::SyncSender<T> {
     #[inline]
     fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
-        self.send(event.into_owned())
-            .map_err(|mpsc::SendError(x)| Cow::Owned(x))
-            .into()
+        self.send(event.into_owned()).map_err(|mpsc::SendError(x)| Cow::Owned(x)).into()
     }
 }
 

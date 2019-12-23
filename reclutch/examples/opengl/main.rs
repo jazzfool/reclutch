@@ -100,9 +100,7 @@ fn main() {
         )
         .with_resizable(false);
 
-    let cb = glutin::ContextBuilder::new()
-        .with_vsync(true)
-        .with_srgb(true);
+    let cb = glutin::ContextBuilder::new().with_vsync(true).with_srgb(true);
 
     let gl_display = glium::Display::new(wb, cb, &event_loop).unwrap();
 
@@ -242,9 +240,7 @@ fn main() {
             None,
         );
 
-        display
-            .push_command_group(&builder.build(), None, Some(false))
-            .unwrap();
+        display.push_command_group(&builder.build(), None, Some(false)).unwrap();
     }
 
     let mut latest_window_size = window_size;
@@ -259,10 +255,7 @@ fn main() {
         );
 
         match event {
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
                 roll += 0.001;
                 pitch += 0.002;
                 yaw += 0.003;
@@ -307,9 +300,7 @@ fn main() {
                 if display.size().0 != latest_window_size.0 as _
                     || display.size().1 != latest_window_size.1 as _
                 {
-                    display
-                        .resize((latest_window_size.0 as _, latest_window_size.1 as _))
-                        .unwrap();
+                    display.resize((latest_window_size.0 as _, latest_window_size.1 as _)).unwrap();
                 }
 
                 display.present(None).unwrap();
@@ -328,16 +319,10 @@ fn main() {
             Event::EventsCleared => {
                 gl_display.gl_window().window().request_redraw();
             }
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
+            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 *control_flow = ControlFlow::Exit;
             }
-            Event::WindowEvent {
-                event: WindowEvent::Resized(size),
-                ..
-            } => {
+            Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 let size = size.to_physical(gl_display.gl_window().window().hidpi_factor());
                 latest_window_size = (size.width as _, size.height as _);
             }

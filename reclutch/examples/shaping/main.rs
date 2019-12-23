@@ -66,10 +66,8 @@ fn main() {
                 .to_logical(event_loop.primary_monitor().hidpi_factor()),
         );
 
-    let context = glutin::ContextBuilder::new()
-        .with_vsync(true)
-        .build_windowed(wb, &event_loop)
-        .unwrap();
+    let context =
+        glutin::ContextBuilder::new().with_vsync(true).build_windowed(wb, &event_loop).unwrap();
 
     let context = unsafe { context.make_current().unwrap() };
 
@@ -86,9 +84,9 @@ fn main() {
     {
         let font_data = std::sync::Arc::new(include_bytes!("NotoSans.ttf").to_vec());
         let font_resource = display
-            .new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                SharedData::RefCount(font_data.clone()),
-            )))
+            .new_resource(ResourceDescriptor::Font(ResourceData::Data(SharedData::RefCount(
+                font_data.clone(),
+            ))))
             .unwrap();
         let font_info = FontInfo::from_data(font_data, 0).unwrap();
 
@@ -143,40 +141,27 @@ fn main() {
             builder.push_text(text_blob, None);
         }
 
-        display
-            .push_command_group(&builder.build(), None, Some(false))
-            .unwrap();
+        display.push_command_group(&builder.build(), None, Some(false)).unwrap();
     }
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            WinitEvent::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            WinitEvent::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
                 if display.size().0 != latest_window_size.0 as _
                     || display.size().1 != latest_window_size.1 as _
                 {
-                    display
-                        .resize((latest_window_size.0 as _, latest_window_size.1 as _))
-                        .unwrap();
+                    display.resize((latest_window_size.0 as _, latest_window_size.1 as _)).unwrap();
                 }
 
                 display.present(None).unwrap();
                 context.swap_buffers().unwrap();
             }
-            WinitEvent::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
+            WinitEvent::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 *control_flow = ControlFlow::Exit;
             }
-            WinitEvent::WindowEvent {
-                event: WindowEvent::Resized(size),
-                ..
-            } => {
+            WinitEvent::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 let size = size.to_physical(context.window().hidpi_factor());
                 latest_window_size = (size.width as _, size.height as _);
             }

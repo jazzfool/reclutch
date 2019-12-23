@@ -86,10 +86,7 @@ impl SkiaGraphicsDisplay {
     ) -> Result<(sk::Surface, sk::gpu::Context), error::SkiaError> {
         let mut context = Self::new_gl_context()?;
 
-        Ok((
-            SkiaGraphicsDisplay::new_gl_framebuffer_from_context(target, &mut context)?,
-            context,
-        ))
+        Ok((SkiaGraphicsDisplay::new_gl_framebuffer_from_context(target, &mut context)?, context))
     }
 
     fn new_gl_framebuffer_from_context(
@@ -100,10 +97,7 @@ impl SkiaGraphicsDisplay {
             target.size,
             None,
             8,
-            sk::gpu::gl::FramebufferInfo {
-                fboid: target.framebuffer_id,
-                format: gl::RGBA8,
-            },
+            sk::gpu::gl::FramebufferInfo { fboid: target.framebuffer_id, format: gl::RGBA8 },
         );
 
         Ok(sk::Surface::from_backend_render_target(
@@ -122,10 +116,7 @@ impl SkiaGraphicsDisplay {
     ) -> Result<(sk::Surface, sk::gpu::Context), error::SkiaError> {
         let mut context = Self::new_gl_context()?;
 
-        Ok((
-            SkiaGraphicsDisplay::new_gl_texture_from_context(target, &mut context)?,
-            context,
-        ))
+        Ok((SkiaGraphicsDisplay::new_gl_texture_from_context(target, &mut context)?, context))
     }
 
     fn new_gl_texture_from_context(
@@ -135,11 +126,7 @@ impl SkiaGraphicsDisplay {
         let info = unsafe {
             sk::gpu::BackendTexture::new_gl(
                 target.size,
-                if target.mip_mapped {
-                    sk::gpu::MipMapped::Yes
-                } else {
-                    sk::gpu::MipMapped::No
-                },
+                if target.mip_mapped { sk::gpu::MipMapped::Yes } else { sk::gpu::MipMapped::No },
                 sk::gpu::gl::TextureInfo {
                     format: gl::RGBA8,
                     target: gl::TEXTURE_2D,
@@ -262,11 +249,7 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
                 commands.to_owned(),
                 display_list_bounds(commands)?,
                 protected.unwrap_or(true),
-                if always_alive.unwrap_or(true) {
-                    Some(true)
-                } else {
-                    None
-                },
+                if always_alive.unwrap_or(true) { Some(true) } else { None },
             ),
         );
 
@@ -277,9 +260,7 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
 
     #[inline]
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]> {
-        self.command_groups
-            .get(&handle.id())
-            .map(|cmdgroup| &cmdgroup.0[..])
+        self.command_groups.get(&handle.id()).map(|cmdgroup| &cmdgroup.0[..])
     }
 
     fn modify_command_group(
@@ -297,11 +278,7 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
                         commands.to_owned(),
                         bounds,
                         protected.unwrap_or(true),
-                        if always_alive.unwrap_or(true) {
-                            Some(true)
-                        } else {
-                            None
-                        },
+                        if always_alive.unwrap_or(true) { Some(true) } else { None },
                     ),
                 );
             }
@@ -349,11 +326,7 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         let size = self.size();
         let surface = &mut self.surface;
         for cmd_group in cmds {
-            let count = if *cmd_group.1 {
-                Some(surface.canvas().save())
-            } else {
-                None
-            };
+            let count = if *cmd_group.1 { Some(surface.canvas().save()) } else { None };
 
             draw_command_group(cmd_group.0, surface, resources, size)?;
 
@@ -502,12 +475,7 @@ fn convert_paint(
 }
 
 fn convert_rect(rect: &Rect) -> sk::Rect {
-    sk::Rect::from_xywh(
-        rect.origin.x,
-        rect.origin.y,
-        rect.size.width,
-        rect.size.height,
-    )
+    sk::Rect::from_xywh(rect.origin.x, rect.origin.y, rect.size.width, rect.size.height)
 }
 
 fn convert_display_text(
@@ -538,10 +506,7 @@ fn convert_display_text(
 
 fn apply_clip(canvas: &mut sk::Canvas, clip: &DisplayClip) {
     match clip {
-        DisplayClip::Rectangle {
-            ref rect,
-            antialias,
-        } => {
+        DisplayClip::Rectangle { ref rect, antialias } => {
             canvas.clip_rect(convert_rect(rect), None, *antialias);
         }
         DisplayClip::RoundRectangle { ref rect, radii } => {
@@ -592,9 +557,7 @@ fn draw_command_group(
                             *filter,
                         )
                         .map_err(|e| error::DisplayError::InternalError(e.into()))?;
-                        surface
-                            .canvas()
-                            .draw_line(convert_point(*a), convert_point(*b), &paint);
+                        surface.canvas().draw_line(convert_point(*a), convert_point(*b), &paint);
                     }
                     GraphicsDisplayItem::Rectangle { rect, paint } => {
                         let paint = convert_paint(paint, *filter)
@@ -639,10 +602,7 @@ fn draw_command_group(
 
                                 apply_clip(
                                     surface.canvas(),
-                                    &DisplayClip::Rectangle {
-                                        rect: *dst,
-                                        antialias: true,
-                                    },
+                                    &DisplayClip::Rectangle { rect: *dst, antialias: true },
                                 );
 
                                 let o_src = src.map(|src_rect| convert_rect(&src_rect));
@@ -664,9 +624,8 @@ fn draw_command_group(
                 },
                 DisplayItem::Text(ref item) => {
                     if let ResourceReference::Font(ref id) = item.font {
-                        if let Resource::Font(ref typeface) = resources
-                            .get(id)
-                            .ok_or(error::DisplayError::InvalidResource(*id))?
+                        if let Resource::Font(ref typeface) =
+                            resources.get(id).ok_or(error::DisplayError::InvalidResource(*id))?
                         {
                             let paint = convert_paint(
                                 &GraphicsDisplayPaint::Fill(item.color.clone()),
@@ -730,9 +689,7 @@ fn draw_command_group(
 
                         paint.set_color_filter(sk::ColorFilters::matrix(&color_matrix));
 
-                        surface
-                            .canvas()
-                            .save_layer(&sk::SaveLayerRec::default().paint(&paint));
+                        surface.canvas().save_layer(&sk::SaveLayerRec::default().paint(&paint));
                     }
                 }
 
@@ -748,17 +705,13 @@ fn draw_command_group(
                 let mut paint = sk::Paint::default();
                 paint.set_alpha_f(*opacity);
 
-                surface
-                    .canvas()
-                    .save_layer(&sk::SaveLayerRec::default().paint(&paint));
+                surface.canvas().save_layer(&sk::SaveLayerRec::default().paint(&paint));
             }
             DisplayCommand::Restore => {
                 surface.canvas().restore();
             }
             DisplayCommand::Translate(ref offset) => {
-                surface
-                    .canvas()
-                    .translate(sk::Vector::new(offset.x, offset.y));
+                surface.canvas().translate(sk::Vector::new(offset.x, offset.y));
             }
             DisplayCommand::Scale(ref scale) => {
                 surface.canvas().scale((scale.x, scale.y));

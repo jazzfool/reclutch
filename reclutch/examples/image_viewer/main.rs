@@ -113,8 +113,7 @@ impl Widget for Titlebar {
                         click.with(|pos| self.bounds().contains(pos.clone()))
                     {
                         self.cursor_anchor = Some(position.clone());
-                        self.move_event
-                            .emit_owned(TitlebarEvent::BeginClick(position.clone()));
+                        self.move_event.emit_owned(TitlebarEvent::BeginClick(position.clone()));
                     }
                 }
                 GlobalEvent::MouseRelease(_) => {
@@ -125,8 +124,7 @@ impl Widget for Titlebar {
                 }
                 GlobalEvent::MouseMove(pos) => {
                     if let Some(ref cursor_anchor) = self.cursor_anchor {
-                        self.move_event
-                            .emit_owned(TitlebarEvent::Move(pos - *cursor_anchor));
+                        self.move_event.emit_owned(TitlebarEvent::Move(pos - *cursor_anchor));
                     }
                 }
                 _ => (),
@@ -137,9 +135,9 @@ impl Widget for Titlebar {
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) {
         if self.font_resource.is_none() {
             self.font_resource = display
-                .new_resource(ResourceDescriptor::Font(ResourceData::Data(
-                    SharedData::RefCount(std::sync::Arc::new(self.font.data().unwrap())),
-                )))
+                .new_resource(ResourceDescriptor::Font(ResourceData::Data(SharedData::RefCount(
+                    std::sync::Arc::new(self.font.data().unwrap()),
+                ))))
                 .ok();
         }
 
@@ -157,15 +155,8 @@ impl Widget for Titlebar {
 
         builder.push_line(
             Point::new(bounds.origin.x, bounds.origin.y + bounds.size.height),
-            Point::new(
-                bounds.origin.x + bounds.size.width,
-                bounds.origin.y + bounds.size.height,
-            ),
-            GraphicsDisplayStroke {
-                thickness: 1.0,
-                antialias: false,
-                ..Default::default()
-            },
+            Point::new(bounds.origin.x + bounds.size.width, bounds.origin.y + bounds.size.height),
+            GraphicsDisplayStroke { thickness: 1.0, antialias: false, ..Default::default() },
             None,
         );
 
@@ -181,8 +172,7 @@ impl Widget for Titlebar {
             None,
         );
 
-        self.command_group
-            .push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), None, None);
     }
 }
 
@@ -307,9 +297,9 @@ impl Widget for Panel {
     fn draw(&mut self, display: &mut dyn GraphicsDisplay, aux: &mut ()) {
         if self.image.is_none() {
             self.image = display
-                .new_resource(ResourceDescriptor::Image(ImageData::Encoded(
-                    ResourceData::Data(SharedData::Static(self.image_data)),
-                )))
+                .new_resource(ResourceDescriptor::Image(ImageData::Encoded(ResourceData::Data(
+                    SharedData::Static(self.image_data),
+                ))))
                 .ok();
         }
 
@@ -338,8 +328,7 @@ impl Widget for Panel {
             None,
         );
 
-        self.command_group
-            .push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), None, None);
 
         for child in self.children_mut() {
             child.draw(display, aux);
@@ -356,10 +345,7 @@ struct PanelContainer {
 
 impl PanelContainer {
     fn new() -> Self {
-        PanelContainer {
-            panels: Vec::new(),
-            listeners: Vec::new(),
-        }
+        PanelContainer { panels: Vec::new(), listeners: Vec::new() }
     }
 
     fn add_panel(&mut self, panel: Panel) {
@@ -476,37 +462,25 @@ fn main() {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::WindowEvent {
-                event: WindowEvent::RedrawRequested,
-                ..
-            } => {
+            Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
                 if display.size().0 != latest_window_size.0 as _
                     || display.size().1 != latest_window_size.1 as _
                 {
-                    display
-                        .resize((latest_window_size.0 as _, latest_window_size.1 as _))
-                        .unwrap();
+                    display.resize((latest_window_size.0 as _, latest_window_size.1 as _)).unwrap();
                 }
 
                 panel_container.draw(&mut display, &mut ());
                 display.present(None).unwrap();
                 context.swap_buffers().unwrap();
             }
-            Event::WindowEvent {
-                event: WindowEvent::CursorMoved { position, .. },
-                ..
-            } => {
+            Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
                 let position = position.to_physical(globals.hidpi_factor);
                 globals.cursor = Point::new(position.x as _, position.y as _);
                 global_q.emit_owned(GlobalEvent::MouseMove(globals.cursor.clone()));
             }
             Event::WindowEvent {
                 event:
-                    WindowEvent::MouseInput {
-                        button: glutin::event::MouseButton::Left,
-                        state,
-                        ..
-                    },
+                    WindowEvent::MouseInput { button: glutin::event::MouseButton::Left, state, .. },
                 ..
             } => match state {
                 glutin::event::ElementState::Pressed => {
@@ -518,16 +492,10 @@ fn main() {
                     global_q.emit_owned(GlobalEvent::MouseRelease(globals.cursor.clone()));
                 }
             },
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => {
+            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 *control_flow = ControlFlow::Exit;
             }
-            Event::WindowEvent {
-                event: WindowEvent::Resized(size),
-                ..
-            } => {
+            Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
                 let size = size.to_physical(context.window().hidpi_factor());
                 latest_window_size = (size.width as _, size.height as _);
                 globals.size.width = size.width as _;

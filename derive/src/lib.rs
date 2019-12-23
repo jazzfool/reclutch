@@ -30,20 +30,9 @@ enum ChildReference {
 
 fn chk_attrs_is_child(attrs: &[syn::Attribute]) -> ChildAttr {
     for attr in attrs {
-        if attr
-            .path
-            .segments
-            .first()
-            .map(|i| i.ident == "widget_child")
-            .unwrap_or(false)
-        {
+        if attr.path.segments.first().map(|i| i.ident == "widget_child").unwrap_or(false) {
             return ChildAttr::WidgetChild;
-        } else if attr
-            .path
-            .segments
-            .first()
-            .map(|i| i.ident == "vec_widget_child")
-            .unwrap_or(false)
+        } else if attr.path.segments.first().map(|i| i.ident == "vec_widget_child").unwrap_or(false)
         {
             return ChildAttr::VecWidgetChild;
         }
@@ -53,11 +42,7 @@ fn chk_attrs_is_child(attrs: &[syn::Attribute]) -> ChildAttr {
 
 fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
     let trait_type = if let Some(attr) = ast.attrs.iter().find(|attr| {
-        attr.path
-            .segments
-            .first()
-            .map(|i| i.ident == "widget_children_trait")
-            .unwrap_or(false)
+        attr.path.segments.first().map(|i| i.ident == "widget_children_trait").unwrap_or(false)
     }) {
         let mut out = None;
         for token in attr.tokens.clone().into_iter() {

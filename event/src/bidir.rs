@@ -51,11 +51,7 @@ impl<Tp, Ts> Queue<Tp, Ts> {
         let mut inner = self.0.borrow_mut();
         let inner = &mut *inner;
         let (inevq, outevq) = (&mut inner.0, &mut inner.1);
-        outevq.extend(
-            std::mem::replace(inevq, VecDeque::new())
-                .into_iter()
-                .flat_map(f),
-        )
+        outevq.extend(std::mem::replace(inevq, VecDeque::new()).into_iter().flat_map(f))
     }
 
     /// This function retrieves the newest event from
@@ -76,11 +72,7 @@ impl<Tp, Ts> Secondary<Tp, Ts> {
         let mut inner = (self.0).0.borrow_mut();
         let inner = &mut *inner;
         let (inevq, outevq) = (&mut inner.1, &mut inner.0);
-        outevq.extend(
-            std::mem::replace(inevq, VecDeque::new())
-                .into_iter()
-                .flat_map(f),
-        )
+        outevq.extend(std::mem::replace(inevq, VecDeque::new()).into_iter().flat_map(f))
     }
 
     /// This function retrieves the newest event from
@@ -140,17 +132,12 @@ impl<Tp: Clone, Ts> traits::Listen for Queue<Tp, Ts> {
     where
         F: FnMut(&Self::Item) -> R,
     {
-        std::mem::replace(&mut self.0.borrow_mut().0, VecDeque::new())
-            .iter()
-            .map(f)
-            .collect()
+        std::mem::replace(&mut self.0.borrow_mut().0, VecDeque::new()).iter().map(f).collect()
     }
 
     #[inline]
     fn peek(&self) -> Vec<Self::Item> {
-        std::mem::replace(&mut self.0.borrow_mut().0, VecDeque::new())
-            .into_iter()
-            .collect()
+        std::mem::replace(&mut self.0.borrow_mut().0, VecDeque::new()).into_iter().collect()
     }
 }
 
@@ -170,17 +157,12 @@ impl<Tp, Ts: Clone> traits::Listen for Secondary<Tp, Ts> {
     where
         F: FnMut(&Self::Item) -> R,
     {
-        std::mem::replace(&mut (self.0).0.borrow_mut().1, VecDeque::new())
-            .iter()
-            .map(f)
-            .collect()
+        std::mem::replace(&mut (self.0).0.borrow_mut().1, VecDeque::new()).iter().map(f).collect()
     }
 
     #[inline]
     fn peek(&self) -> Vec<Self::Item> {
-        std::mem::replace(&mut (self.0).0.borrow_mut().1, VecDeque::new())
-            .into_iter()
-            .collect()
+        std::mem::replace(&mut (self.0).0.borrow_mut().1, VecDeque::new()).into_iter().collect()
     }
 }
 

@@ -14,10 +14,7 @@ pub struct ListenerWrapper<IL: Listen> {
 
 impl<IQ> QueueWrapper<IQ> {
     pub fn new(inner: IQ) -> Self {
-        Self {
-            inner,
-            wakers: Arc::new(Mutex::new(Vec::new())),
-        }
+        Self { inner, wakers: Arc::new(Mutex::new(Vec::new())) }
     }
 
     pub fn into_inner(self) -> IQ {
