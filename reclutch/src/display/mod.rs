@@ -95,7 +95,7 @@ pub enum ImageData {
 }
 
 /// How pixels are stored in memory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RasterImageFormat {
     /// 4x8-bit components, in order of; red, green, blue and alpha.
     Rgba8,
@@ -104,7 +104,7 @@ pub enum RasterImageFormat {
 }
 
 /// Information about a raster image.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RasterImageInfo {
     pub size: (u32, u32),
     pub format: RasterImageFormat,
@@ -120,7 +120,7 @@ pub enum ResourceDescriptor {
 /// Contains a tagged ID to an existing resource, created through [`new_resource`](trait.GraphicsDisplay.html#method.new_resource).
 ///
 /// This is used to references resources in draw commands and to remove resources through [`remove_resource`](trait.GraphicsDisplay.html#method.remove_resource).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResourceReference {
     Image(u64),
     Font(u64),
@@ -163,7 +163,7 @@ pub fn ok_or_push(
 }
 
 /// Handle to a command group within a [`GraphicsDisplay`](trait.GraphicsDisplay.html).
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CommandGroupHandle(u64);
 
 impl CommandGroupHandle {
@@ -179,7 +179,7 @@ impl CommandGroupHandle {
 }
 
 /// Helper wrapper around [`CommandGroupHandle`](struct.CommandGroupHandle.html).
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CommandGroup(Option<CommandGroupHandle>, bool);
 
 impl Default for CommandGroup {
@@ -249,7 +249,7 @@ impl CommandGroup {
 }
 
 /// Stroke cap (stroke start/end) appearance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LineCap {
     /// The cap of the stroke will appear as expected.
     Flat,
@@ -266,7 +266,7 @@ impl Default for LineCap {
 }
 
 /// Path corner appearance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LineJoin {
     /// The corner will appear as expected.
     Miter,
@@ -280,6 +280,123 @@ impl Default for LineJoin {
     fn default() -> Self {
         LineJoin::Miter
     }
+}
+
+/// An "event"/segment within a vector path.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VectorPathEvent {
+    MoveTo { to: Point },
+    LineTo { to: Point },
+    QuadTo { control: Point, to: Point },
+    ConicTo { control: Point, to: Point, weight: f32 },
+    CubicTo { c1: Point, c2: Point, to: Point },
+    ArcTo { center: Point, radii: Vector, start_angle: f32, sweep_angle: f32 },
+}
+
+/// A vector path, represented as a series of events/segments.
+pub type VectorPath = Vec<VectorPathEvent>;
+
+/// Helper to assist in the creation of a `VectorPath`.
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct VectorPathBuilder {
+    path: VectorPath,
+}
+
+impl VectorPathBuilder {
+    /// Creates a new and empty vector path builder.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Creates a new vector path builder from an existing path.
+    pub fn from_path(path: VectorPath) -> Self {
+        VectorPathBuilder { path }
+    }
+
+    /// Moves the current point.
+    pub fn move_to(&mut self, to: Point) {
+        self.path.push(VectorPathEvent::MoveTo { to });
+    }
+
+    /// Adds a line.
+    pub fn line_to(&mut self, to: Point) {
+        self.path.push(VectorPathEvent::LineTo { to });
+    }
+
+    /// Adds a quadratic curve.
+    pub fn quad_to(&mut self, control: Point, to: Point) {
+        self.path.push(VectorPathEvent::QuadTo { control, to });
+    }
+
+    /// Adds a conic curve (conic cross-section).
+    pub fn conic_to(&mut self, control: Point, to: Point, weight: f32) {
+        self.path.push(VectorPathEvent::ConicTo { control, to, weight });
+    }
+
+    /// Adds a cubic curve.
+    pub fn cubic_to(&mut self, c1: Point, c2: Point, to: Point) {
+        self.path.push(VectorPathEvent::CubicTo { c1, c2, to });
+    }
+
+    /// Adds an arc curve (segment of a circle).
+    pub fn arc_to(&mut self, center: Point, radii: Vector, start_angle: f32, sweep_angle: f32) {
+        self.path.push(VectorPathEvent::ArcTo { center, radii, start_angle, sweep_angle });
+    }
+
+    /// Returns the final path
+    #[inline(always)]
+    pub fn build(self) -> VectorPath {
+        self.path
+    }
+}
+
+/// Returns the roughly approximate bounds of a vector path.
+/// Note that this function is deliberately very lazy in terms of computing bounds;
+/// control points are counted as boundaries.
+pub fn vector_path_bounds(path: &VectorPath) -> Rect {
+    let points = path.iter().cloned().fold(Vec::new(), |mut points, event| {
+        let was_move_to = match event {
+            VectorPathEvent::MoveTo { to } => {
+                points.push(to);
+                true
+            }
+            VectorPathEvent::LineTo { to } => {
+                points.push(to);
+                false
+            }
+            VectorPathEvent::QuadTo { control, to } => {
+                points.push(control);
+                points.push(to);
+                false
+            }
+            VectorPathEvent::ConicTo { control, to, .. } => {
+                points.push(control);
+                points.push(to);
+                false
+            }
+            VectorPathEvent::CubicTo { c1, c2, to } => {
+                points.push(c1);
+                points.push(c2);
+                points.push(to);
+                false
+            }
+            VectorPathEvent::ArcTo { center, radii, .. } => {
+                let tl = center - radii;
+                let bl = center + (radii * 2.0);
+                points.push(tl);
+                points.push(bl);
+                false
+            }
+        };
+
+        if !was_move_to && points.is_empty() {
+            points.push(Point::new(0.0, 0.0));
+        }
+
+        points
+    });
+
+    Rect::from_points(points.iter().cloned())
 }
 
 /// Stroke/outline appearance.
@@ -362,6 +479,14 @@ pub enum GraphicsDisplayItem {
         /// Reference to the image resource.
         resource: ResourceReference,
     },
+    Path {
+        /// Vector path.
+        path: VectorPath,
+        /// Whether the path is closed or not.
+        is_closed: bool,
+        /// Paint style of the vector path.
+        paint: GraphicsDisplayPaint,
+    },
 }
 
 impl GraphicsDisplayItem {
@@ -405,6 +530,19 @@ impl GraphicsDisplayItem {
                 }
             }
             GraphicsDisplayItem::Image { dst, .. } => *dst,
+            GraphicsDisplayItem::Path { path, paint, .. } => {
+                let inflation = if let GraphicsDisplayPaint::Stroke(GraphicsDisplayStroke {
+                    thickness,
+                    ..
+                }) = paint
+                {
+                    thickness * 2.0
+                } else {
+                    0.0
+                };
+
+                vector_path_bounds(path).inflate(inflation, inflation)
+            }
         }
     }
 }
@@ -769,7 +907,7 @@ impl DisplayItem {
 }
 
 /// Clipping shapes.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum DisplayClip {
     /// Rectangle clip.
     Rectangle {
@@ -777,25 +915,29 @@ pub enum DisplayClip {
         /// As a general rule, set to true if [`rect`](enum.DisplayClip.html#variant.Rectangle.field.rect) isn't pixel-aligned.
         antialias: bool,
     },
+    /// Rectangle clip with rounded corners.
     RoundRectangle {
         rect: Rect,
+        /// Corner radii.
         radii: [f32; 4],
     },
-    Ellipse {
-        center: Point,
-        radii: Vector,
-    },
+    /// Elliptical clip.
+    Ellipse { center: Point, radii: Vector },
+    /// Vector path clip.
+    Path { path: VectorPath, is_closed: bool },
 }
 
 impl DisplayClip {
     pub fn bounds(&self) -> Rect {
         match self {
-            DisplayClip::Rectangle { ref rect, .. }
-            | DisplayClip::RoundRectangle { ref rect, .. } => (*rect),
-            DisplayClip::Ellipse { ref center, ref radii } => Rect::new(
+            DisplayClip::Rectangle { rect, .. } | DisplayClip::RoundRectangle { rect, .. } => {
+                (*rect)
+            }
+            DisplayClip::Ellipse { center, radii } => Rect::new(
                 (center.x - radii.x, center.y - radii.y).into(),
                 (radii.x * 2.0, radii.y * 2.0).into(),
             ),
+            DisplayClip::Path { path, .. } => vector_path_bounds(path),
         }
     }
 }
@@ -988,6 +1130,20 @@ impl DisplayListBuilder {
                 dst,
                 resource: image,
             }),
+            filter,
+        ));
+    }
+
+    /// Pushes a vector path.
+    pub fn push_path(
+        &mut self,
+        path: VectorPath,
+        is_closed: bool,
+        paint: GraphicsDisplayPaint,
+        filter: Option<Filter>,
+    ) {
+        self.display_list.push(DisplayCommand::Item(
+            DisplayItem::Graphics(GraphicsDisplayItem::Path { path, is_closed, paint }),
             filter,
         ));
     }

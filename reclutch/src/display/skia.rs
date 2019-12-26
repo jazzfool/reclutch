@@ -478,6 +478,39 @@ fn convert_rect(rect: &Rect) -> sk::Rect {
     sk::Rect::from_xywh(rect.origin.x, rect.origin.y, rect.size.width, rect.size.height)
 }
 
+fn convert_path(vector_path: &VectorPath, close: bool) -> sk::Path {
+    let mut path = sk::Path::new();
+    for event in vector_path {
+        match event {
+            VectorPathEvent::MoveTo { to } => {
+                path.move_to(convert_point(*to));
+            }
+            VectorPathEvent::LineTo { to } => {
+                path.line_to(convert_point(*to));
+            }
+            VectorPathEvent::QuadTo { control, to } => {
+                path.quad_to(convert_point(*control), convert_point(*to));
+            }
+            VectorPathEvent::ConicTo { control, to, weight } => {
+                path.conic_to(convert_point(*control), convert_point(*to), *weight);
+            }
+            VectorPathEvent::CubicTo { c1, c2, to } => {
+                path.cubic_to(convert_point(*c1), convert_point(*c2), convert_point(*to));
+            }
+            VectorPathEvent::ArcTo { center, radii, start_angle, sweep_angle } => {
+                let rect = convert_rect(&Rect::new(*center - *radii, (*radii * 2.0).to_size()));
+                path.arc_to(rect, *start_angle, *sweep_angle, false);
+            }
+        }
+    }
+
+    if close {
+        path.close();
+    }
+
+    path
+}
+
 fn convert_display_text(
     text: &DisplayText,
     font: sk::Font,
@@ -534,6 +567,10 @@ fn apply_clip(canvas: &mut sk::Canvas, clip: &DisplayClip) {
                 None,
             );
 
+            canvas.clip_path(&path, None, true);
+        }
+        DisplayClip::Path { path, is_closed } => {
+            let path = convert_path(path, *is_closed);
             canvas.clip_path(&path, None, true);
         }
     };
@@ -620,6 +657,13 @@ fn draw_command_group(
                         } else {
                             return Err(error::DisplayError::MismatchedResource(resource.id()));
                         }
+                    }
+                    GraphicsDisplayItem::Path { path, is_closed, paint } => {
+                        surface.canvas().draw_path(
+                            &convert_path(path, *is_closed),
+                            &convert_paint(paint, *filter)
+                                .map_err(|e| error::DisplayError::InternalError(e.into()))?,
+                        );
                     }
                 },
                 DisplayItem::Text(ref item) => {
