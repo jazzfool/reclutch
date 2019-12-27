@@ -144,10 +144,10 @@ pub enum SharedData {
 
 /// Pushes or modifies a command group, depending on whether `handle` contains a value or not.
 /// This means that if `handle` did not contain a value, [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group) will be called and `handle` will be assigned to the returned handle.
-pub fn ok_or_push(
+pub fn ok_or_push<D: Sized>(
     handle: &mut Option<CommandGroupHandle>,
-    display: &mut dyn GraphicsDisplay,
-    commands: &[DisplayCommand],
+    display: &mut dyn GraphicsDisplay<D>,
+    commands: &[D],
     protected: impl Into<Option<bool>>,
     always_alive: impl Into<Option<bool>>,
 ) {
@@ -198,10 +198,10 @@ impl CommandGroup {
     ///
     /// See [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
     /// Also see [`push_with`](struct.CommandGroup.html#method.push_with), which is more efficient.
-    pub fn push(
+    pub fn push<D: Sized>(
         &mut self,
-        display: &mut dyn GraphicsDisplay,
-        commands: &[DisplayCommand],
+        display: &mut dyn GraphicsDisplay<D>,
+        commands: &[D],
         protected: impl Into<Option<bool>>,
         always_alive: impl Into<Option<bool>>,
     ) {
@@ -218,14 +218,14 @@ impl CommandGroup {
     /// function when needed, so as to avoid commands that are expensive to build.
     ///
     /// As a general rule, use this where possible.
-    pub fn push_with<F>(
+    pub fn push_with<F, D: Sized>(
         &mut self,
-        display: &mut dyn GraphicsDisplay,
+        display: &mut dyn GraphicsDisplay<D>,
         f: F,
         protected: impl Into<Option<bool>>,
         always_alive: impl Into<Option<bool>>,
     ) where
-        F: FnOnce() -> Vec<DisplayCommand>,
+        F: FnOnce() -> Vec<D>,
     {
         if self.1 {
             self.1 = false;
