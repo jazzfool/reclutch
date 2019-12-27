@@ -21,7 +21,7 @@ futures-core = { version = "0.3", optional = true }
 retain_mut = "0.1"
 slotmap = "0.4"
 # keep this in sync with the version listed in reclutch/Cargo.toml
-winit = { version = "0.20.0-alpha4", optional = true }
+winit = { version = "0.20.0-alpha5", optional = true }
 
 [dev-dependencies]
 criterion = "0.3"

@@ -234,14 +234,9 @@ impl<T> QueueInterfaceCommon for winit::event_loop::EventLoopProxy<T> {
 impl<T: Clone> Emitter for winit::event_loop::EventLoopProxy<T> {
     #[inline]
     fn emit<'a>(&self, event: Cow<'a, T>) -> EmitResult<'a, T> {
-        if self.send_event(event.clone().into_owned()).is_ok() {
-            EmitResult::Delivered
-        } else {
-            // sadly, EventLoopProxy::send_event doesn't give us the owned event back
-            // if it fails
-            // ref: https://github.com/rust-windowing/winit/issues/1292
-            EmitResult::Undelivered(event)
-        }
+        self.send_event(event.into_owned())
+            .map_err(|winit::event_loop::EventLoopClosed(x)| Cow::Owned(x))
+            .into()
     }
 }
 
