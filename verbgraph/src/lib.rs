@@ -21,8 +21,7 @@ pub trait Event: Clone {
 /// A queue handler not bound to any specific event queue.
 #[derive(Clone)]
 pub struct UnboundQueueHandler<T, A: 'static, E: Event> {
-    handlers:
-        HashMap<&'static str, Rc<RefCell<dyn FnMut(&mut T, &mut A, E, &mut VerbGraphContext<A>)>>>,
+    handlers: HashMap<&'static str, Rc<RefCell<dyn FnMut(&mut T, &mut A, E)>>>,
 }
 
 impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
@@ -37,7 +36,7 @@ impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
     pub fn on(
         mut self,
         ev: &'static str,
-        handler: impl FnMut(&mut T, &mut A, E, &mut VerbGraphContext<A>) + 'static,
+        handler: impl FnMut(&mut T, &mut A, E) + 'static,
     ) -> Self {
         self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
         self
@@ -54,8 +53,7 @@ impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
 
 /// A queue handler containing a map of event keys to closures, bound to an event.
 pub struct QueueHandler<T, A: 'static, E: Event, L: EventListen<Item = E>> {
-    handlers:
-        HashMap<&'static str, Rc<RefCell<dyn FnMut(&mut T, &mut A, E, &mut VerbGraphContext<A>)>>>,
+    handlers: HashMap<&'static str, Rc<RefCell<dyn FnMut(&mut T, &mut A, E)>>>,
     listener: L,
 }
 
@@ -73,7 +71,7 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
     pub fn on(
         mut self,
         ev: &'static str,
-        handler: impl FnMut(&mut T, &mut A, E, &mut VerbGraphContext<A>) + 'static,
+        handler: impl FnMut(&mut T, &mut A, E) + 'static,
     ) -> Self {
         self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
         self
@@ -83,16 +81,16 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
 /// Implemented by queue handlers to execute the inner closures regardless of surrounding types.
 trait DynQueueHandler<T, A> {
     /// Invokes the queue handler to peek events and match them.
-    fn update(&mut self, obj: &mut T, additional: &mut A, context: &mut VerbGraphContext<A>);
+    fn update(&mut self, obj: &mut T, additional: &mut A);
 }
 
 impl<T, A, E: Event, L: EventListen<Item = E>> DynQueueHandler<T, A> for QueueHandler<T, A, E, L> {
-    fn update(&mut self, obj: &mut T, additional: &mut A, context: &mut VerbGraphContext<A>) {
+    fn update(&mut self, obj: &mut T, additional: &mut A) {
         for event in self.listener.peek() {
             if let Some(handler) = self.handlers.get_mut(event.get_key()) {
                 use std::ops::DerefMut;
                 let mut handler = handler.as_ref().borrow_mut();
-                (handler.deref_mut())(obj, additional, event.clone(), context);
+                (handler.deref_mut())(obj, additional, event.clone());
             }
         }
     }
@@ -113,6 +111,7 @@ impl<T: 'static, A: 'static> Default for VerbGraph<T, A> {
 impl<T: 'static, A: 'static> VerbGraph<T, A> {
     /// Creates a new, empty verb graph.
     /// Synonymous to `Default::default()`.
+    #[inline]
     pub fn new() -> Self {
         Default::default()
     }
@@ -127,81 +126,66 @@ impl<T: 'static, A: 'static> VerbGraph<T, A> {
         self
     }
 
+    fn update_handlers(
+        handlers: &mut [Box<dyn DynQueueHandler<T, A>>],
+        obj: &mut T,
+        additional: &mut A,
+    ) {
+        for handler in handlers {
+            handler.update(obj, additional);
+        }
+    }
+
     /// Invokes all the queue handlers in a linear fashion, however non-linear jumping between verb graphs is still supported.
     pub fn update_all(&mut self, obj: &mut T, additional: &mut A) {
-        let mut ctxt = VerbGraphContext::<A>(Default::default());
         for (_, handler_list) in &mut self.handlers {
-            for handler in handler_list {
-                handler.update(obj, additional, &mut ctxt);
-            }
+            VerbGraph::update_handlers(handler_list, obj, additional)
         }
     }
 
     /// Invokes the queue handlers for a specific tag.
     #[inline]
     pub fn update_tag(&mut self, obj: &mut T, additional: &mut A, tag: &'static str) {
-        self.update_tag_in_ctxt(
-            obj,
-            additional,
-            tag,
-            &mut VerbGraphContext::<A>(Default::default()),
-        );
-    }
-
-    fn update_tag_in_ctxt(
-        &mut self,
-        obj: &mut T,
-        additional: &mut A,
-        tag: &'static str,
-        ctxt: &mut VerbGraphContext<A>,
-    ) {
         if let Some(handlers) = self.handlers.get_mut(tag) {
-            for handler in handlers {
-                handler.update(obj, additional, ctxt);
-            }
+            VerbGraph::update_handlers(handlers, obj, additional)
         }
     }
 }
 
-/// Performs verb graph traversal during execution.
-pub struct VerbGraphContext<A: 'static>(std::marker::PhantomData<A>);
-
-impl<A: 'static> VerbGraphContext<A> {
-    /// Invokes the queue handler for a specific tag on a given object containing a verb graph.
-    pub fn require_update<T: HasVerbGraph<A>>(
-        &mut self,
-        obj: &mut T,
-        additional: &mut A,
-        tag: &'static str,
-    ) {
-        let mut graph = obj.verb_graph_mut().take().unwrap();
-        graph.update_tag_in_ctxt(obj, additional, tag, self);
+/// Invokes the queue handler for a specific tag on a given object containing a verb graph.
+#[inline]
+pub fn require_update<T, A>(obj: &mut T, additional: &mut A, tag: &'static str)
+where
+    T: HasVerbGraph<A>,
+    A: 'static,
+{
+    if let Some(mut graph) = obj.verb_graph_mut().take() {
+        graph.update_tag(obj, additional, tag);
         *obj.verb_graph_mut() = Some(graph);
     }
 }
 
 /// Simplifies the syntax of creating a verb graph.
 /// Example usage:
-/// ```rust
-/// verbgraph! {
+/// ```rust,ignore
+/// reclutch_verbgraph::verbgraph! {
 ///     SomeObject as obj,
 ///     Aux as aux,
-///     GraphContext as ctxt,
 ///
 ///     "tag" => event in &event_queue => {
 ///         event_key => {
-///             println!("Handling 'event_key' for event `event_queue`, under the tag `tag`");   
+///             println!("Handling 'event_key' for event `event_queue`, under the tag `tag`");
 ///         }
 ///     }
 /// }
 /// ```
 /// Expands to:
-/// ```rust
+/// ```rust,ignore
 /// VerbGraph::new().add(
 ///     "tag",
 ///     QueueHandler::new(&event_queue).on(
 ///         "event_key",
-///         |obj: &mut SomeObject, aux: &mut Aux, event, ctxt| {
+///         |obj: &mut SomeObject, aux: &mut Aux, event| {
 ///             let event = event.unwrap_as_event_key();
 ///             {
 ///                 println!("Handling 'event_key' for event in 'event_queue' under the tag 'tag'");
@@ -212,14 +196,14 @@ impl<A: 'static> VerbGraphContext<A> {
 /// ```
 #[macro_export]
 macro_rules! verbgraph {
-    ($ot:ty as $obj:ident,$at:ty as $add:ident,GraphContext as $ctxt:ident,$($tag:expr => $eo:ident in $eq:expr=>{$($ev:tt $body:block)*})*) => {{
+    ($ot:ty as $obj:ident,$at:ty as $add:ident, $($tag:expr => $eo:ident in $eq:expr=> {$($ev:tt => $body:block)*})*) => {{
         let mut graph = $crate::VerbGraph::new();
         $(
             let mut qh = $crate::QueueHandler::new($eq);
             $(
                 qh = qh.on(
                     std::stringify!($ev),
-                    |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo, $ctxt| {
+                    |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo| {
                         #[allow(unused_variables)]
                         $crate::paste::expr!{
                             let $eo = $eo.[<unwrap_as_ $ev>]().unwrap();
