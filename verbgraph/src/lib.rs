@@ -152,6 +152,18 @@ impl<T: 'static, A: 'static> VerbGraph<T, A> {
     }
 }
 
+fn update_obj_with<T, A, F>(obj: &mut T, additional: &mut A, f: F)
+where
+    T: HasVerbGraph<A>,
+    A: 'static,
+    F: FnOnce(&mut VerbGraph<T, A>, &mut T, &mut A),
+{
+    if let Some(mut graph) = obj.verb_graph_mut().take() {
+        f(&mut graph, obj, additional);
+        *obj.verb_graph_mut() = Some(graph);
+    }
+}
+
 /// Invokes the queue handler for a specific tag on a given object containing a verb graph.
 #[inline]
 pub fn require_update<T, A>(obj: &mut T, additional: &mut A, tag: &'static str)
@@ -159,10 +171,17 @@ where
     T: HasVerbGraph<A>,
     A: 'static,
 {
-    if let Some(mut graph) = obj.verb_graph_mut().take() {
-        graph.update_tag(obj, additional, tag);
-        *obj.verb_graph_mut() = Some(graph);
-    }
+    update_obj_with(obj, additional, |graph, obj, additional| graph.update_tag(obj, additional, tag));
+}
+
+/// Invokes the queue handler for all tags on a given object containing a verb graph.
+#[inline]
+pub fn update_all<T,A>(obj: &mut T, additional: &mut A)
+where
+    T: HasVerbGraph<A>,
+    A: 'static,
+{
+    update_obj_with(obj, additional, VerbGraph::update_all);
 }
 
 /// Simplifies the syntax of creating a verb graph.

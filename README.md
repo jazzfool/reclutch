@@ -244,9 +244,8 @@ fn update(&mut self, aux: &mut Aux) {
         child.update(aux);
     }
 
-    let mut graph = self.graph.take().unwrap();
-    graph.update_all(self, aux);
-    self.graph = Some(graph);
+    // this requires an implementation of `HasVerbGraph` on self
+    reclutch_verbgraph::update_all(&mut self, aux);
 }
 ```
 
