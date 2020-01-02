@@ -33,7 +33,7 @@ impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
 
     /// Adds a closure to be executed when an event of a specific key is matched.
     ///
-    /// Also see `[event_key](struct.Event.html#structmethod.get_key)`.
+    /// Also see [`event_key`](struct.Event.html#structmethod.get_key).
     pub fn on(
         mut self,
         ev: &'static str,
@@ -69,7 +69,7 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
 
     /// Adds a closure to be executed when an event of a specific key is matched.
     ///
-    /// Also see `[event_key](struct.Event.html#structmethod.get_key)`.
+    /// Also see [`event_key`](struct.Event.html#structmethod.get_key).
     pub fn on(
         mut self,
         ev: &'static str,
