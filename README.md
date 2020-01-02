@@ -214,7 +214,7 @@ fn update(&mut self, aux: &mut Globals) {
 
 The above code is fine, but for more a complex UI then there is the possibility of events being processed out-of-order.
 To fix this, Reclutch has the `verbgraph` module; a facility to jump between widgets and into their specific queue handlers.
-In essence, it breaks the linear execution of update procedures so that .
+In essence, it breaks the linear execution of update procedures so that dependent events can be handled even if the primary `update` function has already be executed.
 
 This is best shown through example;
 ```rust
@@ -251,7 +251,7 @@ fn update(&mut self, aux: &mut Aux) {
 }
 ```
 
-In the `verbgraph` module is also the `Event` trait, which is required to support the syntax seen seen in `verbgraph!`.
+In the `verbgraph` module is also the `Event` trait, which is required to support the syntax seen in `verbgraph!`.
 
 ```rust
 #[derive(Event, Clone)]
