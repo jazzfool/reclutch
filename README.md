@@ -1,27 +1,25 @@
-<p align="center">
-    <img src=".media/reclutch.png" width="256px"/>
-</p>
-
-## <p align="center">Gain control of your UI again</p>
+# Reclutch
 
 [![Build Status](https://travis-ci.com/jazzfool/reclutch.svg?branch=master)](https://travis-ci.com/jazzfool/reclutch)
 
-## Features
+A strong foundation for building predictable and straight-forward Rust UI toolkits. Reclutch is:
+- **Bare:** Very little UI code is included. In practice it's a utility library which makes very little assumptions about the toolkit or UI.
+- **Platform-agnostic:** Although a default display object is provided, the type of display object is generic, meaning you can build for platforms other than desktop. For example you can create web applications simply by using DOM nodes as display objects while still being efficient, given the retained-mode design.
+- **Reusable:** Provided structures such as unbound queue handlers allow for the reuse of common logical components across widgets.
 
-- Barebones (i.e. no widget toolkit or layout library provided).
-- [Events and event queues](event/README.md)
-- Retained-mode rendering.
-- Object-oriented widgets in idiomatic Rust.
-- Renderer-agnostic.
-- Text utilities (line-wrapping, support for text shaping).
-
-There is an (optional) OpenGL Skia implementation for the renderer.
+## Overview
+Reclutch implements the well-known retained-mode widget ownership design within safe Rust, following along the footsteps of popular desktop frameworks. To implement this behavior, three core ideas are implemented:
+- A widget ownership model with no middleman, allowing widgets to mutate children at any time, but also collect children as a whole to make traversing the widget tree a trivial task.
+- A robust event queue system with support for `futures`, `crossbeam` and `winit` event loop integration, plus a multitude of queue utilities and queue variations for support in any environment.
+- An event queue abstraction to facilitate just-in-time event coordination between widgets, filling any pitfalls that may arise when using event queues. Beyond this, it also moves the code to handle queues to the constructor, presenting an opportunity to modularize and reuse logic across widgets.
 
 <p align="center">
     <img src=".media/showcase.png" width="90%"/>
 </p>
 
-##### For a widget toolkit built on Reclutch, see [Thunderclap](https://github.com/jazzfool/reui).
+### *Also see:*
+- [Events and event queues](event/README.md)
+- [Thunderclap Toolkit](https://github.com/jazzfool/reui)
 
 ## Example
 
