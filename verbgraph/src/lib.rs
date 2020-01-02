@@ -181,8 +181,9 @@ impl<A: 'static> VerbGraphContext<A> {
 }
 
 /// Simplifies the syntax of creating a verb graph.
-/// Example usage:
-/// ```rust
+///
+/// # Example
+/// ```ignore
 /// verbgraph! {
 ///     SomeObject as obj,
 ///     Aux as aux,
@@ -196,13 +197,13 @@ impl<A: 'static> VerbGraphContext<A> {
 /// }
 /// ```
 /// Expands to:
-/// ```rust
+/// ```ignore
 /// VerbGraph::new().add(
 ///     "tag",
 ///     QueueHandler::new(&event_queue).on(
 ///         "event_key",
 ///         |obj: &mut SomeObject, aux: &mut Aux, event, ctxt| {
-///             let event = event.unwrap_as_event_key();
+///             let event = event.unwrap_as_event_key().unwrap();
 ///             {
 ///                 println!("Handling 'event_key' for event in 'event_queue' under the tag 'tag'");
 ///             }
@@ -231,4 +232,50 @@ macro_rules! verbgraph {
         )*
         graph
     }};
+}
+
+/// Simplifies the syntax of creating an unbound queue handler.
+///
+/// # Example
+/// ```ignore
+/// unbound_queue_handler! {
+///     SomeObject as obj,
+///     Aux as aux,
+///     EventType as event,
+///     GraphContext as ctxt,
+///
+///     event_key {
+///         println!("Handling 'event_key' for an unknown event queue");
+///     }
+/// }
+/// ```
+/// Expands to:
+/// ```ignore
+/// UnboundQueueHandler::new().on(
+///     "event_key",
+///     |obj: &mut SomeObject, aux: &mut Aux, event: EventType, ctxt| {
+///         let event = event.unwrap_as_event_key().unwrap();
+///         {
+///             println!("Handling 'event_key' for an unknown event queue");
+///         }
+///     },
+/// )
+/// ```
+#[macro_export]
+macro_rules! unbound_queue_handler {
+    ($ot:ty as $obj:ident,$at:ty as $add:ident,$et:ty as $eo:ident,GraphContext as $ctxt:ident,$($ev:tt $body:block)*) => {{
+        let mut qh = $crate::QueueHandler::new();
+        $(
+            qh = qh.on(
+                std::stringify!($ev),
+                |$obj: &mut $ot, #[allow(unused_variables)] $add: &mut $at, $eo: $et, $ctxt| {
+                    #[allow(unused_variables)]
+                    $crate::paste::expr!{
+                        let $eo = $eo.[<unwrap_as_ $ev>]().unwrap();
+                        $body
+                    }
+                });
+        )*
+        qh
+    }}
 }
