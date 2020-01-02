@@ -1,5 +1,7 @@
 extern crate proc_macro;
 
+mod event;
+
 use {proc_macro::TokenStream, quote::quote};
 
 #[proc_macro_derive(
@@ -180,4 +182,11 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
         }
     }
     .into()
+}
+
+#[proc_macro_derive(Event, attributes(event_key))]
+pub fn event_macro_derive(input: TokenStream) -> TokenStream {
+    let ast: syn::DeriveInput = syn::parse(input).unwrap();
+
+    event::impl_event_macro(ast)
 }

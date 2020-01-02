@@ -1,0 +1,13 @@
+[package]
+name = "reclutch_verbgraph"
+version = "0.0.0"
+authors = ["jazzfool <saveuselon@gmail.com>"]
+edition = "2018"
+license = "MIT / Apache-2.0"
+description = "A system to build safe event graphs with non-linear execution dependencies"
+homepage = "http://github.com/jazzfool/reclutch/tree/master/verbtree"
+repository = "http://github.com/jazzfool/reclutch"
+
+[dependencies]
+reclutch_event = { path = "../event" }
+paste = "0.1"

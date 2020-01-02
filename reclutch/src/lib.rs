@@ -90,8 +90,10 @@ pub use reclutch_event as event;
 #[macro_use]
 extern crate reclutch_derive;
 
+pub use reclutch_verbgraph as verbgraph;
+
 #[cfg(feature = "reclutch_derive")]
-pub use reclutch_derive::WidgetChildren;
+pub use reclutch_derive::{Event, WidgetChildren};
 
 pub mod prelude {
     pub use crate::{

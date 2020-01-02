@@ -3,4 +3,5 @@ members = [
     "derive",
     "event",
     "reclutch",
+    "verbgraph",
 ]

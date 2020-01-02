@@ -21,7 +21,7 @@ There is an (optional) OpenGL Skia implementation for the renderer.
     <img src=".media/showcase.png" width="90%"/>
 </p>
 
-For a widget toolkit built on Reclutch, see [Reui](https://github.com/jazzfool/reui), which in the regards of events also provides a more traditional closure-centric abstraction for event queue handling.
+##### For a widget toolkit built on Reclutch, see [Thunderclap](https://github.com/jazzfool/reui).
 
 ## Example
 
@@ -210,6 +210,107 @@ fn update(&mut self, aux: &mut Globals) {
 }
 ```
 
+## Updating correctly
+
+The above code is fine, but for more a complex UI then there is the possibility of events being processed out-of-order.
+To fix this, Reclutch has the `verbgraph` module; a facility to jump between widgets and into their specific queue handlers.
+In essence, it breaks the linear execution of update procedures so that .
+
+This is best shown through example;
+```rust
+fn new() -> Self {
+    let graph = verbgraph! {
+        Self as obj,
+        Aux as aux,
+        GraphContext as ctxt,
+        
+        // the string "count_up" is the tag used to identify procedures.
+        // they can also overlap.
+        "count_up" => event in &count_up.event => {
+            click {
+                obj.count += 1;
+                obj.template_label.values[0] = obj.count.to_string();
+                // if we don't call this then `obj.dynamic_label` doesn't
+                // get a chance to respond to our changes in this update pass.
+                ctxt.require_update(obj.template_label, aux, "update_template");
+                // "update_template" refers to the tag.
+            }        
+        }
+    };
+    // ...
+}
+
+fn update(&mut self, aux: &mut Aux) {
+    for child in self.children_mut() {
+        child.update(aux);
+    }
+
+    let mut graph = self.graph.take().unwrap();
+    graph.update_all(self, aux);
+    self.graph = Some(graph);
+}
+```
+
+In the `verbgraph` module is also the `Event` trait, which is required to support the syntax seen seen in `verbgraph!`.
+
+```rust
+#[derive(Event, Clone)]
+enum AnEvent {
+    #[event_key(pop)]
+    Pop,
+    #[event_key(squeeze)]
+    Squeeze(f32),
+    #[event_key(smash)]
+    Smash {
+        force: f64,
+        hulk: bool,
+    },
+}
+```
+Generates exactly;
+```rust
+impl reclutch::verbgraph::Event for AnEvent {
+    fn get_key(&self) -> &'static str {
+        match self {
+            AnEvent::Pop => "pop",
+            AnEvent::Squeeze(..) => "squeeze",
+            AnEvent::Smash{..} => "smash",
+        }
+    }
+}
+
+impl AnEvent {
+    pub fn unwrap_as_pop(self) -> Option<()> {
+        if let AnEvent::Pop = self {
+            Some(())
+        } else {
+            None
+        }
+    }
+
+    pub fn unwrap_as_squeeze(self) -> Option<(f32)> {
+        if let AnEvent::Squeeze(x0) = self {
+            Some((x0))
+        } else {
+            None
+        }
+    }
+
+    pub fn unwrap_as_smash(self) -> Option<(f64, bool)> {
+        if let AnEvent::Smash{force, hulk} = self {
+            Some((force, hulk))
+        } else {
+            None
+        }
+    }
+}
+```
+
+`get_key` is used to find the correct closure to execute given an event
+and `unwrap_as_` is used to extract the inner information from within the
+given closure (because once `get_key` is matched then we can be certain it
+is of a certain variant).
+
 ## License
 
 Reclutch is licensed under either
@@ -219,4 +320,4 @@ Reclutch is licensed under either
 
 at your choosing.
 
-This license also applies to all "sub-projects" (`event` and `derive`).
+This license also applies to all "sub-projects" (`event`, `derive` and `verbgraph`).
