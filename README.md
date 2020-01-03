@@ -220,19 +220,18 @@ fn new() -> Self {
     let graph = verbgraph! {
         Self as obj,
         Aux as aux,
-        GraphContext as ctxt,
-        
+
         // the string "count_up" is the tag used to identify procedures.
         // they can also overlap.
         "count_up" => event in &count_up.event => {
-            click {
+            click => {
                 obj.count += 1;
                 obj.template_label.values[0] = obj.count.to_string();
                 // if we don't call this then `obj.dynamic_label` doesn't
                 // get a chance to respond to our changes in this update pass.
-                ctxt.require_update(obj.template_label, aux, "update_template");
+                reclutch_verbgraph::require_update(obj.template_label, aux, "update_template");
                 // "update_template" refers to the tag.
-            }        
+            }
         }
     };
     // ...
@@ -243,9 +242,8 @@ fn update(&mut self, aux: &mut Aux) {
         child.update(aux);
     }
 
-    let mut graph = self.graph.take().unwrap();
-    graph.update_all(self, aux);
-    self.graph = Some(graph);
+    // this requires an implementation of `HasVerbGraph` on self
+    reclutch_verbgraph::update_all(&mut self, aux);
 }
 ```
 
