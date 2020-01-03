@@ -5,10 +5,9 @@ use {
 
 pub use paste;
 
-/// An object which contains an `OptionVerbGraph` that can be accessed immutably and mutably.
+/// An object which contains an `OptionVerbGraph` that can be accessed mutably.
 pub trait HasVerbGraph<A: 'static>: Sized + 'static {
-    fn verb_graph(&self) -> &OptionVerbGraph<Self, A>;
-    fn verb_graph_mut(&mut self) -> &mut OptionVerbGraph<Self, A>;
+    fn verb_graph(&mut self) -> &mut OptionVerbGraph<Self, A>;
 }
 
 pub type OptionVerbGraph<T, A> = Option<VerbGraph<T, A>>;
@@ -174,9 +173,9 @@ impl<A: 'static> VerbGraphContext<A> {
         additional: &mut A,
         tag: &'static str,
     ) {
-        let mut graph = obj.verb_graph_mut().take().unwrap();
+        let mut graph = obj.verb_graph().take().unwrap();
         graph.update_tag_in_ctxt(obj, additional, tag, self);
-        *obj.verb_graph_mut() = Some(graph);
+        *obj.verb_graph() = Some(graph);
     }
 }
 
@@ -278,4 +277,85 @@ macro_rules! unbound_queue_handler {
         )*
         qh
     }}
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, reclutch_event::RcEventQueue};
+
+    #[test]
+    fn test_jumping() {
+        #[derive(Clone)]
+        struct EmptyEvent;
+
+        impl Event for EmptyEvent {
+            fn get_key(&self) -> &'static str {
+                "empty"
+            }
+        }
+
+        impl EmptyEvent {
+            fn unwrap_as_empty(self) -> Option<()> {
+                Some(())
+            }
+        }
+
+        #[derive(Default)]
+        struct Dependency {
+            a: i32,
+            b: i32,
+            q: RcEventQueue<EmptyEvent>,
+            g: OptionVerbGraph<Self, ()>,
+        }
+
+        impl HasVerbGraph<()> for Dependency {
+            fn verb_graph(&mut self) -> &mut OptionVerbGraph<Self, ()> {
+                &mut self.g
+            }
+        }
+
+        #[derive(Default)]
+        struct Root {
+            dep: Dependency,
+            q: RcEventQueue<EmptyEvent>,
+        }
+
+        let mut root = Root::default();
+
+        let mut root_graph = verbgraph! {
+            Root as obj,
+            () as aux,
+            GraphContext as ctxt,
+            "_" => event in &root.q => {
+                empty {
+                    obj.dep.a += 1;
+                    obj.dep.q.emit_owned(EmptyEvent);
+                    ctxt.require_update(&mut obj.dep, aux, "copy");
+                }
+            }
+        };
+
+        root.dep.g = verbgraph! {
+            Dependency as obj,
+            () as _aux,
+            GraphContext as _ctxt,
+            "copy" => event in &root.dep.q => {
+                empty {
+                    obj.b = obj.a;
+                }
+            }
+        }
+        .into();
+
+        for _ in 0..7 {
+            root.q.emit_owned(EmptyEvent);
+        }
+
+        root_graph.update_all(&mut root, &mut ());
+
+        // without ever explicitly updating `root.dep.g`, `obj.a` should still be copied to `obj.b`.
+
+        assert_eq!(root.dep.a, root.dep.b);
+        assert_eq!(root.dep.b, 7);
+    }
 }
