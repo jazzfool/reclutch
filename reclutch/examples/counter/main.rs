@@ -245,8 +245,6 @@ fn main() {
 
     let context = unsafe { context.make_current().unwrap() };
 
-    gl::load_with(|proc| context.get_proc_address(proc) as _);
-
     let mut display = display::skia::SkiaGraphicsDisplay::new_gl_framebuffer(
         &display::skia::SkiaOpenGlFramebuffer {
             framebuffer_id: 0,

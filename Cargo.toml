@@ -1,7 +1,8 @@
 [workspace]
 members = [
-    "derive",
+    "core",
     "event",
-    "reclutch",
+    "derive",
     "verbgraph",
+    "reclutch",
 ]

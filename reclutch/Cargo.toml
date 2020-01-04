@@ -5,25 +5,17 @@ authors = ["jazzfool <saveuselon@gmail.com>"]
 edition = "2018"
 license = "MIT / Apache-2.0"
 description = "Rust UI Core"
-homepage = "http://github.com/jazzfool/reclutch"
+homepage = "http://github.com/jazzfool/reclutch/tree/master/core"
 repository = "http://github.com/jazzfool/reclutch"
 
 [features]
 default = ["reclutch_derive"]
-skia = ["skia-safe", "gl", "linked-hash-map"]
+skia = ["reclutch_core/skia"]
 
 [dependencies]
-reclutch_event = { path = "../event" }
+reclutch_core = { path = "../core" }
 reclutch_verbgraph = { path = "../verbgraph" }
 reclutch_derive = { path = "../derive", optional = true }
-euclid = "0.20"
-thiserror = "1.0"
-font-kit = "0.5"
-palette = "0.5"
-xi-unicode = "0.2"
-skia-safe = { version = "0.21", optional = true }
-gl = { version = "0.14", optional = true }
-linked-hash-map = { version = "0.5", optional = true }
 
 [[example]]
 name = "counter"
@@ -44,6 +36,5 @@ required-features = ["skia"]
 [dev-dependencies]
 glium = "0.26.0-alpha5"
 nalgebra = "0.19"
-float-cmp = "0.6"
 harfbuzz_rs = "1.0"
 rusttype = "0.8"

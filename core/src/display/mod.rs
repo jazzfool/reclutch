@@ -599,7 +599,7 @@ impl DisplayText {
     /// Returns a sub-range of the text.
     ///
     /// # Example
-    /// ```
+    /// ```rust,ignore
     /// use reclutch::display::DisplayText;
     ///
     /// let text = DisplayText::Simple("Hello, world!".to_string());

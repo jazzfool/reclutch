@@ -9,5 +9,5 @@ homepage = "http://github.com/jazzfool/reclutch/tree/master/verbtree"
 repository = "http://github.com/jazzfool/reclutch"
 
 [dependencies]
-reclutch_event = { path = "../event" }
+reclutch_core = { path = "../core" }
 paste = "0.1"

@@ -1,13 +1,13 @@
 use {
-    reclutch_event::prelude::*,
+    reclutch_core::event::prelude::*,
     std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc},
 };
 
 pub use paste;
 
 /// An object which contains an `OptionVerbGraph` that can be accessed mutably.
-pub trait HasVerbGraph<A: 'static>: Sized + 'static {
-    fn verb_graph(&mut self) -> &mut OptionVerbGraph<Self, A>;
+pub trait HasVerbGraph: reclutch_core::widget::Widget + Sized + 'static {
+    fn verb_graph(&mut self) -> &mut OptionVerbGraph<Self, Self::UpdateAux>;
 }
 
 pub type OptionVerbGraph<T, A> = Option<VerbGraph<T, A>>;
@@ -153,7 +153,7 @@ impl<T: 'static, A: 'static> VerbGraph<T, A> {
 
 fn update_obj_with<T, A, F>(obj: &mut T, additional: &mut A, f: F)
 where
-    T: HasVerbGraph<A>,
+    T: HasVerbGraph<UpdateAux = A>,
     A: 'static,
     F: FnOnce(&mut VerbGraph<T, A>, &mut T, &mut A),
 {
@@ -167,7 +167,7 @@ where
 #[inline]
 pub fn require_update<T, A>(obj: &mut T, additional: &mut A, tag: &'static str)
 where
-    T: HasVerbGraph<A>,
+    T: HasVerbGraph<UpdateAux = A>,
     A: 'static,
 {
     update_obj_with(obj, additional, |graph, obj, additional| {
@@ -179,7 +179,7 @@ where
 #[inline]
 pub fn update_all<T, A>(obj: &mut T, additional: &mut A)
 where
-    T: HasVerbGraph<A>,
+    T: HasVerbGraph<UpdateAux = A>,
     A: 'static,
 {
     update_obj_with(obj, additional, VerbGraph::update_all);
@@ -283,7 +283,7 @@ macro_rules! unbound_queue_handler {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, reclutch_event::RcEventQueue};
+    use {super::*, reclutch_core::event::RcEventQueue};
 
     #[test]
     fn test_jumping() {
@@ -310,7 +310,13 @@ mod tests {
             g: OptionVerbGraph<Self, ()>,
         }
 
-        impl HasVerbGraph<()> for Dependency {
+        impl reclutch_core::widget::Widget for Dependency {
+            type UpdateAux = ();
+            type GraphicalAux = ();
+            type DisplayObject = ();
+        }
+
+        impl HasVerbGraph for Dependency {
             fn verb_graph(&mut self) -> &mut OptionVerbGraph<Self, ()> {
                 &mut self.g
             }
