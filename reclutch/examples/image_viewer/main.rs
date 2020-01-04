@@ -172,7 +172,7 @@ impl Widget for Titlebar {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), Default::default(), None, None);
     }
 }
 
@@ -281,6 +281,8 @@ impl Widget for Panel {
                 GlobalEvent::MouseClick(click) => {
                     if let Some(_) = click.with(|pos| self.bounds().contains(pos.clone())) {
                         self.on_click.emit_owned(self as _);
+                        self.command_group.repaint();
+                        self.titlebar.command_group.repaint();
                     }
                 }
                 GlobalEvent::WindowResize => {
@@ -328,7 +330,7 @@ impl Widget for Panel {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), Default::default(), None, None);
 
         for child in self.children_mut() {
             child.draw(display, aux);
@@ -426,6 +428,7 @@ fn main() {
     display
         .push_command_group(
             &[DisplayCommand::Clear(Color::new(1.0, 1.0, 1.0, 1.0))],
+            Default::default(),
             None,
             Some(false),
         )
@@ -444,16 +447,16 @@ fn main() {
 
     panel_container.add_panel(Panel::new(
         Point::new(10.0, 10.0),
-        Size::new(378.4, 100.0),
-        "Reclutch Logo".into(),
-        include_bytes!("../../../.media/reclutch.png"),
+        Size::new(288.0, 180.15),
+        "Ferris".into(),
+        include_bytes!("ferris.png"),
         &mut global_q,
     ));
 
     panel_container.add_panel(Panel::new(
         Point::new(30.0, 30.0),
         Size::new(300.0, 200.0),
-        "Photography (by S. Unrau)".into(),
+        "Forest".into(),
         include_bytes!("image.jpg"),
         &mut global_q,
     ));

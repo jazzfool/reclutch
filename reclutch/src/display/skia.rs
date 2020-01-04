@@ -1,7 +1,11 @@
 //! Robust implementation of [`GraphicsDisplay`](../trait.GraphicsDisplay.html) using Google's Skia.
 
 use super::*;
-use {crate::error, skia_safe as sk, std::collections::HashMap};
+use {
+    crate::error,
+    skia_safe as sk,
+    std::collections::{BTreeMap, HashMap},
+};
 
 /// Contains information about an existing OpenGL framebuffer.
 #[derive(Debug, Clone, Copy)]
@@ -33,8 +37,11 @@ pub struct SkiaGraphicsDisplay {
     surface: sk::Surface,
     surface_type: SurfaceType,
     context: sk::gpu::Context,
-    command_groups:
+    command_groups: BTreeMap<
+        ZOrder,
         linked_hash_map::LinkedHashMap<u64, (Vec<DisplayCommand>, Rect, bool, Option<bool>)>,
+    >,
+    z_lookup: HashMap<CommandGroupHandle, ZOrder>,
     next_command_group_id: u64,
     resources: HashMap<u64, Resource>,
     next_resource_id: u64,
@@ -50,7 +57,8 @@ impl SkiaGraphicsDisplay {
             surface,
             surface_type: SurfaceType::OpenGlFramebuffer(*target),
             context,
-            command_groups: linked_hash_map::LinkedHashMap::new(),
+            command_groups: Default::default(),
+            z_lookup: HashMap::new(),
             next_command_group_id: 0,
             resources: HashMap::new(),
             next_resource_id: 0,
@@ -66,7 +74,8 @@ impl SkiaGraphicsDisplay {
             surface,
             surface_type: SurfaceType::OpenGlTexture(*target),
             context,
-            command_groups: linked_hash_map::LinkedHashMap::new(),
+            command_groups: Default::default(),
+            z_lookup: HashMap::new(),
             next_command_group_id: 0,
             resources: HashMap::new(),
             next_resource_id: 0,
@@ -238,12 +247,13 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
     fn push_command_group(
         &mut self,
         commands: &[DisplayCommand],
+        z_order: ZOrder,
         protected: Option<bool>,
         always_alive: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>> {
         let id = self.next_command_group_id;
 
-        self.command_groups.insert(
+        self.command_groups.entry(z_order).or_default().insert(
             id,
             (
                 commands.to_owned(),
@@ -260,39 +270,49 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
 
     #[inline]
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]> {
-        self.command_groups.get(&handle.id()).map(|cmdgroup| &cmdgroup.0[..])
+        self.command_groups
+            .get(self.z_lookup.get(&handle)?)?
+            .get(&handle.id())
+            .map(|cmdgroup| &cmdgroup.0[..])
     }
 
     fn modify_command_group(
         &mut self,
         handle: CommandGroupHandle,
         commands: &[DisplayCommand],
+        z_order: ZOrder,
         protected: Option<bool>,
         always_alive: Option<bool>,
     ) {
-        if self.command_groups.contains_key(&handle.id()) {
-            if let Ok(bounds) = display_list_bounds(commands) {
-                self.command_groups.insert(
-                    handle.id(),
-                    (
-                        commands.to_owned(),
-                        bounds,
-                        protected.unwrap_or(true),
-                        if always_alive.unwrap_or(true) { Some(true) } else { None },
-                    ),
-                );
+        if let Some(z_list) = self.command_groups.get_mut(&z_order) {
+            if z_list.contains_key(&handle.id()) {
+                if let Ok(bounds) = display_list_bounds(commands) {
+                    z_list.insert(
+                        handle.id(),
+                        (
+                            commands.to_owned(),
+                            bounds,
+                            protected.unwrap_or(true),
+                            if always_alive.unwrap_or(true) { Some(true) } else { None },
+                        ),
+                    );
+                }
             }
         }
     }
 
     fn maintain_command_group(&mut self, handle: CommandGroupHandle) {
-        if let Some(cmd_group) = self.command_groups.get_refresh(&handle.id()) {
-            cmd_group.3 = cmd_group.3.map(|_| true);
+        if let Some(z) = self.z_lookup.get(&handle) {
+            if let Some(z_list) = self.command_groups.get_mut(z) {
+                if let Some(cmd_group) = z_list.get_refresh(&handle.id()) {
+                    cmd_group.3 = cmd_group.3.map(|_| true);
+                }
+            }
         }
     }
 
     fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>> {
-        Some(self.command_groups.remove(&handle.id())?.0)
+        Some(self.command_groups.get_mut(self.z_lookup.get(&handle)?)?.remove(&handle.id())?.0)
     }
 
     #[inline]
@@ -302,46 +322,58 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
 
     fn present(&mut self, cull: Option<Rect>) -> Result<(), error::DisplayError> {
         let mut processed = Vec::new();
-        let cmds = self
-            .command_groups
-            .iter()
-            .map(|(id, cmds)| (&cmds.0, &cmds.1, &cmds.2, &cmds.3, *id))
-            .filter_map(|(cmd_group, bounds, protected, maintained, id)| {
-                if cull.map(|cull| cull.intersects(bounds)).unwrap_or(true) {
-                    if let Some(maintained) = *maintained {
-                        if maintained {
-                            processed.push((true, id));
-                        } else {
-                            processed.push((false, id));
-                            return None;
+
+        {
+            let cmds = self
+                .command_groups
+                .iter()
+                .fold(Vec::new(), |mut list, (_, z_list)| {
+                    list.extend(z_list.iter());
+                    list
+                })
+                .into_iter()
+                .map(|(id, cmds)| (&cmds.0, &cmds.1, &cmds.2, &cmds.3, *id))
+                .filter_map(|(cmd_group, bounds, protected, maintained, id)| {
+                    if cull.map(|cull| cull.intersects(bounds)).unwrap_or(true) {
+                        if let Some(maintained) = *maintained {
+                            if maintained {
+                                processed.push((true, id));
+                            } else {
+                                processed.push((false, id));
+                                return None;
+                            }
                         }
+
+                        Some((cmd_group, protected))
+                    } else {
+                        None
                     }
+                });
+            let resources = &self.resources;
+            let size = self.size();
+            let surface = &mut self.surface;
+            for cmd_group in cmds {
+                let count = if *cmd_group.1 { Some(surface.canvas().save()) } else { None };
 
-                    Some((cmd_group, protected))
-                } else {
-                    None
+                draw_command_group(cmd_group.0, surface, resources, size)?;
+
+                if let Some(count) = count {
+                    surface.canvas().restore_to_count(count);
                 }
-            });
-        let resources = &self.resources;
-        let size = self.size();
-        let surface = &mut self.surface;
-        for cmd_group in cmds {
-            let count = if *cmd_group.1 { Some(surface.canvas().save()) } else { None };
-
-            draw_command_group(cmd_group.0, surface, resources, size)?;
-
-            if let Some(count) = count {
-                surface.canvas().restore_to_count(count);
             }
+
+            surface.flush();
         }
 
-        surface.flush();
-
         for (ok, id) in processed {
-            if ok {
-                self.command_groups.get_mut(&id).unwrap().3 = Some(false);
-            } else {
-                self.command_groups.remove(&id);
+            if let Some(z) = self.z_lookup.get(&CommandGroupHandle(id)) {
+                if let Some(z_list) = self.command_groups.get_mut(z) {
+                    if ok {
+                        z_list.get_mut(&id).unwrap().3 = Some(false);
+                    } else {
+                        z_list.remove(&id);
+                    }
+                }
             }
         }
 

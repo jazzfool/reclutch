@@ -117,7 +117,7 @@ impl Widget for Counter {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), display::ZOrder(-1), None, None);
 
         for child in self.children_mut() {
             child.draw(display, aux);
@@ -225,7 +225,7 @@ impl Widget for Button {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), None, None);
+        self.command_group.push(display, &builder.build(), Default::default(), None, None);
     }
 }
 

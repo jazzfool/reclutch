@@ -16,6 +16,9 @@ pub type Rect = euclid::Rect<f32, euclid::UnknownUnit>;
 /// An angle in radians.
 pub type Angle = euclid::Angle<f32>;
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ZOrder(pub i32);
+
 /// A trait to process display commands.
 ///
 /// In a retained implementation, command groups are persistent in the underlying graphics API (e.g. vertex buffer objects in OpenGL).
@@ -48,6 +51,7 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
     fn push_command_group(
         &mut self,
         commands: &[D],
+        z_order: ZOrder,
         protected: Option<bool>,
         always_alive: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
@@ -60,6 +64,7 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
         &mut self,
         handle: CommandGroupHandle,
         commands: &[D],
+        z_order: ZOrder,
         protected: Option<bool>,
         always_alive: Option<bool>,
     );
@@ -148,16 +153,24 @@ pub fn ok_or_push<D: Sized>(
     handle: &mut Option<CommandGroupHandle>,
     display: &mut dyn GraphicsDisplay<D>,
     commands: &[D],
+    z_order: ZOrder,
     protected: impl Into<Option<bool>>,
     always_alive: impl Into<Option<bool>>,
 ) {
     match handle {
         Some(ref handle) => {
-            display.modify_command_group(*handle, commands, protected.into(), always_alive.into());
+            display.modify_command_group(
+                *handle,
+                commands,
+                z_order,
+                protected.into(),
+                always_alive.into(),
+            );
         }
         None => {
-            *handle =
-                display.push_command_group(commands, protected.into(), always_alive.into()).ok();
+            *handle = display
+                .push_command_group(commands, z_order, protected.into(), always_alive.into())
+                .ok();
         }
     }
 }
@@ -202,12 +215,13 @@ impl CommandGroup {
         &mut self,
         display: &mut dyn GraphicsDisplay<D>,
         commands: &[D],
+        z_order: ZOrder,
         protected: impl Into<Option<bool>>,
         always_alive: impl Into<Option<bool>>,
     ) {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, commands, protected, always_alive);
+            ok_or_push(&mut self.0, display, commands, z_order, protected, always_alive);
         } else {
             display.maintain_command_group(self.0.unwrap());
         }
@@ -222,6 +236,7 @@ impl CommandGroup {
         &mut self,
         display: &mut dyn GraphicsDisplay<D>,
         f: F,
+        z_order: ZOrder,
         protected: impl Into<Option<bool>>,
         always_alive: impl Into<Option<bool>>,
     ) where
@@ -229,7 +244,7 @@ impl CommandGroup {
     {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, &f(), protected, always_alive);
+            ok_or_push(&mut self.0, display, &f(), z_order, protected, always_alive);
         } else {
             display.maintain_command_group(self.0.unwrap());
         }

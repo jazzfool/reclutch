@@ -141,6 +141,7 @@ The derive functionality is a feature, enabled by default.
 ## Rendering
 
 Rendering is done through "command groups". It's designed in a way that both a retained-mode renderer (e.g. WebRender) and an immediate-mode renderer (Direct2D, Skia, Cairo) can be implemented.
+The API also supports Z-Order.
 
 ```rust
 struct VisualWidget {
@@ -166,7 +167,7 @@ impl Widget for VisualWidget {
             None);
 
         // Only pushes/modifies the command group if a repaint is needed.
-        self.command_group.push(display, &builder.build(), None, true);
+        self.command_group.push(display, &builder.build(), Default::default(), None, true);
 
         draw_children();
     }
@@ -226,10 +227,12 @@ fn new() -> Self {
         "count_up" => event in &count_up.event => {
             click => {
                 obj.count += 1;
+                // here template_label is assumed to be a label whose text uses a templating enigne
+                // that needs to be explicitly rendered.
                 obj.template_label.values[0] = obj.count.to_string();
                 // if we don't call this then `obj.dynamic_label` doesn't
                 // get a chance to respond to our changes in this update pass.
-                reclutch_verbgraph::require_update(obj.template_label, aux, "update_template");
+                reclutch_verbgraph::require_update(&mut obj.template_label, aux, "update_template");
                 // "update_template" refers to the tag.
             }
         }
@@ -243,7 +246,7 @@ fn update(&mut self, aux: &mut Aux) {
     }
 
     // this requires an implementation of `HasVerbGraph` on self
-    reclutch_verbgraph::update_all(&mut self, aux);
+    reclutch_verbgraph::update_all(self, aux);
 }
 ```
 

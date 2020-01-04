@@ -240,7 +240,7 @@ fn main() {
             None,
         );
 
-        display.push_command_group(&builder.build(), None, Some(false)).unwrap();
+        display.push_command_group(&builder.build(), Default::default(), None, None).unwrap();
     }
 
     let mut latest_window_size = window_size;
