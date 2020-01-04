@@ -264,12 +264,12 @@ macro_rules! verbgraph {
 /// ```
 #[macro_export]
 macro_rules! unbound_queue_handler {
-    ($ot:ty as $obj:ident,$at:ty as $add:ident,$et:ty as $eo:ident,GraphContext as $ctxt:ident,$($ev:tt => $body:block)*) => {{
+    ($ot:ty as $obj:ident,$at:ty as $add:ident,$et:ty as $eo:ident,$($ev:tt => $body:block)*) => {{
         let mut qh = $crate::QueueHandler::new();
         $(
             qh = qh.on(
                 std::stringify!($ev),
-                |$obj: &mut $ot, #[allow(unused_variables)] $add: &mut $at, $eo: $et, $ctxt| {
+                |$obj: &mut $ot, #[allow(unused_variables)] $add: &mut $at, $eo: $et| {
                     #[allow(unused_variables)]
                     $crate::paste::expr!{
                         let $eo = $eo.[<unwrap_as_ $ev>]().unwrap();
