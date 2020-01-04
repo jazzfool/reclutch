@@ -265,7 +265,7 @@ macro_rules! verbgraph {
 #[macro_export]
 macro_rules! unbound_queue_handler {
     ($ot:ty as $obj:ident,$at:ty as $add:ident,$et:ty as $eo:ident,$($ev:tt => $body:block)*) => {{
-        let mut qh = $crate::QueueHandler::new();
+        let mut qh = $crate::UnboundQueueHandler::new();
         $(
             qh = qh.on(
                 std::stringify!($ev),
