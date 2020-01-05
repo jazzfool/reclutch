@@ -10,6 +10,12 @@ pub trait HasVerbGraph: reclutch_core::widget::Widget + Sized + 'static {
     fn verb_graph(&mut self) -> &mut OptionVerbGraph<Self, Self::UpdateAux>;
 }
 
+/// An object which performs updates on it's own internal `VerbGraph`.
+pub trait OperatesVerbGraph: reclutch_core::widget::Widget {
+    fn update_all(&mut self, additional: &mut Self::UpdateAux);
+    fn require_update(&mut self, additional: &mut Self::UpdateAux, tag: &'static str);
+}
+
 pub type OptionVerbGraph<T, A> = Option<VerbGraph<T, A>>;
 
 /// Event which returns a string corresponding to the current event variant.

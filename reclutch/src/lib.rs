@@ -82,7 +82,7 @@ associated types will have defaults.
 extern crate reclutch_derive;
 
 #[cfg(feature = "reclutch_derive")]
-pub use reclutch_derive::{Event, WidgetChildren};
+pub use reclutch_derive::{Event, OperatesVerbGraph, WidgetChildren};
 
 pub use reclutch_verbgraph as verbgraph;
 

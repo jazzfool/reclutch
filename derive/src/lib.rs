@@ -184,6 +184,33 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
     .into()
 }
 
+#[proc_macro_derive(OperatesVerbGraph)]
+pub fn operates_verb_graph_macro_derive(input: TokenStream) -> TokenStream {
+    let ast: syn::DeriveInput = syn::parse(input).unwrap();
+
+    impl_operates_verb_graph_macro(ast)
+}
+
+fn impl_operates_verb_graph_macro(ast: syn::DeriveInput) -> TokenStream {
+    let name = &ast.ident;
+    let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
+
+    {
+        quote! {
+            impl #impl_generics reclutch::verbgraph::OperatesVerbGraph for #name #ty_generics #where_clause {
+                fn update_all(&mut self, additional: &mut <Self as reclutch::widget::Widget>::UpdateAux) {
+                    reclutch::verbgraph::update_all(self, additional);
+                }
+
+                fn require_update(&mut self, additional: &mut <Self as reclutch::widget::Widget>::UpdateAux, tag: &'static str) {
+                    reclutch::verbgraph::require_update(self, additional, tag);
+                }
+            }
+        }
+    }
+    .into()
+}
+
 #[proc_macro_derive(Event, attributes(event_key))]
 pub fn event_macro_derive(input: TokenStream) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
