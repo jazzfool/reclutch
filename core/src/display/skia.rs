@@ -699,6 +699,11 @@ fn draw_command_group(
                     }
                 },
                 DisplayItem::Text(ref item) => {
+                    if item.text.len() == 0 {
+                        // for some reason Skia doesn't like drawing empty text blobs
+                        continue;
+                    }
+
                     if let ResourceReference::Font(ref id) = item.font {
                         if let Resource::Font(ref typeface) =
                             resources.get(id).ok_or(error::DisplayError::InvalidResource(*id))?
