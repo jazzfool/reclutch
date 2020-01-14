@@ -1,6 +1,7 @@
 use crate::*;
 use std::{cell::RefCell, ops::Deref};
 
+/// The most basic form of event queue (i.e. minimal indirection to the raw queue).
 #[derive(Debug)]
 pub struct Queue<T>(pub RefCell<RawEventQueue<T>>);
 

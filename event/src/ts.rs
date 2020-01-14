@@ -1,6 +1,7 @@
 use crate::*;
 use std::sync::{Arc, RwLock};
 
+/// Identical to [`nonts`], except using thread-safe abstractions (`Arc` over `Rc` and `RwLock` over `RefCell`).
 pub type Queue<T> = Arc<RwLock<RawEventQueue<T>>>;
 
 impl<T: Clone> QueueInterfaceListable for Queue<T> {

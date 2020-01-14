@@ -16,14 +16,16 @@ pub type Rect = euclid::Rect<f32, euclid::UnknownUnit>;
 /// An angle in radians.
 pub type Angle = euclid::Angle<f32>;
 
+/// The stacking order of command groups.
+/// How this is actually used depends on the `GraphicsDisplay` implementation.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ZOrder(pub i32);
 
 /// A trait to process display commands.
 ///
 /// In a retained implementation, command groups are persistent in the underlying graphics API (e.g. vertex buffer objects in OpenGL).
-/// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](trait.GraphicsDisplay.html#method.present).
-/// An unmaintained command group ([`maintain_command_group`](trait.GraphicsDisplay.html#method.maintain_command_group)) is removed.
+/// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](trait.GraphicsDisplay.html#tymethod.present).
+/// An unmaintained command group ([`maintain_command_group`](trait.GraphicsDisplay.html#tymethod.maintain_command_group)) is removed.
 ///
 /// The generic type parameter is the form in which the implementation can process display commands.
 /// This defaults to `DisplayCommand`, which supports shapes, gradients, backdrop filters, strokes, text, clips, transformation and state saving.
@@ -56,10 +58,10 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
         always_alive: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
 
-    /// Returns an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
+    /// Returns an existing command group by the handle returned from `push_command_group`.
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[D]>;
 
-    /// Overwrites an existing command group by the handle returned from [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
+    /// Overwrites an existing command group by the handle returned from `push_command_group`.
     fn modify_command_group(
         &mut self,
         handle: CommandGroupHandle,
@@ -115,16 +117,16 @@ pub struct RasterImageInfo {
     pub format: RasterImageFormat,
 }
 
-/// Contains information required to load a resource through [`new_resource`](trait.GraphicsDisplay.html#method.new_resource).
+/// Contains information required to load a resource through [`new_resource`](trait.GraphicsDisplay.html#tymethod.new_resource).
 #[derive(Debug, Clone)]
 pub enum ResourceDescriptor {
     Image(ImageData),
     Font(ResourceData),
 }
 
-/// Contains a tagged ID to an existing resource, created through [`new_resource`](trait.GraphicsDisplay.html#method.new_resource).
+/// Contains a tagged ID to an existing resource, created through [`new_resource`](trait.GraphicsDisplay.html#tymethod.new_resource).
 ///
-/// This is used to references resources in draw commands and to remove resources through [`remove_resource`](trait.GraphicsDisplay.html#method.remove_resource).
+/// This is used to references resources in draw commands and to remove resources through [`remove_resource`](trait.GraphicsDisplay.html#tymethod.remove_resource).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResourceReference {
     Image(u64),
@@ -148,7 +150,7 @@ pub enum SharedData {
 }
 
 /// Pushes or modifies a command group, depending on whether `handle` contains a value or not.
-/// This means that if `handle` did not contain a value, [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group) will be called and `handle` will be assigned to the returned handle.
+/// This means that if `handle` did not contain a value, [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group) will be called and `handle` will be assigned to the returned handle.
 pub fn ok_or_push<D: Sized>(
     handle: &mut Option<CommandGroupHandle>,
     display: &mut dyn GraphicsDisplay<D>,
@@ -209,7 +211,7 @@ impl CommandGroup {
 
     /// Pushes a list of commands if the repaint flag is set, and resets repaint flag if so.
     ///
-    /// See [`push_command_group`](trait.GraphicsDisplay.html#method.push_command_group).
+    /// See [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
     /// Also see [`push_with`](struct.CommandGroup.html#method.push_with), which is more efficient.
     pub fn push<D: Sized>(
         &mut self,
@@ -227,8 +229,8 @@ impl CommandGroup {
         }
     }
 
-    /// Almost identical to [`push`](struct.CommandGroup.html#method.push), however
-    /// instead of discarding the unused commands, it only invokes the provided
+    /// Almost identical to `push`, however instead of discarding the unused commands,
+    /// it only invokes the provided
     /// function when needed, so as to avoid commands that are expensive to build.
     ///
     /// As a general rule, use this where possible.
@@ -250,13 +252,13 @@ impl CommandGroup {
         }
     }
 
-    /// Sets the repaint flag so that next time [`push`](struct.CommandGroup.html#method.push) is called the commands will be pushed.
+    /// Sets the repaint flag so that next time `push` is called the commands will be pushed.
     #[inline(always)]
     pub fn repaint(&mut self) {
         self.1 = true;
     }
 
-    /// Returns flag indicating whether next [`push`](struct.CommandGroup.html#method.push) will skip or not.
+    /// Returns flag indicating whether next `push` will skip or not.
     #[inline(always)]
     pub fn will_repaint(&self) -> bool {
         self.1
@@ -427,7 +429,7 @@ pub struct GraphicsDisplayStroke {
     pub join: LineJoin,
     /// With regards to [`miter`](enum.LineJoin.html#variant.Miter), describes the maximum value of the miter length (the distance between the outer-most and inner-most part of the corner).
     pub miter_limit: f32,
-    /// Whether this stroke should be antialiased or not. This can be used to achieve sharp, thin outlines.
+    /// Whether this stroke should be anti-aliased or not. This can be used to achieve sharp, thin outlines.
     pub antialias: bool,
 }
 
@@ -927,7 +929,7 @@ pub enum DisplayClip {
     /// Rectangle clip.
     Rectangle {
         rect: Rect,
-        /// As a general rule, set to true if [`rect`](enum.DisplayClip.html#variant.Rectangle.field.rect) isn't pixel-aligned.
+        /// As a general rule, set to true if [`rect`](enum.DisplayClip.html#variant.Rectangle) isn't pixel-aligned.
         antialias: bool,
     },
     /// Rectangle clip with rounded corners.

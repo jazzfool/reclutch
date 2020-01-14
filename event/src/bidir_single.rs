@@ -4,7 +4,7 @@ use std::{borrow::Cow, cell::RefCell, rc::Rc};
 /// Non-thread-safe, reference-counted,
 /// bidirectional event queue,
 /// designed for `1:1` communication,
-/// thus, it doesn't support multicasting.
+/// thus, it doesn't support multi-casting.
 ///
 /// The first type parameter describes the
 /// events which the primary peer receives,

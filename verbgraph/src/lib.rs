@@ -16,6 +16,8 @@ pub trait OperatesVerbGraph: reclutch_core::widget::Widget {
     fn require_update(&mut self, additional: &mut Self::UpdateAux, tag: &'static str);
 }
 
+/// Helper type alias; `VerbGraph` is commonly stored in an `Option` to allow
+/// referencing it's outer widget without violating borrow rules.
 pub type OptionVerbGraph<T, A> = Option<VerbGraph<T, A>>;
 
 /// Event which returns a string corresponding to the current event variant.
