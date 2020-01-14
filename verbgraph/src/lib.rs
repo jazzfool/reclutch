@@ -91,13 +91,16 @@ trait DynQueueHandler<T, A> {
 
 impl<T, A, E: Event, L: EventListen<Item = E>> DynQueueHandler<T, A> for QueueHandler<T, A, E, L> {
     fn update(&mut self, obj: &mut T, additional: &mut A) {
-        for event in self.listener.peek() {
-            if let Some(handler) = self.handlers.get_mut(event.get_key()) {
-                use std::ops::DerefMut;
-                let mut handler = handler.as_ref().borrow_mut();
-                (handler.deref_mut())(obj, additional, event.clone());
+        let handlers = &mut self.handlers;
+        self.listener.with(|events| {
+            for event in events {
+                if let Some(handler) = handlers.get_mut(event.get_key()) {
+                    use std::ops::DerefMut;
+                    let mut handler = handler.as_ref().borrow_mut();
+                    (handler.deref_mut())(obj, additional, event.clone());
+                }
             }
-        }
+        });
     }
 }
 
