@@ -3,7 +3,7 @@ use std::{cell::RefCell, ops::Deref, rc::Rc};
 
 type Intern<T> = Rc<RefCell<RawEventQueue<T>>>;
 
-/// Non-thread-safe queue; a step above [`nonrc`].
+/// Non-thread-safe queue; a step above [`nonrc`](crate::nonrc).
 #[derive(Debug)]
 pub struct Queue<T>(pub Intern<T>);
 

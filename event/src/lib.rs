@@ -22,14 +22,14 @@
 
 # `Emitter`'s
 
-`Emitter`'s (data types which implement the [`EventEmitter`](prelude::EventEmitter) trait)
+`Emitter`'s (data types which implement the [`EventEmitter`](crate::prelude::EventEmitter) trait)
 represent an event queue instance including the event sending capability
-and often (when they implement the [`QueueInterfaceListable`](traits::QueueInterfaceListable))
+and often (when they implement the `QueueInterfaceListable`)
 have the ability to construct new `Listener`s.
 
 # `Listener`'s
 
-`Listener`'s (data types which implement the [`EventListen`](prelude::EventListen) trait)
+`Listener`'s (data types which implement the `EventListen` trait)
 represent the receiving end of an event queue.
 A `Listener` should be wrapped inside of an Rc or Arc
 if you want multiple references to the same listener

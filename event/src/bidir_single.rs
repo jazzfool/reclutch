@@ -17,7 +17,7 @@ use std::{borrow::Cow, cell::RefCell, rc::Rc};
 #[derive(Clone, Debug)]
 pub struct Queue<Tp, Ts>(pub(crate) Rc<RefCell<(Option<Tp>, Option<Ts>)>>);
 
-/// The "other" end of the bidirectional [`Queue`]
+/// The "other" end of the bidirectional [`Queue`](crate::bidir_single::Queue)
 #[derive(Clone, Debug)]
 pub struct Secondary<Tp, Ts>(Queue<Tp, Ts>);
 
@@ -39,7 +39,7 @@ impl<Tp, Ts> Queue<Tp, Ts> {
     /// This function returns the "other" end of the bidirectional `Queue`
     ///
     /// NOTE: multiple calls to this method on the same queue
-    /// return wrapped references to the same [`Secondary`].
+    /// return wrapped references to the same [`Secondary`](crate::bidir_single::Secondary).
     #[inline]
     pub fn secondary(&self) -> Secondary<Tp, Ts> {
         Secondary(Queue(Rc::clone(&self.0)))

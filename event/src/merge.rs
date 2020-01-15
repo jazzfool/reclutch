@@ -2,7 +2,7 @@ use crate::traits::Listen;
 
 pub type Listener<T> = Vec<Box<dyn Merge<T>>>;
 
-/// Merging utility trait to take peeked values and append them, either directly or indirectly, to a `Vec`.
+/// Merging utility trait to take peeked values and append them, either directly or indirectly, to a [`Vec`](std::vec::Vec).
 pub trait Merge<T> {
     fn extend_other(&self, o: &mut Vec<T>);
     fn indirect_with(&self, f: &mut dyn FnMut(&T));

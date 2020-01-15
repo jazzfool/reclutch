@@ -7,6 +7,7 @@ pub use euclid;
 pub use font_kit;
 pub use palette;
 
+/// Intricate event queues.
 pub use reclutch_event as event;
 
 pub mod prelude {
@@ -17,6 +18,7 @@ pub mod prelude {
     pub use reclutch_event::prelude::*;
 }
 
+/// Widget systems in which Reclutch is built around.
 pub mod widget {
     use crate::display::{GraphicsDisplay, Rect};
 
@@ -37,7 +39,7 @@ pub mod widget {
         /// to process events, emit events and execute all the side effects attached to such.
         /// Event handling is performed through a focused event system (see the event module).
         ///
-        /// This is also where the [`UpdateAux`](trait.Widget.html#associatedtype.UpdateAux) associated type comes in.
+        /// This is also where the [`UpdateAux`] associated type comes in.
         /// It allows you to pass mutable data around during updating.
         ///
         /// Here's an example implementation of `update`:
@@ -68,22 +70,24 @@ pub mod widget {
         ///     // --snip--
         /// }
         /// ```
+        ///
+        /// [`UpdateAux`]: Widget::UpdateAux
         fn update(&mut self, _aux: &mut Self::UpdateAux) {}
 
         /// Drawing is renderer-agnostic, however this doesn't mean the API is restrictive.
-        /// Generally, drawing is performed through [`CommandGroup`](../display/struct.CommandGroup.html).
-        /// This is also where [`GraphicalAux`](trait.Widget.html#associatedtype.GraphicalAux) and [`DisplayObject`](trait.Widget.html#associatedtype.DisplayObject) come in handy.
+        /// Generally, drawing is performed through [`CommandGroup`].
+        /// This is also where [`GraphicalAux`] and [`DisplayObject`] come in handy.
         ///
-        /// `GraphicalAux` allows you to pass extra data around while rendering,
-        /// much like `UpdateAux`. A use case of this could be, for example,
+        /// [`GraphicalAux`] allows you to pass extra data around while rendering,
+        /// much like [`UpdateAux`]. A use case of this could be, for example,
         /// rendering widgets into smaller displays and compositing them into a
-        /// larger display by attaching the larger display as `GraphicalAux`.
+        /// larger display by attaching the larger display as [`GraphicalAux`].
         ///
-        /// `DisplayObject` is simply the type that is used for `GraphicsDisplay`
+        /// [`DisplayObject`] is simply the type that is used for [`GraphicsDisplay`]
         /// (i.e. it's the form in which the widget visually expresses itself).
         /// If you're doing regular graphical rendering, then it is strongly
-        /// advised to use `DisplayCommand`, which is the type supported by the
-        /// default rendering back-ends. For more information, see [`GraphicsDisplay`](../display/trait.GraphicsDisplay.html).
+        /// advised to use [`DisplayCommand`], which is the type supported by the
+        /// default rendering back-ends. For more information, see [`GraphicsDisplay`].
         ///
         /// A simple example of this can be seen below:
         /// ```ignore
@@ -109,9 +113,15 @@ pub mod widget {
         ///     }
         /// }
         /// ```
-        /// Notice that although `DisplayObject` is defined as `DisplayCommand`,
+        /// Notice that although [`DisplayObject`] is defined as [`DisplayCommand`],
         /// it needn't be passed to the `display` parameter's type. This is because
-        /// `GraphicsDisplay` defaults the generic to `DisplayCommand` already.
+        /// [`GraphicsDisplay`] defaults the generic to [`DisplayCommand`] already.
+        ///
+        /// [`CommandGroup`]: crate::display::CommandGroup
+        /// [`GraphicalAux`]: Widget::GraphicalAux
+        /// [`DisplayObject`]: Widget::DisplayObject
+        /// [`UpdateAux`]: Widget::UpdateAux
+        /// [`DisplayCommand`]: crate::display::DisplayCommand
         fn draw(
             &mut self,
             _display: &mut dyn GraphicsDisplay<Self::DisplayObject>,
@@ -124,6 +134,7 @@ pub mod widget {
     ///
     /// Ideally, this wouldn't be implemented directly, but rather with `derive(WidgetChildren)`.
     pub trait WidgetChildren: Widget {
+        /// Returns all the children as immutable dynamic references.
         fn children(
             &self,
         ) -> Vec<
@@ -136,6 +147,7 @@ pub mod widget {
             Vec::new()
         }
 
+        /// Returns all the children as mutable dynamic references.
         fn children_mut(
             &mut self,
         ) -> Vec<

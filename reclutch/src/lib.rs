@@ -3,11 +3,10 @@
 Reclutch is a barebones foundation to build a UI from, with a strong focus
 on control.
 
-# `Widgets`
+# `Widget`
 
-A widget only defines 3 methods; [`bounds`](widget/trait.Widget.html#tymethod.bounds),
-[`update`](widget/trait.Widget.html#tymethod.update), and [`draw`](widget/trait.Widget.html#tymethod.draw).
-It also defines 3 associated types (`UpdateAux`, `GraphicalAux` and `DisplayObject`), discussed in relevant documentation.
+A widget only defines 3 methods; [`bounds`], [`update`], and [`draw`].
+It also defines 3 associated types ([`UpdateAux`], [`GraphicalAux`] and [`DisplayObject`]), discussed in relevant documentation.
 
 When implementing these methods, child widgets must be considered. Therefore
 it is advisable to propagate them;
@@ -22,10 +21,10 @@ The above example involves the `WidgetChildren` trait.
 
 # `WidgetChildren`
 
-`WidgetChildren` is a supertrait which defines an interface to collate all the
-child widgets from fields into a single `Vec`.
+[`WidgetChildren`] is a supertrait which defines an interface to collate all the
+child widgets from fields into a single [`Vec`].
 
-Most of the time you don't want to implement `WidgetChildren` manually, instead
+Most of the time you don't want to implement [`WidgetChildren`] manually, instead
 you can use the provided `derive` crate to reduce it to a couple extra lines;
 ```ignore
 #[derive(WidgetChildren)]
@@ -69,11 +68,13 @@ impl reclutch::widget::WidgetChildren for CounterWidget {
 }
 ```
 
-It should be noted that `Widget` and `WidgetChildren` aren't in a stable state.
-
-When/if trait specialization become stabilized, `WidgetChildren` can be merged into
-`Widget`. Further, when/if associated type defaults become stabilized, the `Widget`
-associated types will have defaults.
+[`bounds`]: widget::Widget::bounds
+[`update`]: widget::Widget::update
+[`draw`]: widget::Widget::draw
+[`UpdateAux`]: widget::Widget::UpdateAux
+[`GraphicalAux`]: widget::Widget::GraphicalAux
+[`DisplayObject`]: widget::Widget::DisplayObject
+[`WidgetChildren`]: widget::WidgetChildren
 **/
 
 #[cfg(feature = "reclutch_derive")]

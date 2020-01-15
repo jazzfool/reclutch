@@ -29,7 +29,7 @@ impl<'a, T: Clone> EmitResult<'a, T> {
         }
     }
 
-    /// Converts this `EmitResult` into `std::result::Result`.
+    /// Converts this `EmitResult` into [`std::result::Result`].
     pub fn to_result(self) -> Result<(), Cow<'a, T>> {
         self.into()
     }
@@ -126,7 +126,7 @@ where
         self.emit(Cow::Owned(event))
     }
 
-    /// Pushs/emits an event, performing conversion from borrowed
+    /// Pushes/emits an event, performing conversion from borrowed
     #[inline]
     fn emit_borrowed<'a>(&mut self, event: &'a Self::Item) -> EmitResult<'a, Self::Item> {
         self.emit(Cow::Borrowed(event))

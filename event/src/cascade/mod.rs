@@ -6,7 +6,7 @@ pub mod utils;
 pub trait CascadeTrait: 'static + Send {
     /// Register the cascade input `Receiver`.
     /// This function must register exactly one `Receiver` and
-    /// return the index (as returned from [Select::recv](crossbeam_channel::Select::recv)).
+    /// return the index (as returned from [`Select::recv`](crossbeam_channel::Select::recv)).
     fn register_input<'a>(&'a self, sel: &mut chan::Select<'a>) -> usize;
 
     /// Try to forward data incoming via the registered input `Receiver`.
@@ -15,17 +15,17 @@ pub trait CascadeTrait: 'static + Send {
     /// # Return values
     /// * `Some([])`: nothing to do
     /// * `None`: channel closed -> drop this cascade
-    /// * `Some([...])`: call [`cleanup`](CascadeTrait::cleanup) later with the data
+    /// * `Some([...])`: call [`cleanup`](crate::cascade::CascadeTrait::cleanup) later with the data
     ///
     /// # Design
-    /// The processing of incoming events is splitted into `try_run` and `cleanup`
+    /// The processing of incoming events is split into `try_run` and `cleanup`
     /// to bypass conflicting borrows between `self` and `oper`, because both
     /// hold read-only references to the same underlying memory (`Self`).
     /// Thus, `self` can't be a mutable reference because it would conflict with `'a`.
     fn try_run<'a>(&self, oper: chan::SelectedOperation<'a>) -> Option<utils::CleanupIndices>;
 
     /// This function is expected to be called with the unwrapped return value of
-    /// [`try_run`](CascadeTrait::try_run) if it returned a non-empty value.
+    /// [`try_run`](crate::cascade::CascadeTrait::try_run) if it returned a non-empty value.
     fn cleanup(&mut self, clx: utils::CleanupIndices) -> bool;
 
     /// Returns if the cascade output filter count is null
@@ -39,7 +39,7 @@ pub trait Push: CascadeTrait + Sized {
     /// Each event is forwarded (to `ev_out`) if `filter(&event) == true`.
     /// Processing of the event stops after the first matching filter.
     ///
-    /// `keep_after_disconnect` specifies the behavoir of this `Cascade` item
+    /// `keep_after_disconnect` specifies the behavior of this `Cascade` item
     /// after `ev_out` signals that it won't accept new events.
     /// * `true`: the filter is left in the cascade, but will drop matching events
     ///   instead of forwarding
@@ -50,7 +50,7 @@ pub trait Push: CascadeTrait + Sized {
         O: Emitter<Item = Self::Item> + Send + 'static,
         F: Fn(&Self::Item) -> bool + Send + 'static;
 
-    /// This function extends the functionality of [`push`](Push::push)
+    /// This function extends the functionality of [`push`](crate::cascade::Push::push)
     /// with the ability to cascade event queues with different
     /// underlying types.
     ///
@@ -70,10 +70,8 @@ pub trait Push: CascadeTrait + Sized {
     where
         O: Emitter<Item = Self::Item> + Clone + Send + Sync + 'static,
     {
-        // we need a clonable O to perform the automatic clenaup
-        self.push(ev_out.clone(), false, move |event| {
-            ev_out.emit_borrowed(event).was_delivered()
-        })
+        // we need a Clone`-able O to perform the automatic cleanup
+        self.push(ev_out.clone(), false, move |event| ev_out.emit_borrowed(event).was_delivered())
     }
 
     /// Append a cascade output as notification queue.
@@ -82,12 +80,12 @@ pub trait Push: CascadeTrait + Sized {
     /// This is useful to wake up threads which aren't listening on the actual,
     /// but need to be notified when events pass through the cascade.
     /// Important note: The events which triggered the emission of the tokens
-    /// possibily aren't available yet when the token is consumed.
+    /// possibly aren't available yet when the token is consumed.
     fn push_notify_via_token<O>(self, ev_out: O) -> Self
     where
         O: Emitter<Item = ()> + Clone + Send + Sync + 'static,
     {
-        // we need a clonable O to perform the automatic clenaup
+        // we need a `Clone`-able O to perform the automatic cleanup
         self.push_map(ev_out.clone(), false, move |event| {
             let _ = ev_out.emit_owned(());
             Err(event)
@@ -244,10 +242,7 @@ mod tests {
             s.spawn(move |_| run_worker(ctrl_rx, Vec::new()));
             ctrl_tx
                 .send(
-                    ev1_rx
-                        .push(ev2_tx, false, |i| i % 2 == 1)
-                        .push(ev3_tx, false, |_| true)
-                        .wrap(),
+                    ev1_rx.push(ev2_tx, false, |i| i % 2 == 1).push(ev3_tx, false, |_| true).wrap(),
                 )
                 .unwrap();
             ev1_tx.emit_owned(2).to_result().unwrap();
@@ -266,10 +261,7 @@ mod tests {
         let (stop_tx, stop_rx) = chan::bounded(0);
         let mut cascades = Vec::new();
         cascades.push(
-            ev1_rx
-                .push(ev2_tx, false, |i| i % 2 == 1)
-                .push_map(ev3_tx, false, |_| Ok(true))
-                .wrap(),
+            ev1_rx.push(ev2_tx, false, |i| i % 2 == 1).push_map(ev3_tx, false, |_| Ok(true)).wrap(),
         );
         crossbeam_utils::thread::scope(move |s| {
             s.spawn(move |_| run_worker(stop_rx, cascades));

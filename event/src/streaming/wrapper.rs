@@ -25,9 +25,9 @@ impl<IQ> QueueWrapper<IQ> {
 
     /// # Safety
     /// This method is marked unsafe because it might allow
-    /// type contract-breaking behavoir.
-    /// It is forbidden to call [`emit`](Emitter::emit)
-    /// or similiar functions on the returned reference.
+    /// type contract-breaking behavior.
+    /// It is forbidden to call [`emit`](crate::traits::Emitter::emit)
+    /// or similar functions on the returned reference.
     pub unsafe fn inner_mut(&mut self) -> &mut IQ {
         &mut self.inner
     }

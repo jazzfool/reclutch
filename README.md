@@ -3,12 +3,15 @@
 [![Build Status](https://travis-ci.com/jazzfool/reclutch.svg?branch=master)](https://travis-ci.com/jazzfool/reclutch)
 
 A strong foundation for building predictable and straight-forward Rust UI toolkits. Reclutch is:
+
 - **Bare:** Very little UI code is included. In practice it's a utility library which makes very little assumptions about the toolkit or UI.
 - **Platform-agnostic:** Although a default display object is provided, the type of display object is generic, meaning you can build for platforms other than desktop. For example you can create web applications simply by using DOM nodes as display objects while still being efficient, given the retained-mode design.
 - **Reusable:** Provided structures such as unbound queue handlers allow for the reuse of common logical components across widgets.
 
 ## Overview
+
 Reclutch implements the well-known retained-mode widget ownership design within safe Rust, following along the footsteps of popular desktop frameworks. To implement this behavior, three core ideas are implemented:
+
 - A widget ownership model with no middleman, allowing widgets to mutate children at any time, but also collect children as a whole to make traversing the widget tree a trivial task.
 - A robust event queue system with support for `futures`, `crossbeam` and `winit` event loop integration, plus a multitude of queue utilities and queue variations for support in any environment.
 - An event queue abstraction to facilitate just-in-time event coordination between widgets, filling any pitfalls that may arise when using event queues. Beyond this, it also moves the code to handle queues to the constructor, presenting an opportunity to modularize and reuse logic across widgets.
@@ -17,7 +20,8 @@ Reclutch implements the well-known retained-mode widget ownership design within 
     <img src=".media/showcase.png" width="90%"/>
 </p>
 
-### *Also see:*
+### _Also see:_
+
 - [Events and event queues](event/README.md)
 - [Thunderclap Toolkit](https://github.com/jazzfool/reui)
 
@@ -216,6 +220,7 @@ To fix this, Reclutch has the `verbgraph` module; a facility to jump between wid
 In essence, it breaks the linear execution of update procedures so that dependent events can be handled even if the primary `update` function has already be executed.
 
 This is best shown through example;
+
 ```rust
 fn new() -> Self {
     let graph = verbgraph! {
@@ -227,7 +232,7 @@ fn new() -> Self {
         "count_up" => event in &count_up.event => {
             click => {
                 obj.count += 1;
-                // here template_label is assumed to be a label whose text uses a templating enigne
+                // here template_label is assumed to be a label whose text uses a template engine
                 // that needs to be explicitly rendered.
                 obj.template_label.values[0] = obj.count.to_string();
                 // if we don't call this then `obj.dynamic_label` doesn't
@@ -266,7 +271,9 @@ enum AnEvent {
     },
 }
 ```
+
 Generates exactly;
+
 ```rust
 impl reclutch::verbgraph::Event for AnEvent {
     fn get_key(&self) -> &'static str {

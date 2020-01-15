@@ -17,20 +17,22 @@ pub type Rect = euclid::Rect<f32, euclid::UnknownUnit>;
 pub type Angle = euclid::Angle<f32>;
 
 /// The stacking order of command groups.
-/// How this is actually used depends on the `GraphicsDisplay` implementation.
+/// How this is actually used depends on the [`GraphicsDisplay`] implementation.
+///
+/// [`GraphicsDisplay`]: GraphicsDisplay
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ZOrder(pub i32);
 
 /// A trait to process display commands.
 ///
 /// In a retained implementation, command groups are persistent in the underlying graphics API (e.g. vertex buffer objects in OpenGL).
-/// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](trait.GraphicsDisplay.html#tymethod.present).
-/// An unmaintained command group ([`maintain_command_group`](trait.GraphicsDisplay.html#tymethod.maintain_command_group)) is removed.
+/// Contrasting this, an immediate implementation treats command groups as an instantaneous representation of the scene within [`present`](GraphicsDisplay::present).
+/// An unmaintained command group ([`maintain_command_group`](GraphicsDisplay::maintain_command_group)) is removed.
 ///
 /// The generic type parameter is the form in which the implementation can process display commands.
-/// This defaults to `DisplayCommand`, which supports shapes, gradients, backdrop filters, strokes, text, clips, transformation and state saving.
+/// This defaults to [`DisplayCommand`](DisplayCommand), which supports shapes, gradients, backdrop filters, strokes, text, clips, transformation and state saving.
 /// If you have something more specific in mind (e.g. HTML/DOM), it may be beneficial to define your own type,
-/// however this means implementing `GraphicsDisplay` yourself.
+/// however this means implementing [`GraphicsDisplay`](GraphicsDisplay) yourself.
 pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
     /// Resizes the underlying surface.
     fn resize(&mut self, size: (u32, u32)) -> Result<(), Box<dyn std::error::Error>>;
@@ -46,7 +48,7 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
 
     /// Pushes a new command group to the scene, returning the handle which can be used to manipulate it later.
     ///
-    /// Normally [`Save`](enum.DisplayCommand.html#variant.Save) and [`Restore`](enum.DisplayCommand.html#variant.Restore) (more specifically an internal `RestoreToCount`) is invoked between command group execution to prevent any leaking
+    /// Normally [`Save`](DisplayCommand::Save) and [`Restore`](DisplayCommand::Restore) (more specifically an internal `RestoreToCount`) is invoked between command group execution to prevent any leaking
     /// of clips/transforms, however this can be explicitly disabled by letting `protected` be `false`.
     ///
     /// `always_alive` means that the command group is not subjective to maintenance. This means the only way to make it go away is to remove it directly.
@@ -58,10 +60,10 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
         always_alive: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
 
-    /// Returns an existing command group by the handle returned from `push_command_group`.
+    /// Returns an existing command group by the handle returned from [`push_command_group`](GraphicsDisplay::push_command_group).
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[D]>;
 
-    /// Overwrites an existing command group by the handle returned from `push_command_group`.
+    /// Overwrites an existing command group by the handle returned from [`push_command_group`](GraphicsDisplay::push_command_group).
     fn modify_command_group(
         &mut self,
         handle: CommandGroupHandle,
@@ -117,16 +119,16 @@ pub struct RasterImageInfo {
     pub format: RasterImageFormat,
 }
 
-/// Contains information required to load a resource through [`new_resource`](trait.GraphicsDisplay.html#tymethod.new_resource).
+/// Contains information required to load a resource through [`new_resource`](GraphicsDisplay::new_resource).
 #[derive(Debug, Clone)]
 pub enum ResourceDescriptor {
     Image(ImageData),
     Font(ResourceData),
 }
 
-/// Contains a tagged ID to an existing resource, created through [`new_resource`](trait.GraphicsDisplay.html#tymethod.new_resource).
+/// Contains a tagged ID to an existing resource, created through [`new_resource`](GraphicsDisplay::new_resource).
 ///
-/// This is used to references resources in draw commands and to remove resources through [`remove_resource`](trait.GraphicsDisplay.html#tymethod.remove_resource).
+/// This is used to references resources in draw commands and to remove resources through [`remove_resource`](GraphicsDisplay::remove_resource).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ResourceReference {
     Image(u64),
@@ -142,7 +144,7 @@ impl ResourceReference {
     }
 }
 
-/// Data stored as bytes, either in a atomically reference counted `Vec` or a static reference.
+/// Data stored as bytes, either in a atomically reference counted [`Vec`](std::vec::Vec) or a static reference.
 #[derive(Debug, Clone)]
 pub enum SharedData {
     RefCount(Arc<Vec<u8>>),
@@ -150,7 +152,7 @@ pub enum SharedData {
 }
 
 /// Pushes or modifies a command group, depending on whether `handle` contains a value or not.
-/// This means that if `handle` did not contain a value, [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group) will be called and `handle` will be assigned to the returned handle.
+/// This means that if `handle` did not contain a value, [`push_command_group`](GraphicsDisplay::push_command_group) will be called and `handle` will be assigned to the returned handle.
 pub fn ok_or_push<D: Sized>(
     handle: &mut Option<CommandGroupHandle>,
     display: &mut dyn GraphicsDisplay<D>,
@@ -177,12 +179,12 @@ pub fn ok_or_push<D: Sized>(
     }
 }
 
-/// Handle to a command group within a [`GraphicsDisplay`](trait.GraphicsDisplay.html).
+/// Handle to a command group within a [`GraphicsDisplay`](GraphicsDisplay).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CommandGroupHandle(u64);
 
 impl CommandGroupHandle {
-    /// Creates a new `CommandGroupHandle`, with the inner ID set to `id`.
+    /// Creates a new [`CommandGroupHandle`](CommandGroupHandle), with the inner ID set to `id`.
     pub fn new(id: u64) -> Self {
         Self(id)
     }
@@ -193,7 +195,7 @@ impl CommandGroupHandle {
     }
 }
 
-/// Helper wrapper around [`CommandGroupHandle`](struct.CommandGroupHandle.html).
+/// Helper wrapper around [`CommandGroupHandle`](CommandGroupHandle).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CommandGroup(Option<CommandGroupHandle>, bool);
 
@@ -211,8 +213,8 @@ impl CommandGroup {
 
     /// Pushes a list of commands if the repaint flag is set, and resets repaint flag if so.
     ///
-    /// See [`push_command_group`](trait.GraphicsDisplay.html#tymethod.push_command_group).
-    /// Also see [`push_with`](struct.CommandGroup.html#method.push_with), which is more efficient.
+    /// See [`push_command_group`](GraphicsDisplay::push_command_group).
+    /// Also see [`push_with`](CommandGroup::push_with), which is more efficient.
     pub fn push<D: Sized>(
         &mut self,
         display: &mut dyn GraphicsDisplay<D>,
@@ -229,11 +231,12 @@ impl CommandGroup {
         }
     }
 
-    /// Almost identical to `push`, however instead of discarding the unused commands,
-    /// it only invokes the provided
-    /// function when needed, so as to avoid commands that are expensive to build.
+    /// Almost identical to [`push`], however instead of discarding the unused commands,
+    /// it only invokes the provided function when needed, so as to avoid commands that are expensive to build.
     ///
-    /// As a general rule, use this where possible.
+    /// As a general rule, use this over [`push`] where possible.
+    ///
+    /// [`push`]: CommandGroup::push
     pub fn push_with<F, D: Sized>(
         &mut self,
         display: &mut dyn GraphicsDisplay<D>,
@@ -252,13 +255,13 @@ impl CommandGroup {
         }
     }
 
-    /// Sets the repaint flag so that next time `push` is called the commands will be pushed.
+    /// Sets the repaint flag so that next time [`push`](CommandGroup::push) is called the commands will be pushed.
     #[inline(always)]
     pub fn repaint(&mut self) {
         self.1 = true;
     }
 
-    /// Returns flag indicating whether next `push` will skip or not.
+    /// Returns flag indicating whether next [`push`](CommandGroup::push) will skip or not.
     #[inline(always)]
     pub fn will_repaint(&self) -> bool {
         self.1
@@ -313,7 +316,7 @@ pub enum VectorPathEvent {
 /// A vector path, represented as a series of events/segments.
 pub type VectorPath = Vec<VectorPathEvent>;
 
-/// Helper to assist in the creation of a `VectorPath`.
+/// Helper to assist in the creation of a [`VectorPath`](VectorPath).
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct VectorPathBuilder {
     path: VectorPath,
@@ -427,7 +430,7 @@ pub struct GraphicsDisplayStroke {
     pub cap: LineCap,
     /// Appearance of the corners of the stroke.
     pub join: LineJoin,
-    /// With regards to [`miter`](enum.LineJoin.html#variant.Miter), describes the maximum value of the miter length (the distance between the outer-most and inner-most part of the corner).
+    /// With regards to [`miter`](LineJoin::Miter), describes the maximum value of the miter length (the distance between the outer-most and inner-most part of the corner).
     pub miter_limit: f32,
     /// Whether this stroke should be anti-aliased or not. This can be used to achieve sharp, thin outlines.
     pub antialias: bool,
@@ -455,7 +458,7 @@ pub enum GraphicsDisplayPaint {
     Stroke(GraphicsDisplayStroke),
 }
 
-/// Describes all the possible graphical items (excluding text, see [`TextDisplayItem`](struct.TextDisplayItem.html)).
+/// Describes all the possible graphical items (excluding text, see [`TextDisplayItem`](TextDisplayItem)).
 #[derive(Clone)]
 pub enum GraphicsDisplayItem {
     Line {
@@ -573,9 +576,9 @@ pub struct ShapedGlyph {
     pub offset: Vector,
 }
 
-/// The single-character version of [`DisplayText`](enum.DisplayText.html).
+/// The single-character version of [`DisplayText`](DisplayText).
 ///
-/// This is only ever officially used in the [`retain`](enum.DisplayText.html#method.retain) method.
+/// This is only ever officially used in the [`filter`](DisplayText::filter) method.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DisplayCharacter {
     Character(char),
@@ -665,7 +668,7 @@ impl TextDisplayItem {
     /// Returns the maximum boundaries for the text.
     ///
     /// The height of the bounding box is conservative; it doesn't change based
-    /// on the contents of [`text`](struct.TextDisplayItem.html#structfield.text), is defined on a per-font basis,
+    /// on the contents of [`text`](TextDisplayItem::text), is defined on a per-font basis,
     /// and is "worst-case" (as in it represents the largest height value in the font).
     ///
     /// The bounding box is identical to that of a browser's.
@@ -678,7 +681,7 @@ impl TextDisplayItem {
 
     /// Returns the boundaries of the text, up to the n-th character (`limit`).
     ///
-    /// For more information, see [`bounds`](struct.TextDisplayItem.html#method.bounds).
+    /// For more information, see [`bounds`](TextDisplayItem::bounds).
     pub fn limited_bounds(&self, limit: usize) -> Result<Rect, error::FontError> {
         let metrics = self.font_info.font.metrics();
         let units_per_em = metrics.units_per_em as f32;
@@ -792,7 +795,7 @@ impl TextDisplayItem {
     }
 }
 
-/// Centers an un-positioned rectangle (`Size`) within a rectangle.
+/// Centers an un-positioned rectangle ([`Size`](Size)) within a rectangle.
 pub fn center(inner: Size, outer: Rect) -> Point {
     Point::new(
         outer.origin.x + ((outer.size.width - inner.width) / 2.0),
@@ -830,7 +833,7 @@ pub struct FontInfo {
 impl FontInfo {
     /// Creates a new font reference, matched to the font `name`, with optional `fallbacks` and `properties`.
     ///
-    /// See [`from_postscript_name`](struct.FontInfo.html#method.from_postscript_name).
+    /// See [`from_postscript_name`](FontInfo::from_postscript_name).
     pub fn from_name(
         name: &str,
         fallbacks: &[&str],
@@ -853,7 +856,7 @@ impl FontInfo {
 
     /// Creates a new font reference, matched to the PostScript `name`, with optional `fallbacks`.
     ///
-    /// If the exact desired font is known, this constructor is more appropriate than [`from_name`](struct.FontInfo.html#method.from_name).
+    /// If the exact desired font is known, this constructor is more appropriate than [`from_name`](FontInfo::from_name).
     pub fn from_postscript_name(name: &str, fallbacks: &[&str]) -> Result<Self, error::FontError> {
         let mut names = vec![name.to_string()];
         names.append(&mut fallbacks.iter().map(|name| name.to_string()).collect());
@@ -886,7 +889,7 @@ impl FontInfo {
     }
 
     /// Creates a new font reference from font data.
-    /// Similar to [`from_path`](struct.FontInfo.html#method.from_path), however as bytes rather than a path to a file.
+    /// Similar to [`from_path`](FontInfo::from_path), however as bytes rather than a path to a file.
     pub fn from_data(data: Arc<Vec<u8>>, font_index: u32) -> Result<Self, error::FontError> {
         let font = font_kit::font::Font::from_bytes(data, font_index)?;
 
@@ -929,7 +932,7 @@ pub enum DisplayClip {
     /// Rectangle clip.
     Rectangle {
         rect: Rect,
-        /// As a general rule, set to true if [`rect`](enum.DisplayClip.html#variant.Rectangle) isn't pixel-aligned.
+        /// As a general rule, set to true if [`rect`](DisplayClip::Rectangle::rect) isn't pixel-aligned.
         antialias: bool,
     },
     /// Rectangle clip with rounded corners.
@@ -967,7 +970,7 @@ pub enum DisplayCommand {
     /// Applies a filter onto the frame with a mask.
     BackdropFilter(DisplayClip, Filter),
     /// Pushes a clip onto the draw state.
-    /// To remove the clip, call this after a [`save`](enum.DisplayCommand.html#variant.Save) command, which once [`restored`](enum.DisplayCommand.html#variant.Restore), the clip will be removed.
+    /// To remove the clip, call this after a [`save`](DisplayCommand::Save) command, which once [`restored`](DisplayCommand::Restore), the clip will be removed.
     Clip(DisplayClip),
     /// Saves the draw state (clip and transformations).
     Save,
