@@ -601,10 +601,16 @@ impl DisplayText {
         }
     }
 
+    /// Returns `true` of the length of the text, either as n-characters of n-glyphs, is 0, otherwise `false`.
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns a sub-range of the text.
     ///
     /// # Example
-    /// ```rust,ignore
+    /// ```rust
     /// use reclutch::display::DisplayText;
     ///
     /// let text = DisplayText::Simple("Hello, world!".to_string());
@@ -721,11 +727,11 @@ impl TextDisplayItem {
         Ok(Rect::new(Point::new(self.bottom_left.x, y), Size::new(width, height)))
     }
 
-    /// Breaks the text based on a bounding box using the standard Unicode line
+    /// Breaks the text based on a maximum width using the standard Unicode line
     /// breaking algorithm.
     pub fn linebreak(
         mut self,
-        rect: Rect,
+        max_width: f32,
         line_height: f32,
         remove_newlines: bool,
     ) -> Result<Vec<TextDisplayItem>, error::FontError> {
@@ -741,17 +747,17 @@ impl TextDisplayItem {
         let mut next = None;
 
         for (offset, hard) in xi_unicode::LineBreakIterator::new(&text) {
-            if hard || self.limited_bounds(offset)?.max_x() > rect.max_x() {
+            if hard || self.limited_bounds(offset)?.size.width > max_width {
                 let next_text = TextDisplayItem {
                     text: self.text.subtext(offset..self.text.len()),
-                    font: self.font.clone(),
+                    font: self.font,
                     font_info: self.font_info.clone(),
                     size: self.size,
                     bottom_left: self.bottom_left + Size::new(0.0, line_height),
                     color: self.color.clone(),
                 };
 
-                if next_text.text.len() == 0 {
+                if next_text.text.is_empty() {
                     continue;
                 }
 
@@ -773,11 +779,11 @@ impl TextDisplayItem {
                 });
             }
 
-            if self.text.len() > 0 {
+            if !self.text.is_empty() {
                 out.push(self);
             }
 
-            out.extend(next.linebreak(rect, line_height, remove_newlines)?.into_iter());
+            out.extend(next.linebreak(max_width, line_height, remove_newlines)?.into_iter());
         } else {
             out.push(self);
         }

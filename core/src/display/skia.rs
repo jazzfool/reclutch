@@ -1,4 +1,4 @@
-//! Robust implementation of [`GraphicsDisplay`](../trait.GraphicsDisplay.html) using Google's Skia.
+//! Robust implementation of `GraphicsDisplay` using Google's Skia.
 
 use super::*;
 use {
@@ -32,7 +32,7 @@ enum Resource {
     Font(sk::Typeface),
 }
 
-/// Converts [`DisplayCommand`](../enum.DisplayCommand.html) to immediate-mode Skia commands.
+/// Converts [`DisplayCommand`](crate::display::DisplayCommand) to immediate-mode Skia commands.
 pub struct SkiaGraphicsDisplay {
     surface: sk::Surface,
     surface_type: SurfaceType,
@@ -48,7 +48,7 @@ pub struct SkiaGraphicsDisplay {
 }
 
 impl SkiaGraphicsDisplay {
-    /// Creates a new [`SkiaGraphicsDisplay`](struct.SkiaGraphicsDisplay.html) with the Skia OpenGL backend, drawing into an existing framebuffer.
+    /// Creates a new [`SkiaGraphicsDisplay`](SkiaGraphicsDisplay) with the Skia OpenGL backend, drawing into an existing framebuffer.
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components.
     pub fn new_gl_framebuffer(target: &SkiaOpenGlFramebuffer) -> Result<Self, error::SkiaError> {
@@ -65,7 +65,7 @@ impl SkiaGraphicsDisplay {
         })
     }
 
-    /// Creates a new [`SkiaGraphicsDisplay`](struct.SkiaGraphicsDisplay.html) with the Skia OpenGL backend, drawing into an existing texture.
+    /// Creates a new [`SkiaGraphicsDisplay`](SkiaGraphicsDisplay) with the Skia OpenGL backend, drawing into an existing texture.
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components
     pub fn new_gl_texture(target: &SkiaOpenGlTexture) -> Result<Self, error::SkiaError> {
