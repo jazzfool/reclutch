@@ -373,7 +373,7 @@ impl VectorPathBuilder {
 /// Returns the roughly approximate bounds of a vector path.
 /// Note that this function is deliberately very lazy in terms of computing bounds;
 /// control points are counted as boundaries.
-pub fn vector_path_bounds(path: &VectorPath) -> Rect {
+pub fn vector_path_bounds(path: &[VectorPathEvent]) -> Rect {
     let points = path.iter().cloned().fold(Vec::new(), |mut points, event| {
         let was_move_to = match event {
             VectorPathEvent::MoveTo { to } => {
@@ -653,6 +653,12 @@ impl From<String> for DisplayText {
     }
 }
 
+impl From<&str> for DisplayText {
+    fn from(text: &str) -> Self {
+        text.to_string().into()
+    }
+}
+
 impl From<Vec<ShapedGlyph>> for DisplayText {
     fn from(glyphs: Vec<ShapedGlyph>) -> Self {
         DisplayText::Shaped(glyphs)
@@ -865,7 +871,7 @@ impl FontInfo {
     /// If the exact desired font is known, this constructor is more appropriate than [`from_name`](FontInfo::from_name).
     pub fn from_postscript_name(name: &str, fallbacks: &[&str]) -> Result<Self, error::FontError> {
         let mut names = vec![name.to_string()];
-        names.append(&mut fallbacks.iter().map(|name| name.to_string()).collect());
+        names.append(&mut fallbacks.iter().map(|&name| name.to_string()).collect());
 
         let mut font = None;
 
