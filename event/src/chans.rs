@@ -352,7 +352,7 @@ mod tests {
     fn test_event_listener() {
         let event = Queue::new();
 
-        event.emit_owned(0i32).to_result().unwrap_err();
+        event.emit_owned(0i32).into_result().unwrap_err();
 
         let suls = event.listen_and_subscribe();
         let data = &[1, 2, 3];
@@ -364,7 +364,7 @@ mod tests {
         });
 
         for i in data.into_iter() {
-            event.emit_borrowed(i).to_result().unwrap();
+            event.emit_borrowed(i).into_result().unwrap();
         }
         h.join().unwrap();
     }
@@ -375,13 +375,13 @@ mod tests {
 
         let suls1 = event.listen_and_subscribe();
 
-        event.emit_owned(10).to_result().unwrap();
+        event.emit_owned(10).into_result().unwrap();
 
         assert!(!event.buffer_is_empty());
 
         let suls2 = event.listen_and_subscribe();
 
-        event.emit_owned(20).to_result().unwrap();
+        event.emit_owned(20).into_result().unwrap();
 
         let h1 = std::thread::spawn(move || {
             assert_eq!(suls1.notifier.recv(), Ok(()));
@@ -401,7 +401,7 @@ mod tests {
         assert!(event.buffer_is_empty());
 
         for _i in 0..10 {
-            event.emit_owned(30).to_result().unwrap();
+            event.emit_owned(30).into_result().unwrap();
         }
 
         h1.join().unwrap();
@@ -418,8 +418,8 @@ mod tests {
         let suls1 = event1.listen_and_subscribe();
         let suls2 = event2.listen_and_subscribe();
 
-        event1.emit_owned(20).to_result().unwrap();
-        event2.emit_owned(10).to_result().unwrap();
+        event1.emit_owned(20).into_result().unwrap();
+        event2.emit_owned(10).into_result().unwrap();
 
         chan::select! {
             recv(suls1.notifier) -> _msg => {

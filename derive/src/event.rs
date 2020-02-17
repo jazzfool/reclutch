@@ -21,27 +21,21 @@ pub fn impl_event_macro(ast: syn::DeriveInput) -> TokenStream {
                     proc_macro2::TokenStream,
                 ) = (match_ext.into(), ty.into(), ret.into());
 
-                key_pats.push(
-                    {
-                        quote! { #name::#um => std::stringify!(#key) }
-                    }
-                    .into(),
-                );
+                key_pats.push({
+                    quote! { #name::#um => std::stringify!(#key) }
+                });
 
-                cast_fns.push(
-                    {
-                        quote! {
-                            pub fn #func(self) -> Option<#ty> {
-                                if let #name::#match_ext = self {
-                                    Some(#ret)
-                                } else {
-                                    None
-                                }
+                cast_fns.push({
+                    quote! {
+                        pub fn #func(self) -> Option<#ty> {
+                            if let #name::#match_ext = self {
+                                Some(#ret)
+                            } else {
+                                None
                             }
                         }
                     }
-                    .into(),
-                );
+                });
             }
 
             {
@@ -106,15 +100,14 @@ fn get_variant_matched_tuples(variant: &syn::Variant) -> (TokenStream, TokenStre
             .into(),
         ),
         syn::Fields::Unnamed(fields) => {
-            let mut matching: Vec<syn::Ident> = Vec::new();
-            let mut types: Vec<syn::Type> = Vec::new();
-            let mut idx = 0;
-
-            for field in &fields.unnamed {
-                matching.push(quote::format_ident!("x{}", idx.to_string()));
-                types.push(field.ty.clone());
-                idx += 1;
-            }
+            let (matching, types): (Vec<syn::Ident>, Vec<syn::Type>) = fields
+                .unnamed
+                .iter()
+                .enumerate()
+                .map(|(idx, field)| {
+                    (quote::format_ident!("x{}", idx.to_string()), field.ty.clone())
+                })
+                .unzip();
 
             (
                 {
@@ -208,10 +201,10 @@ fn find_event_key(attrs: &[syn::Attribute]) -> syn::Ident {
     for attr in attrs {
         if attr.path.segments.first().map(|i| i.ident == "event_key").unwrap_or(false) {
             if let proc_macro2::TokenTree::Group(grp) =
-                attr.clone().tokens.into_iter().nth(0).unwrap()
+                attr.clone().tokens.into_iter().next().unwrap()
             {
                 if let proc_macro2::TokenTree::Ident(ident) =
-                    grp.stream().into_iter().nth(0).unwrap()
+                    grp.stream().into_iter().next().unwrap()
                 {
                     return ident;
                 }

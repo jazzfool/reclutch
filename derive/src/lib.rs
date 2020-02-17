@@ -48,12 +48,9 @@ fn impl_widget_macro(ast: &syn::DeriveInput) -> TokenStream {
     }) {
         let mut out = None;
         for token in attr.tokens.clone().into_iter() {
-            match token {
-                proc_macro2::TokenTree::Group(grp) => {
-                    out = Some(grp.stream());
-                    break;
-                }
-                _ => {}
+            if let proc_macro2::TokenTree::Group(grp) = token {
+                out = Some(grp.stream());
+                break;
             }
         }
 

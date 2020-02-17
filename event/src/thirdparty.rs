@@ -249,7 +249,7 @@ mod tests {
     fn test_event_listener() {
         let mut event = Vec::new();
 
-        event.emit_owned(0i32).to_result().unwrap_err();
+        event.emit_owned(0i32).into_result().unwrap_err();
 
         let (sender, receiver) = mpsc::channel();
         event.push(sender);
@@ -263,7 +263,7 @@ mod tests {
         });
 
         for i in data {
-            event.emit_borrowed(i).to_result().unwrap();
+            event.emit_borrowed(i).into_result().unwrap();
         }
         h.join().unwrap();
     }
@@ -275,12 +275,12 @@ mod tests {
         let (sender, subs1) = mpsc::channel();
         event.push(sender);
 
-        event.emit_owned(10i32).to_result().unwrap();
+        event.emit_owned(10i32).into_result().unwrap();
 
         let (sender, subs2) = mpsc::channel();
         event.push(sender);
 
-        event.emit_owned(20i32).to_result().unwrap();
+        event.emit_owned(20i32).into_result().unwrap();
 
         let h1 = std::thread::spawn(move || {
             assert_eq!(subs1.recv(), Ok(10i32));
@@ -297,7 +297,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(200));
 
         for _i in 0..10 {
-            event.emit_owned(30i32).to_result().unwrap();
+            event.emit_owned(30i32).into_result().unwrap();
         }
 
         h1.join().unwrap();

@@ -30,7 +30,7 @@ impl<'a, T: Clone> EmitResult<'a, T> {
     }
 
     /// Converts this `EmitResult` into [`std::result::Result`].
-    pub fn to_result(self) -> Result<(), Cow<'a, T>> {
+    pub fn into_result(self) -> Result<(), Cow<'a, T>> {
         self.into()
     }
 }
@@ -44,9 +44,9 @@ impl<'a, T: Clone> From<Result<(), Cow<'a, T>>> for EmitResult<'a, T> {
     }
 }
 
-impl<'a, T: Clone> Into<Result<(), Cow<'a, T>>> for EmitResult<'a, T> {
-    fn into(self) -> Result<(), Cow<'a, T>> {
-        match self {
+impl<'a, T: Clone> From<EmitResult<'a, T>> for Result<(), Cow<'a, T>> {
+    fn from(emitres: EmitResult<'a, T>) -> Result<(), Cow<'a, T>> {
+        match emitres {
             EmitResult::Delivered => Result::Ok(()),
             EmitResult::Undelivered(x) => Result::Err(x),
         }

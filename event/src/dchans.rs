@@ -157,9 +157,9 @@ mod tests {
             }
         });
 
-        event.emit_owned(1).to_result().unwrap();
-        event.emit_owned(2).to_result().unwrap();
-        event.emit_owned(3).to_result().unwrap();
+        event.emit_owned(1).into_result().unwrap();
+        event.emit_owned(2).into_result().unwrap();
+        event.emit_owned(3).into_result().unwrap();
         h.join().unwrap();
     }
 
@@ -170,12 +170,12 @@ mod tests {
         let (sender, subs1) = chan::unbounded();
         event.push(sender);
 
-        event.emit_owned(10i32).to_result().unwrap();
+        event.emit_owned(10i32).into_result().unwrap();
 
         let (sender, subs2) = chan::unbounded();
         event.push(sender);
 
-        event.emit_owned(20i32).to_result().unwrap();
+        event.emit_owned(20i32).into_result().unwrap();
 
         let h1 = std::thread::spawn(move || {
             assert_eq!(subs1.recv(), Ok(10i32));
@@ -192,7 +192,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(200));
 
         for _i in 0..10 {
-            event.emit_owned(30i32).to_result().unwrap();
+            event.emit_owned(30i32).into_result().unwrap();
         }
 
         h1.join().unwrap();
@@ -204,8 +204,8 @@ mod tests {
         let (event1, subs1) = chan::unbounded();
         let (event2, subs2) = chan::unbounded();
 
-        event1.emit_owned(20i32).to_result().unwrap();
-        event2.emit_owned(10i32).to_result().unwrap();
+        event1.emit_owned(20i32).into_result().unwrap();
+        event2.emit_owned(10i32).into_result().unwrap();
 
         chan::select! {
             recv(subs1) -> msg => {
