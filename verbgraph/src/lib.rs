@@ -31,10 +31,16 @@ pub struct UnboundQueueHandler<T, A: 'static, E: Event> {
     handlers: HashMap<&'static str, Rc<RefCell<dyn FnMut(&mut T, &mut A, E)>>>,
 }
 
+impl<T, A, E: Event> Default for UnboundQueueHandler<T, A, E> {
+    fn default() -> Self {
+        UnboundQueueHandler { handlers: Default::default() }
+    }
+}
+
 impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
     /// Creates a new, unbound queue handler.
     pub fn new() -> Self {
-        UnboundQueueHandler { handlers: HashMap::new() }
+        Default::default()
     }
 
     /// Adds a closure to be executed when an event of a specific key is matched.
@@ -148,7 +154,7 @@ impl<T: 'static, A: 'static> VerbGraph<T, A> {
 
     /// Invokes all the queue handlers in a linear fashion, however non-linear jumping between verb graphs is still supported.
     pub fn update_all(&mut self, obj: &mut T, additional: &mut A) {
-        for (_, handler_list) in &mut self.handlers {
+        for handler_list in self.handlers.values_mut() {
             VerbGraph::update_handlers(handler_list, obj, additional)
         }
     }

@@ -71,13 +71,13 @@ mod tests {
     fn test_event_listener() {
         let event = Queue::new();
 
-        event.emit_owned(0i32).to_result().unwrap_err();
+        event.emit_owned(0i32).into_result().unwrap_err();
 
         let listener = event.listen();
 
-        event.emit_owned(1i32).to_result().unwrap();
-        event.emit_owned(2i32).to_result().unwrap();
-        event.emit_owned(3i32).to_result().unwrap();
+        event.emit_owned(1i32).into_result().unwrap();
+        event.emit_owned(2i32).into_result().unwrap();
+        event.emit_owned(3i32).into_result().unwrap();
 
         assert_eq!(listener.peek(), &[1, 2, 3]);
 
@@ -90,13 +90,13 @@ mod tests {
 
         let listener_1 = event.listen();
 
-        event.emit_owned(10i32).to_result().unwrap();
+        event.emit_owned(10i32).into_result().unwrap();
 
         assert_eq!(event.borrow().events.len(), 1);
 
         let listener_2 = event.listen();
 
-        event.emit_owned(20i32).to_result().unwrap();
+        event.emit_owned(20i32).into_result().unwrap();
 
         assert_eq!(listener_1.peek(), &[10i32, 20i32]);
         assert_eq!(listener_2.peek(), &[20i32]);
@@ -106,7 +106,7 @@ mod tests {
         assert_eq!(event.borrow().events.len(), 0);
 
         for _i in 0..10 {
-            event.emit_owned(30i32).to_result().unwrap();
+            event.emit_owned(30i32).into_result().unwrap();
         }
 
         assert_eq!(listener_2.peek(), &[30i32; 10]);

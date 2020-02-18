@@ -611,6 +611,7 @@ impl DisplayText {
     ///
     /// # Example
     /// ```rust
+    /// # extern crate reclutch_core as reclutch;
     /// use reclutch::display::DisplayText;
     ///
     /// let text = DisplayText::Simple("Hello, world!".to_string());
@@ -962,9 +963,7 @@ pub enum DisplayClip {
 impl DisplayClip {
     pub fn bounds(&self) -> Rect {
         match self {
-            DisplayClip::Rectangle { rect, .. } | DisplayClip::RoundRectangle { rect, .. } => {
-                (*rect)
-            }
+            DisplayClip::Rectangle { rect, .. } | DisplayClip::RoundRectangle { rect, .. } => *rect,
             DisplayClip::Ellipse { center, radii } => Rect::new(
                 (center.x - radii.x, center.y - radii.y).into(),
                 (radii.x * 2.0, radii.y * 2.0).into(),

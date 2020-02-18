@@ -143,8 +143,8 @@ mod tests {
                 assert_eq!(tmp, [1, 2]);
             })
         });
-        eq.emit_owned(1u32).to_result().unwrap();
-        eq.emit_owned(2).to_result().unwrap();
+        eq.emit_owned(1u32).into_result().unwrap();
+        eq.emit_owned(2).into_result().unwrap();
         std::mem::drop(eq);
         h.join().unwrap();
     }

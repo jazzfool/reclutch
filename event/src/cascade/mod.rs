@@ -197,8 +197,8 @@ mod tests {
             s.spawn(move |_| run_worker(stop_rx, cascades));
             let sub = ev2.listen_and_subscribe();
             let sub2 = ev3.listen_and_subscribe();
-            ev1.emit_owned(2).to_result().unwrap();
-            ev1.emit_owned(1).to_result().unwrap();
+            ev1.emit_owned(2).into_result().unwrap();
+            ev1.emit_owned(1).into_result().unwrap();
             assert_eq!(sub.notifier.recv(), Ok(()));
             assert_eq!(sub.listener.peek(), &[1]);
             assert_eq!(sub2.notifier.recv(), Ok(()));
@@ -223,8 +223,8 @@ mod tests {
         );
         crossbeam_utils::thread::scope(move |s| {
             s.spawn(move |_| run_worker(stop_rx, cascades));
-            ev1_tx.emit_owned(2).to_result().unwrap();
-            ev1_tx.emit_owned(1).to_result().unwrap();
+            ev1_tx.emit_owned(2).into_result().unwrap();
+            ev1_tx.emit_owned(1).into_result().unwrap();
             assert_eq!(ev2_rx.recv(), Ok(1));
             assert_eq!(ev3_rx.recv(), Ok(2));
             std::mem::drop(stop_tx);
@@ -245,8 +245,8 @@ mod tests {
                     ev1_rx.push(ev2_tx, false, |i| i % 2 == 1).push(ev3_tx, false, |_| true).wrap(),
                 )
                 .unwrap();
-            ev1_tx.emit_owned(2).to_result().unwrap();
-            ev1_tx.emit_owned(1).to_result().unwrap();
+            ev1_tx.emit_owned(2).into_result().unwrap();
+            ev1_tx.emit_owned(1).into_result().unwrap();
             assert_eq!(ev2_rx.recv(), Ok(1));
             assert_eq!(ev3_rx.recv(), Ok(2));
         })
@@ -265,8 +265,8 @@ mod tests {
         );
         crossbeam_utils::thread::scope(move |s| {
             s.spawn(move |_| run_worker(stop_rx, cascades));
-            ev1_tx.emit_owned(2).to_result().unwrap();
-            ev1_tx.emit_owned(1).to_result().unwrap();
+            ev1_tx.emit_owned(2).into_result().unwrap();
+            ev1_tx.emit_owned(1).into_result().unwrap();
             assert_eq!(ev2_rx.recv(), Ok(1));
             assert_eq!(ev3_rx.recv(), Ok(true));
             std::mem::drop(stop_tx);
@@ -285,8 +285,8 @@ mod tests {
         crossbeam_utils::thread::scope(move |s| {
             let (_stop_tx, stop_rx) = chan::bounded(0);
             s.spawn(move |_| run_worker(stop_rx, cascades));
-            ev1_tx.emit_owned(2).to_result().unwrap();
-            ev1_tx.emit_owned(1).to_result().unwrap();
+            ev1_tx.emit_owned(2).into_result().unwrap();
+            ev1_tx.emit_owned(1).into_result().unwrap();
             std::mem::drop(ev1_tx);
             assert_eq!(ev2_rx.recv(), Ok(2));
             assert_eq!(ev2_rx.recv(), Ok(1));
@@ -307,8 +307,8 @@ mod tests {
         crossbeam_utils::thread::scope(move |s| {
             let (_stop_tx, stop_rx) = chan::bounded(0);
             s.spawn(move |_| run_worker(stop_rx, cascades));
-            ev1_tx.emit_owned(2).to_result().unwrap();
-            ev1_tx.emit_owned(1).to_result().unwrap();
+            ev1_tx.emit_owned(2).into_result().unwrap();
+            ev1_tx.emit_owned(1).into_result().unwrap();
             std::mem::drop(ev1_tx);
             assert_eq!(ev2_rx.recv(), Ok(2));
             assert_eq!(ev2_rx.recv(), Ok(1));
