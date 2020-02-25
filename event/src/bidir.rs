@@ -1,6 +1,11 @@
 use crate::traits::{self, EmitResult};
 use std::{borrow::Cow, cell::RefCell, collections::VecDeque, rc::Rc};
 
+struct InnerRef<'parent, Tin, Tout> {
+    inq: &'parent mut VecDeque<Tin>,
+    outq: &'parent mut VecDeque<Tout>,
+}
+
 /// Non-thread-safe, reference-counted,
 /// bidirectional event queue,
 /// designed for `1:1` communication,
@@ -23,9 +28,6 @@ impl<Tp, Ts> Default for Queue<Tp, Ts> {
     }
 }
 
-// TODO(zserik): introduce some kind of QueueProxy which transparently
-// swaps Tp & Ts to avoid code duplication between [`Queue`] and [`Secondary`].
-
 impl<Tp, Ts> Queue<Tp, Ts> {
     #[inline]
     pub fn new() -> Self {
@@ -41,130 +43,91 @@ impl<Tp, Ts> Queue<Tp, Ts> {
         Secondary(Queue(Rc::clone(&self.0)))
     }
 
-    /// This function iterates over the input event queue
-    /// and optionally schedules items to be put into the
-    /// outgoing event queue
-    pub fn bounce<F>(&self, f: F)
+    fn on_queues_mut<F, R>(&self, f: F) -> R
     where
-        F: FnMut(Tp) -> Option<Ts>,
+        F: FnOnce(InnerRef<Tp, Ts>) -> R,
     {
-        let mut inner = self.0.borrow_mut();
-        let inner = &mut *inner;
-        let (inevq, outevq) = (&mut inner.0, &mut inner.1);
-        outevq.extend(std::mem::replace(inevq, VecDeque::new()).into_iter().flat_map(f))
-    }
-
-    /// This function retrieves the newest event from
-    /// the event queue and drops the rest.
-    pub fn retrieve_newest(&self) -> Option<Tp> {
-        self.0.borrow_mut().0.drain(..).last()
+        let inner = &mut *self.0.borrow_mut();
+        f(InnerRef { inq: &mut inner.0, outq: &mut inner.1 })
     }
 }
 
 impl<Tp, Ts> Secondary<Tp, Ts> {
-    /// Function which iterates over the input event queue
-    /// and optionally schedules items to be put into the
-    /// outgoing event queue
-    pub fn bounce<F>(&self, f: F)
+    fn on_queues_mut<F, R>(&self, f: F) -> R
     where
-        F: FnMut(Ts) -> Option<Tp>,
+        F: FnOnce(InnerRef<Ts, Tp>) -> R,
     {
-        let mut inner = (self.0).0.borrow_mut();
-        let inner = &mut *inner;
-        let (inevq, outevq) = (&mut inner.1, &mut inner.0);
-        outevq.extend(std::mem::replace(inevq, VecDeque::new()).into_iter().flat_map(f))
-    }
-
-    /// This function retrieves the newest event from
-    /// the event queue and drops the rest.
-    pub fn retrieve_newest(&self) -> Option<Ts> {
-        (self.0).0.borrow_mut().1.drain(..).last()
+        let inner = &mut *(self.0).0.borrow_mut();
+        f(InnerRef { inq: &mut inner.1, outq: &mut inner.0 })
     }
 }
 
-impl<Tp, Ts> traits::QueueInterfaceCommon for Queue<Tp, Ts> {
-    type Item = Ts;
+macro_rules! impl_queue_part {
+    ($strucn:ident, $tp1:ident, $tp2:ident, $tin:ident, $tout:ident) => {
+        impl<$tp1, $tp2> $strucn<$tp1, $tp2> {
+            /// Function which iterates over the input event queue
+            /// and optionally schedules items to be put into the
+            /// outgoing event queue
+            pub fn bounce<F>(&self, f: F)
+            where
+                F: FnMut($tin) -> Option<$tout>,
+            {
+                self.on_queues_mut(|x| x.outq.extend(std::mem::replace(x.inq, VecDeque::new()).into_iter().flat_map(f)))
+            }
 
-    #[inline]
-    fn buffer_is_empty(&self) -> bool {
-        self.0.borrow().1.is_empty()
+            /// This function retrieves the newest event from
+            /// the event queue and drops the rest.
+            pub fn retrieve_newest(&self) -> Option<$tin> {
+                self.on_queues_mut(|x| x.inq.drain(..).last())
+            }
+        }
+
+        impl<$tp1, $tp2> traits::QueueInterfaceCommon for $strucn<$tp1, $tp2> {
+            type Item = $tout;
+
+            #[inline]
+            fn buffer_is_empty(&self) -> bool {
+                self.on_queues_mut(|x| x.outq.is_empty())
+            }
+        }
+
+        impl<$tin, $tout: Clone> traits::Emitter for $strucn<$tp1, $tp2> {
+            #[inline]
+            fn emit<'a>(&self, event: Cow<'a, $tout>) -> EmitResult<'a, $tout> {
+                self.on_queues_mut(|x| x.outq.push_back(event.into_owned()));
+                EmitResult::Delivered
+            }
+        }
+
+        impl<$tin: Clone, $tout> traits::Listen for $strucn<$tp1, $tp2> {
+            type Item = $tin;
+
+            #[inline]
+            fn with<F, R>(&self, f: F) -> R
+            where
+                F: FnOnce(&[Self::Item]) -> R,
+            {
+                f(&self.peek()[..])
+            }
+
+            #[inline]
+            fn map<F, R>(&self, f: F) -> Vec<R>
+            where
+                F: FnMut(&Self::Item) -> R,
+            {
+                self.on_queues_mut(|x| std::mem::replace(x.inq, VecDeque::new()).iter().map(f).collect())
+            }
+
+            #[inline]
+            fn peek(&self) -> Vec<Self::Item> {
+                self.on_queues_mut(|x| std::mem::replace(x.inq, VecDeque::new()).into_iter().collect())
+            }
+        }
     }
 }
 
-impl<Tp, Ts> traits::QueueInterfaceCommon for Secondary<Tp, Ts> {
-    type Item = Tp;
-
-    #[inline]
-    fn buffer_is_empty(&self) -> bool {
-        (self.0).0.borrow().0.is_empty()
-    }
-}
-
-impl<Tp, Ts: Clone> traits::Emitter for Queue<Tp, Ts> {
-    #[inline]
-    fn emit<'a>(&self, event: Cow<'a, Ts>) -> EmitResult<'a, Ts> {
-        self.0.borrow_mut().1.push_back(event.into_owned());
-        EmitResult::Delivered
-    }
-}
-
-impl<Tp: Clone, Ts> traits::Emitter for Secondary<Tp, Ts> {
-    #[inline]
-    fn emit<'a>(&self, event: Cow<'a, Tp>) -> EmitResult<'a, Tp> {
-        (self.0).0.borrow_mut().0.push_back(event.into_owned());
-        EmitResult::Delivered
-    }
-}
-
-impl<Tp: Clone, Ts> traits::Listen for Queue<Tp, Ts> {
-    type Item = Tp;
-
-    #[inline]
-    fn with<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&[Self::Item]) -> R,
-    {
-        f(&self.peek()[..])
-    }
-
-    #[inline]
-    fn map<F, R>(&self, f: F) -> Vec<R>
-    where
-        F: FnMut(&Self::Item) -> R,
-    {
-        std::mem::replace(&mut self.0.borrow_mut().0, VecDeque::new()).iter().map(f).collect()
-    }
-
-    #[inline]
-    fn peek(&self) -> Vec<Self::Item> {
-        std::mem::replace(&mut self.0.borrow_mut().0, VecDeque::new()).into_iter().collect()
-    }
-}
-
-impl<Tp, Ts: Clone> traits::Listen for Secondary<Tp, Ts> {
-    type Item = Ts;
-
-    #[inline]
-    fn with<F, R>(&self, f: F) -> R
-    where
-        F: FnOnce(&[Self::Item]) -> R,
-    {
-        f(&self.peek()[..])
-    }
-
-    #[inline]
-    fn map<F, R>(&self, f: F) -> Vec<R>
-    where
-        F: FnMut(&Self::Item) -> R,
-    {
-        std::mem::replace(&mut (self.0).0.borrow_mut().1, VecDeque::new()).iter().map(f).collect()
-    }
-
-    #[inline]
-    fn peek(&self) -> Vec<Self::Item> {
-        std::mem::replace(&mut (self.0).0.borrow_mut().1, VecDeque::new()).into_iter().collect()
-    }
-}
+impl_queue_part!(Queue, Tp, Ts, Tp, Ts);
+impl_queue_part!(Secondary, Tp, Ts, Ts, Tp);
 
 #[cfg(test)]
 mod tests {
