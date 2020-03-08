@@ -24,18 +24,33 @@
 
 ## Callbacks
 
-There are no closures when it comes to callbacks, as it would be too much work to have it fit in safe Rust (and it definitely wouldn't be ergonomic to use).
+At this level, there are no closures when it comes to callbacks. However, the `verbgraph` event queue abstraction does provide closure-based event handling.
 
-Instead, Reclutch uses a simple event queue with listener primitives.
+Instead, the event module uses a simple event queue with listener primitives.
 
-Essentially, the event has a list of all events emitted, stored as a vector, and a list of all listeners, stored as a map. The key of the map is what the listener-facing API stores.
-The value of the map is simply an index. This index keeps track of the last time the event queue was peeked for a specific listener.
-This also allows for simple cleanup of event data not needed (i.e. event data seen by all the listeners); An implicitly called cleanup function looks for the lowest listener index and removes everything before it.
-Further, it's not a "standalone" event system, it only works in a widget environment (or any environment with persistent updates).
-The memory cleanup system resembles an extremely simple garbage collector.
+At it's very core, the event system works like this;
+- An event queue store a list of events (we'll call this `Vec<E>`) and a dictionary of listeners (we'll call this `Map<L, Idx>`).
+- `E` is defined to be a generic type; the event type itself.
+- `L` is defined to be a listener ID that is locally unique within the event queue (not globally unique; e.g. not unique across event queues).
+- `Idx` represents an index in `Vec<E>`. The event at this index holds the latest event the listener (`L`) has "seen".
+- As long as the owning scope of some listener `L` has an immutable reference to the associated event queue, then the events can be processed. We will call the events processed `Vec<Ep>`.
+- The contents of `Vec<Ep>` is defined to be a slice of `Vec<E>`, `[Idx..]`.
+- Thus, `Vec<Ep>` only contains events that have not been seen by `L` yet, or simply, the events past `Idx`.
+- Once `Vec<Ep>` is returned, `Idx` is set to `Vec<E>.len()`.
 
-Thanks to zserik, the events have been made more ergonomic to use and now use the RAII pattern to automatically cleanup when listeners go out of scope.
-The event system is still a work-in-progress and we're looking to find the right balance between performance and ease-of-use.
+This, however, is only the first part of the event system. It can be determined that there is some lower bound, `Idx`, which signifies the lowest common listener index; the index at which all the preceding events have been "seen" by all the listeners. Therefore, a cleanup process that removes all events preceding `Idx` can be implemented.
+- For most implementations, the following steps are invoked by a listener going out of scope.
+- Let `Vec<E>` be the list of events and `Idx` be the lowest common listener index.
+- The slice `[..Idx]` is removed from `Vec<E>`.
+- However, recall that `Map<L, Idx>` stores an index in `Vec<E>` much like a pointer.
+- Consequent to the removal of `[..Idx`], `Vec<E>` has been offset by `-Idx` such that all indices of a given listener `L` have been invalidated.
+- To solve this invalidation, each index of all `L` in `Map<L, Idx>` is offset by `-Idx`.
+- Hence, all events that have been seen by all existing listeners and thereby will never be seen by any listener again (i.e. completely obsolete), are removed.
+
+This cleanup process is not perfectly efficient, however. The lowest common listener index can easily be "held back" by a stale listener that hasn't peeked new events for a while.
+
+Thanks to zserik and his excellent contributions, the events have been made more ergonomic to use and now utilize the RAII pattern to automatically cleanup when listeners go out of scope.
+This module's API is reaching a stable point and is capable for usage outside of a UI.
 
 Here's an example of it's usage outside a widget (with manual updating);
 
