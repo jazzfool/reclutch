@@ -23,7 +23,7 @@ Reclutch implements the well-known retained-mode widget ownership design within 
 ### _Also see:_
 
 - [Events and event queues](event/README.md)
-- [Thunderclap Toolkit](https://github.com/jazzfool/reui)
+- [Thunderclap Toolkit](https://github.com/jazzfool/thunderclap)
 
 ## Example
 
@@ -33,14 +33,19 @@ All rendering details have been excluded for simplicity.
 #[derive(WidgetChildren)]
 struct Button {
     pub button_press: RcEventQueue<()>,
-    global_listener: RcEventListener<WindowEvent>,
+    graph: VerbGraph<Button, ()>,
 }
 
 impl Button {
     pub fn new(global: &mut RcEventQueue<WindowEvent>) -> Self {
         Button {
             button_press: RcEventQueue::new(),
-            global_listener: global.listen(),
+            global_listener: VerbGraph::new().add(
+                "global",
+                QueueHandler::new(global).on("click", |button, _aux, _event: WindowEvent| {
+                    button.button_press.emit_owned(());
+                }),
+            ),
         }
     }
 }
@@ -50,18 +55,18 @@ impl Widget for Button {
     type GraphicalAux = ();
     type DisplayObject = DisplayCommand;
 
-    pub fn bounds(&self) -> Rect { /* --snip-- */ }
+    fn bounds(&self) -> Rect { /* --snip-- */ }
 
-    pub fn update(&mut self, _aux: &mut ()) {
-        for event in self.global_listener.peek() {
-            match event {
-                WindowEvent::OnClick(_) => self.button_press.push(()),
-                _ => (),
-            }
-        }
+    fn update(&mut self, aux: &mut ()) {
+        // Note: this helper function requires that `HasVerbGraph` be implemented on `Self`.
+        reclutch_verbgraph::update_all(self, aux);
+        // The equivalent version which doesn't require `HasVerbGraph` is;
+        let mut graph = self.graph.take().unwrap();
+        graph.update_all(self, aux);
+        self.graph = Some(graph);
     }
 
-    pub fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) { /* --snip-- */ }
+    fn draw(&mut self, display: &mut dyn GraphicsDisplay, _aux: &mut ()) { /* --snip-- */ }
 }
 ```
 
@@ -204,9 +209,12 @@ fn update(&mut self, aux: &mut Globals) {
         child.update(aux);
     }
 
-    // if your UI doesn't update constantly, then you must check child events *after* propagation,
+    // If your UI doesn't update constantly, then you must check child events *after* propagation,
     // but if it does update constantly, then it's more of a micro-optimization, since any missed events
     // will come back around next update.
+    //
+    // This kind of consideration can be avoided by using the more "modern" updating API; `verbgraph`,
+    // which is discussed in the "Updating correctly" section.
     for press_event in self.button_press_listener.peek() {
         self.on_button_press(press_event);
     }
@@ -231,12 +239,14 @@ fn new() -> Self {
         // they can also overlap.
         "count_up" => event in &count_up.event => {
             click => {
+                // here we mutate a variable that `obj.template_label` implicitly/indirectly depends on.
                 obj.count += 1;
-                // here template_label is assumed to be a label whose text uses a template engine
+                // Here template_label is assumed to be a label whose text uses a template engine
                 // that needs to be explicitly rendered.
                 obj.template_label.values[0] = obj.count.to_string();
-                // if we don't call this then `obj.dynamic_label` doesn't
+                // If we don't call this then `obj.dynamic_label` doesn't
                 // get a chance to respond to our changes in this update pass.
+                // This doesn't invoke the entire update cycle for `template_label`, only the specific part we care about; `"update_template"`.
                 reclutch_verbgraph::require_update(&mut obj.template_label, aux, "update_template");
                 // "update_template" refers to the tag.
             }
@@ -250,7 +260,6 @@ fn update(&mut self, aux: &mut Aux) {
         child.update(aux);
     }
 
-    // this requires an implementation of `HasVerbGraph` on self
     reclutch_verbgraph::update_all(self, aux);
 }
 ```
