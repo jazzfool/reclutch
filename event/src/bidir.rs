@@ -72,7 +72,9 @@ macro_rules! impl_queue_part {
             where
                 F: FnMut($tin) -> Option<$tout>,
             {
-                self.on_queues_mut(|x| x.outq.extend(std::mem::replace(x.inq, VecDeque::new()).into_iter().flat_map(f)))
+                self.on_queues_mut(|x| {
+                    x.outq.extend(std::mem::replace(x.inq, VecDeque::new()).into_iter().flat_map(f))
+                })
             }
 
             /// This function retrieves the newest event from
@@ -115,15 +117,46 @@ macro_rules! impl_queue_part {
             where
                 F: FnMut(&Self::Item) -> R,
             {
-                self.on_queues_mut(|x| std::mem::replace(x.inq, VecDeque::new()).iter().map(f).collect())
+                self.on_queues_mut(|x| {
+                    std::mem::replace(x.inq, VecDeque::new()).iter().map(f).collect()
+                })
             }
 
             #[inline]
             fn peek(&self) -> Vec<Self::Item> {
-                self.on_queues_mut(|x| std::mem::replace(x.inq, VecDeque::new()).into_iter().collect())
+                self.on_queues_mut(|x| {
+                    std::mem::replace(x.inq, VecDeque::new()).into_iter().collect()
+                })
+            }
+
+            #[inline]
+            fn with_n<F, R>(&self, n: usize, f: F) -> R
+            where
+                F: FnOnce(&[Self::Item]) -> R,
+            {
+                f(&self.peek_n(n)[..])
+            }
+
+            #[inline]
+            fn map_n<F, R>(&self, n: usize, f: F) -> Vec<R>
+            where
+                F: FnMut(&Self::Item) -> R,
+            {
+                self.on_queues_mut(|x| {
+                    let n = n.min(x.inq.len());
+                    x.inq.drain(0..n).collect::<Vec<_>>().iter().map(f).collect()
+                })
+            }
+
+            #[inline]
+            fn peek_n(&self, n: usize) -> Vec<Self::Item> {
+                self.on_queues_mut(|x| {
+                    let n = n.min(x.inq.len());
+                    x.inq.drain(0..n).collect()
+                })
             }
         }
-    }
+    };
 }
 
 impl_queue_part!(Queue, Tp, Ts, Tp, Ts);
@@ -150,5 +183,25 @@ mod tests {
 
         primary.bounce(|x| Some(x + 1));
         assert_eq!(secondary.peek(), &[5, 6, 7]);
+    }
+
+    #[test]
+    fn test_n_bidir_evq() {
+        let primary = super::Queue::new();
+        let secondary = primary.secondary();
+
+        primary.emit_owned(1);
+        assert_eq!(secondary.peek(), &[1]);
+        primary.emit_owned(2);
+        primary.emit_owned(3);
+        assert_eq!(secondary.peek_n(1), &[2]);
+
+        secondary.emit_owned(4);
+        secondary.emit_owned(5);
+        secondary.emit_owned(6);
+
+        primary.bounce(|x| Some(x + 1));
+        assert_eq!(secondary.peek_n(2), &[3, 5]);
+        assert_eq!(secondary.peek_n(2), &[6, 7]);
     }
 }

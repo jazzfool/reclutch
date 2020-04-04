@@ -53,6 +53,14 @@ impl<T> Queue<T> {
         std::mem::replace(self.listeners.get_mut(key).unwrap(), maxidx)
     }
 
+    /// Get the start index of new events up to `n` since last `pull`/`pull_n`.
+    fn pull_n(&mut self, n: usize, key: ListenerKey) -> (usize, usize) {
+        let idx = self.listeners.get_mut(key).unwrap();
+        let n = n.min(self.events.len() - *idx);
+        *idx += n;
+        (*idx - n, n)
+    }
+
     /// Applies a function to the list of new events since last `pull`
     #[inline]
     pub fn pull_with<F, R>(&mut self, key: ListenerKey, f: F) -> R
@@ -61,6 +69,20 @@ impl<T> Queue<T> {
     {
         let idx = self.pull(key);
         let ret = f(&self.events[idx..]);
+        if idx == 0 {
+            // this was a blocker
+            self.cleanup();
+        }
+        ret
+    }
+
+    #[inline]
+    pub fn pull_n_with<F, R>(&mut self, n: usize, key: ListenerKey, f: F) -> R
+    where
+        F: FnOnce(&[T]) -> R,
+    {
+        let (idx, n) = self.pull_n(n, key);
+        let ret = f(&self.events[idx..idx + n]);
         if idx == 0 {
             // this was a blocker
             self.cleanup();
@@ -155,6 +177,24 @@ mod tests {
         event.emit_owned(3).into_result().unwrap();
 
         event.pull_with(listener, |x| assert_eq!(x, &[1, 2, 3]));
+
+        event.remove_listener(listener);
+    }
+
+    #[test]
+    fn test_n_event_listener() {
+        let mut event = Queue::new();
+
+        event.emit_owned(0).into_result().unwrap_err();
+
+        let listener = event.create_listener();
+
+        event.emit_owned(1).into_result().unwrap();
+        event.emit_owned(2).into_result().unwrap();
+        event.emit_owned(3).into_result().unwrap();
+
+        event.pull_n_with(2, listener, |x| assert_eq!(x, &[1, 2]));
+        event.pull_n_with(2, listener, |x| assert_eq!(x, &[3]));
 
         event.remove_listener(listener);
     }

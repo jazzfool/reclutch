@@ -192,4 +192,30 @@ pub trait Listen {
     {
         self.with(<[Self::Item]>::to_vec)
     }
+
+    /// Almost identical to [`with`](Listen::peek), however only the first `n` events
+    /// are given.
+    fn with_n<F, R>(&self, n: usize, f: F) -> R
+    where
+        F: FnOnce(&[Self::Item]) -> R;
+
+    /// Almost identical to [`map`](Listen::map), however only the first `n` events
+    /// are given.
+    #[inline]
+    fn map_n<F, R>(&self, n: usize, mut f: F) -> Vec<R>
+    where
+        F: FnMut(&Self::Item) -> R,
+    {
+        self.with_n(n, |slc| slc.iter().map(|i| f(i)).collect())
+    }
+
+    /// Almost identical to [`peek`](Listen::peek), however only the first `n` events
+    /// are given.
+    #[inline]
+    fn peek_n(&self, n: usize) -> Vec<Self::Item>
+    where
+        Self::Item: Clone,
+    {
+        self.with_n(n, <[Self::Item]>::to_vec)
+    }
 }

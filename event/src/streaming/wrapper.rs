@@ -87,6 +87,17 @@ where
         buf.clear();
         ret
     }
+
+    fn with_n<F, R>(&self, n: usize, f: F) -> R
+    where
+        F: FnOnce(&[Self::Item]) -> R,
+    {
+        let mut buf = self.buf.borrow_mut();
+        buf.extend(self.inner.peek().into_iter().take(n));
+        let ret = f(&buf[..]);
+        buf.clear();
+        ret
+    }
 }
 
 impl<IL> Stream for ListenerWrapper<IL>

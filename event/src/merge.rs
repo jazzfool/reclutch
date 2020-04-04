@@ -49,4 +49,26 @@ impl<T> Listen for Listener<T> {
         }
         ret
     }
+
+    fn with_n<F, R>(&self, n: usize, f: F) -> R
+    where
+        F: FnOnce(&[Self::Item]) -> R,
+    {
+        let mut events = Vec::<T>::new();
+        for i in self.iter().take(n) {
+            i.extend_other(&mut events);
+        }
+        f(&events[..])
+    }
+
+    fn map_n<F, R>(&self, n: usize, mut f: F) -> Vec<R>
+    where
+        F: FnMut(&Self::Item) -> R,
+    {
+        let mut ret = Vec::new();
+        for i in self.iter().take(n) {
+            i.indirect_with(&mut |j| ret.push(f(j)));
+        }
+        ret
+    }
 }

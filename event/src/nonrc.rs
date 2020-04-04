@@ -46,6 +46,14 @@ impl<T> EventListen for Listener<'_, T> {
     {
         self.1.borrow_mut().pull_with(self.0, f)
     }
+
+    #[inline]
+    fn with_n<F, R>(&self, n: usize, f: F) -> R
+    where
+        F: FnOnce(&[Self::Item]) -> R,
+    {
+        self.1.borrow_mut().pull_n_with(n, self.0, f)
+    }
 }
 
 impl<T> Drop for Listener<'_, T> {
@@ -80,6 +88,24 @@ mod tests {
         event.emit_owned(3i32).into_result().unwrap();
 
         assert_eq!(listener.peek(), &[1, 2, 3]);
+
+        drop(listener);
+    }
+
+    #[test]
+    fn test_n_event_listener() {
+        let event = Queue::new();
+
+        event.emit_owned(0i32).into_result().unwrap_err();
+
+        let listener = event.listen();
+
+        event.emit_owned(1i32).into_result().unwrap();
+        event.emit_owned(2i32).into_result().unwrap();
+        event.emit_owned(3i32).into_result().unwrap();
+
+        assert_eq!(listener.peek_n(2), &[1, 2]);
+        assert_eq!(listener.peek_n(2), &[3]);
 
         drop(listener);
     }

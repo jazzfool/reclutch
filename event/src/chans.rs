@@ -31,10 +31,7 @@ impl<T> Clone for Queue<T> {
 impl<T> Default for Intern<T> {
     #[inline]
     fn default() -> Self {
-        Self {
-            ev: Default::default(),
-            subscribers: Default::default(),
-        }
+        Self { ev: Default::default(), subscribers: Default::default() }
     }
 }
 
@@ -82,10 +79,7 @@ impl<T> Queue<T> {
             inner.subscribers.push(tx);
             inner.ev.create_listener()
         });
-        CombinedListener {
-            listener: Listener(id, self.clone()),
-            notifier: rx,
-        }
+        CombinedListener { listener: Listener(id, self.clone()), notifier: rx }
     }
 
     pub fn cascade(&self) -> Cascade<T>
@@ -93,12 +87,7 @@ impl<T> Queue<T> {
         T: Send + 'static,
     {
         let CombinedListener { listener, notifier } = self.listen_and_subscribe();
-        Cascade {
-            listener,
-            notifier,
-            finalize: None,
-            outs: Vec::new(),
-        }
+        Cascade { listener, notifier, finalize: None, outs: Vec::new() }
     }
 }
 
@@ -164,6 +153,14 @@ impl<T> EventListen for Listener<T> {
     {
         (self.1).0.write().unwrap().ev.pull_with(self.0, f)
     }
+
+    #[inline]
+    fn with_n<F, R>(&self, n: usize, f: F) -> R
+    where
+        F: FnOnce(&[Self::Item]) -> R,
+    {
+        (self.1).0.write().unwrap().ev.pull_n_with(n, self.0, f)
+    }
 }
 
 impl<T> Drop for Listener<T> {
@@ -185,10 +182,7 @@ pub struct Cascade<T> {
     listener: Listener<T>,
     notifier: chan::Receiver<()>,
     finalize: crate::cascade::utils::FinalizeContainer<T>,
-    outs: Vec<(
-        Box<dyn Fn(&mut Vec<T>, bool) -> Result<(), bool> + Send + 'static>,
-        bool,
-    )>,
+    outs: Vec<(Box<dyn Fn(&mut Vec<T>, bool) -> Result<(), bool> + Send + 'static>, bool)>,
 }
 
 impl<T: Clone + Send + Sync + 'static> crate::cascade::Push for Cascade<T> {
@@ -200,23 +194,18 @@ impl<T: Clone + Send + Sync + 'static> crate::cascade::Push for Cascade<T> {
         F: Fn(&T) -> bool + Send + 'static,
     {
         self.outs.push((
-            Box::new(
-                move |x: &mut Vec<T>, drop_if_match: bool| -> Result<(), bool> {
-                    let (forward, keep) = std::mem::replace(x, Vec::new())
-                        .into_iter()
-                        .partition(|x| filter(x));
-                    *x = keep;
-                    if drop_if_match
-                        || forward
-                            .into_iter()
-                            .all(|i| ev_out.emit_owned(i).was_delivered())
-                    {
-                        Ok(())
-                    } else {
-                        Err(keep_after_disconnect)
-                    }
-                },
-            ),
+            Box::new(move |x: &mut Vec<T>, drop_if_match: bool| -> Result<(), bool> {
+                let (forward, keep) =
+                    std::mem::replace(x, Vec::new()).into_iter().partition(|x| filter(x));
+                *x = keep;
+                if drop_if_match
+                    || forward.into_iter().all(|i| ev_out.emit_owned(i).was_delivered())
+                {
+                    Ok(())
+                } else {
+                    Err(keep_after_disconnect)
+                }
+            }),
             false,
         ));
         self
@@ -229,31 +218,27 @@ impl<T: Clone + Send + Sync + 'static> crate::cascade::Push for Cascade<T> {
         F: Fn(T) -> Result<R, T> + Send + 'static,
     {
         self.outs.push((
-            Box::new(
-                move |x: &mut Vec<T>, drop_if_match: bool| -> Result<(), bool> {
-                    let mut keep = Vec::<T>::new();
-                    let mut forward = Vec::<R>::new();
+            Box::new(move |x: &mut Vec<T>, drop_if_match: bool| -> Result<(), bool> {
+                let mut keep = Vec::<T>::new();
+                let mut forward = Vec::<R>::new();
 
-                    for i in std::mem::replace(x, Vec::new()) {
-                        match filtmap(i) {
-                            Ok(x) => forward.push(x),
-                            Err(x) => keep.push(x),
-                        }
+                for i in std::mem::replace(x, Vec::new()) {
+                    match filtmap(i) {
+                        Ok(x) => forward.push(x),
+                        Err(x) => keep.push(x),
                     }
+                }
 
-                    *x = keep;
+                *x = keep;
 
-                    if drop_if_match
-                        || forward
-                            .into_iter()
-                            .all(|i| ev_out.emit_owned(i).was_delivered())
-                    {
-                        Ok(())
-                    } else {
-                        Err(keep_after_disconnect)
-                    }
-                },
-            ),
+                if drop_if_match
+                    || forward.into_iter().all(|i| ev_out.emit_owned(i).was_delivered())
+                {
+                    Ok(())
+                } else {
+                    Err(keep_after_disconnect)
+                }
+            }),
             false,
         ));
         self
@@ -283,20 +268,16 @@ impl<T: Clone + Send + Sync + 'static> CascadeTrait for Cascade<T> {
 
         let events = self.listener.peek();
         let eventcnt = events.len();
-        let rest = self
-            .outs
-            .iter()
-            .enumerate()
-            .try_fold(events, |mut x, (n, i)| {
-                if let Err(y) = (i.0)(&mut x, i.1) {
-                    clx.insert(n, y);
-                }
-                if x.is_empty() {
-                    None
-                } else {
-                    Some(x)
-                }
-            });
+        let rest = self.outs.iter().enumerate().try_fold(events, |mut x, (n, i)| {
+            if let Err(y) = (i.0)(&mut x, i.1) {
+                clx.insert(n, y);
+            }
+            if x.is_empty() {
+                None
+            } else {
+                Some(x)
+            }
+        });
 
         if let Some(ref finalize) = &self.finalize {
             let restlen = rest.as_ref().map(|x| x.len()).unwrap_or(0);
@@ -361,6 +342,27 @@ mod tests {
             assert_eq!(suls.notifier.recv(), Ok(()));
             assert_eq!(suls.notifier.recv(), Ok(()));
             assert_eq!(suls.listener.peek(), data);
+        });
+
+        for i in data.into_iter() {
+            event.emit_borrowed(i).into_result().unwrap();
+        }
+        h.join().unwrap();
+    }
+
+    #[test]
+    fn test_n_event_listener() {
+        let event = Queue::new();
+
+        event.emit_owned(0i32).into_result().unwrap_err();
+
+        let suls = event.listen_and_subscribe();
+        let data = &[1, 2, 3];
+        let h = std::thread::spawn(move || {
+            assert_eq!(suls.notifier.recv(), Ok(()));
+            assert_eq!(suls.notifier.recv(), Ok(()));
+            assert_eq!(suls.notifier.recv(), Ok(()));
+            assert_eq!(suls.listener.peek_n(2), &[1, 2]);
         });
 
         for i in data.into_iter() {

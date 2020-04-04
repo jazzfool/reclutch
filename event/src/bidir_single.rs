@@ -132,6 +132,35 @@ macro_rules! impl_queue_part {
             fn peek(&self) -> Vec<Self::Item> {
                 self.on_queues_mut(|x| x.inq.take().into_iter().collect())
             }
+
+            #[inline]
+            fn with_n<F, R>(&self, n: usize, f: F) -> R
+            where
+                F: FnOnce(&[Self::Item]) -> R,
+            {
+                f(&self.peek_n(n)[..])
+            }
+
+            #[inline]
+            fn map_n<F, R>(&self, n: usize, f: F) -> Vec<R>
+            where
+                F: FnMut(&Self::Item) -> R,
+            {
+                if n == 0 {
+                    Vec::new()
+                } else {
+                    self.on_queues_mut(|x| x.inq.take().iter().map(f).collect())
+                }
+            }
+
+            #[inline]
+            fn peek_n(&self, n: usize) -> Vec<Self::Item> {
+                if n == 0 {
+                    Vec::new()
+                } else {
+                    self.on_queues_mut(|x| x.inq.take().into_iter().collect())
+                }
+            }
         }
     };
 }
@@ -160,5 +189,25 @@ mod tests {
 
         primary.bounce(|x| Some(x + 1));
         assert_eq!(secondary.peek(), &[7]);
+    }
+
+    #[test]
+    fn test_n_bidir_evq() {
+        let primary = super::Queue::new();
+        let secondary = primary.secondary();
+
+        primary.emit_owned(1);
+        assert_eq!(secondary.peek(), &[1]);
+        primary.emit_owned(2);
+        primary.emit_owned(3);
+        assert_eq!(secondary.peek_n(0), &[]);
+        assert_eq!(secondary.peek_n(3), &[3]);
+
+        secondary.emit_owned(4);
+        secondary.emit_owned(5);
+        secondary.emit_owned(6);
+
+        primary.bounce(|x| Some(x + 1));
+        assert_eq!(secondary.peek_n(3), &[7]);
     }
 }

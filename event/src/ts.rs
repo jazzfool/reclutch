@@ -29,6 +29,14 @@ impl<T> EventListen for Listener<T> {
     {
         self.eq.write().ok().unwrap().pull_with(self.key, f)
     }
+
+    #[inline]
+    fn with_n<F, R>(&self, n: usize, f: F) -> R
+    where
+        F: FnOnce(&[Self::Item]) -> R,
+    {
+        self.eq.write().ok().unwrap().pull_n_with(n, self.key, f)
+    }
 }
 
 impl<T> Drop for Listener<T> {

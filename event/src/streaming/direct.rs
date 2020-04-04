@@ -70,6 +70,14 @@ impl<T> Listen for Listener<T> {
     {
         self.inner.with(f)
     }
+
+    #[inline]
+    fn with_n<F, R>(&self, n: usize, f: F) -> R
+    where
+        F: FnOnce(&[Self::Item]) -> R,
+    {
+        self.inner.with_n(n, f)
+    }
 }
 
 impl<T: Unpin> Stream for Listener<T> {
