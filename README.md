@@ -23,7 +23,7 @@ Reclutch implements the well-known retained-mode widget ownership design within 
 ### _Also see:_
 
 - [Events and event queues](event/README.md)
-- [Thunderclap Toolkit](https://github.com/jazzfool/thunderclap)
+- [Otway](https://github.com/jazzfool/otway)
 
 ## Example
 
