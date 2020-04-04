@@ -46,11 +46,11 @@ impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
     /// Adds a closure to be executed when an event of a specific key is matched.
     ///
     /// Also see [`event_key`](struct.Event.html#structmethod.get_key).
-    pub fn on(
-        mut self,
+    pub fn on<'a>(
+        &'a mut self,
         ev: &'static str,
         handler: impl FnMut(&mut T, &mut A, E) + 'static,
-    ) -> Self {
+    ) -> &'a mut Self {
         self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
         self
     }
@@ -81,11 +81,11 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
     /// Adds a closure to be executed when an event of a specific key is matched.
     ///
     /// Also see [`event_key`](struct.Event.html#structmethod.get_key).
-    pub fn on(
-        mut self,
+    pub fn on<'a>(
+        &'a mut self,
         ev: &'static str,
         handler: impl FnMut(&mut T, &mut A, E) + 'static,
-    ) -> Self {
+    ) -> &'a mut Self {
         self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
         self
     }
@@ -253,7 +253,7 @@ macro_rules! verbgraph {
         $(
             let mut qh = $crate::QueueHandler::new($eq);
             $(
-                qh = qh.on(
+                qh.on(
                     std::stringify!($ev),
                     |$obj: &mut $ot, $add: &mut $at, #[allow(unused_variables)] $eo| {
                         #[allow(unused_variables)]
@@ -299,7 +299,7 @@ macro_rules! unbound_queue_handler {
     ($ot:ty as $obj:ident,$at:ty as $add:ident,$et:ty as $eo:ident,$($ev:tt => $body:block)*) => {{
         let mut qh = $crate::UnboundQueueHandler::new();
         $(
-            qh = qh.on(
+            qh.on(
                 std::stringify!($ev),
                 |$obj: &mut $ot, #[allow(unused_variables)] $add: &mut $at, $eo: $et| {
                     #[allow(unused_variables)]
