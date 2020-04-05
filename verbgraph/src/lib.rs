@@ -55,6 +55,17 @@ impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
         self
     }
 
+    /// Same as [`on`](UnboundQueueHandler::on), however `self` is consumed and returned.
+    #[inline]
+    pub fn and_on(
+        mut self,
+        ev: &'static str,
+        handler: impl FnMut(&mut T, &mut A, E) + 'static,
+    ) -> Self {
+        self.on(ev, handler);
+        self
+    }
+
     /// Binds the queue handler to a given event queue, thereby returning a regular, bound queue handler.
     pub fn bind<D: QueueInterfaceListable<Item = E, Listener = L>, L: EventListen<Item = E>>(
         self,
