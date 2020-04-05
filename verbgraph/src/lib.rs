@@ -91,6 +91,7 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
     }
 
     /// Same as [`on`](QueueHandler::on), however `self` is consumed and returned.
+    #[inline]
     pub fn and_on(
         mut self,
         ev: &'static str,
