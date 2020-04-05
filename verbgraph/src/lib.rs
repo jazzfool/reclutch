@@ -169,6 +169,7 @@ impl<T: 'static, A: 'static> VerbGraph<T, A> {
     }
 
     /// Same as [`add`](VerbGraph::add), however `self` is consumed and returned.
+    #[inline]
     pub fn and_add<E: Event + 'static, L: EventListen<Item = E> + 'static>(
         mut self,
         tag: &'static str,
