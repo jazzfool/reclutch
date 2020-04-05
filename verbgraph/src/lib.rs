@@ -96,7 +96,7 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
         ev: &'static str,
         handler: impl FnMut(&mut T, &mut A, E) + 'static,
     ) -> Self {
-        self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
+        self.on(ev, handler);
         self
     }
 }
@@ -173,7 +173,7 @@ impl<T: 'static, A: 'static> VerbGraph<T, A> {
         tag: &'static str,
         handler: QueueHandler<T, A, E, L>,
     ) -> Self {
-        self.handlers.entry(tag).or_default().push(Box::new(handler));
+        self.add(tag, handler);
         self
     }
 
