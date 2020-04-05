@@ -89,6 +89,16 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
         self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
         self
     }
+
+    /// Same as [`on`](QueueHandler::on), however `self` is consumed and returned.
+    pub fn and_on(
+        mut self,
+        ev: &'static str,
+        handler: impl FnMut(&mut T, &mut A, E) + 'static,
+    ) -> Self {
+        self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
+        self
+    }
 }
 
 /// Implemented by queue handlers to execute the inner closures regardless of surrounding types.
@@ -148,7 +158,17 @@ impl<T: 'static, A: 'static> VerbGraph<T, A> {
     }
 
     /// Adds a queue handler, associated with a tag.
-    pub fn add<E: Event + 'static, L: EventListen<Item = E> + 'static>(
+    pub fn add<'a, E: Event + 'static, L: EventListen<Item = E> + 'static>(
+        &'a mut self,
+        tag: &'static str,
+        handler: QueueHandler<T, A, E, L>,
+    ) -> &'a mut Self {
+        self.handlers.entry(tag).or_default().push(Box::new(handler));
+        self
+    }
+
+    /// Same as [`add`](VerbGraph::add), however `self` is consumed and returned.
+    pub fn and_add<E: Event + 'static, L: EventListen<Item = E> + 'static>(
         mut self,
         tag: &'static str,
         handler: QueueHandler<T, A, E, L>,
@@ -263,7 +283,7 @@ macro_rules! verbgraph {
                         }
                     });
             )*
-            graph = graph.add($tag, qh);
+            graph.add($tag, qh);
         )*
         graph
     }};
