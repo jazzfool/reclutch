@@ -1,6 +1,6 @@
 use {
     reclutch_core::event::prelude::*,
-    std::{cell::RefCell, collections::HashMap, ops::Deref, rc::Rc},
+    std::{collections::HashMap, ops::Deref},
 };
 
 pub use paste;
@@ -26,9 +26,8 @@ pub trait Event: Clone {
 }
 
 /// A queue handler not bound to any specific event queue.
-#[derive(Clone)]
 pub struct UnboundQueueHandler<T, A: 'static, E: Event> {
-    handlers: HashMap<&'static str, Rc<RefCell<dyn FnMut(&mut T, &mut A, E)>>>,
+    handlers: HashMap<&'static str, Box<dyn Fn(&mut T, &mut A, E)>>,
 }
 
 impl<T, A, E: Event> Default for UnboundQueueHandler<T, A, E> {
@@ -49,9 +48,9 @@ impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
     pub fn on<'a>(
         &'a mut self,
         ev: &'static str,
-        handler: impl FnMut(&mut T, &mut A, E) + 'static,
+        handler: impl Fn(&mut T, &mut A, E) + 'static,
     ) -> &'a mut Self {
-        self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
+        self.handlers.insert(ev, Box::new(handler));
         self
     }
 
@@ -60,7 +59,7 @@ impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
     pub fn and_on(
         mut self,
         ev: &'static str,
-        handler: impl FnMut(&mut T, &mut A, E) + 'static,
+        handler: impl Fn(&mut T, &mut A, E) + 'static,
     ) -> Self {
         self.on(ev, handler);
         self
@@ -77,7 +76,7 @@ impl<T, A, E: Event> UnboundQueueHandler<T, A, E> {
 
 /// A queue handler containing a map of event keys to closures, bound to an event.
 pub struct QueueHandler<T, A: 'static, E: Event, L: EventListen<Item = E>> {
-    handlers: HashMap<&'static str, Rc<RefCell<dyn FnMut(&mut T, &mut A, E)>>>,
+    handlers: HashMap<&'static str, Box<dyn Fn(&mut T, &mut A, E)>>,
     listener: L,
 }
 
@@ -95,9 +94,9 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
     pub fn on<'a>(
         &'a mut self,
         ev: &'static str,
-        handler: impl FnMut(&mut T, &mut A, E) + 'static,
+        handler: impl Fn(&mut T, &mut A, E) + 'static,
     ) -> &'a mut Self {
-        self.handlers.insert(ev, Rc::new(RefCell::new(handler)));
+        self.handlers.insert(ev, Box::new(handler));
         self
     }
 
@@ -106,7 +105,7 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
     pub fn and_on(
         mut self,
         ev: &'static str,
-        handler: impl FnMut(&mut T, &mut A, E) + 'static,
+        handler: impl Fn(&mut T, &mut A, E) + 'static,
     ) -> Self {
         self.on(ev, handler);
         self
@@ -127,9 +126,7 @@ impl<T, A, E: Event, L: EventListen<Item = E>> DynQueueHandler<T, A> for QueueHa
         self.listener.with(|events| {
             for event in events {
                 if let Some(handler) = handlers.get_mut(event.get_key()) {
-                    use std::ops::DerefMut;
-                    let mut handler = handler.as_ref().borrow_mut();
-                    (handler.deref_mut())(obj, additional, event.clone());
+                    (*handler)(obj, additional, event.clone());
                 }
             }
         });
@@ -140,9 +137,7 @@ impl<T, A, E: Event, L: EventListen<Item = E>> DynQueueHandler<T, A> for QueueHa
         self.listener.with_n(n, |events| {
             for event in events {
                 if let Some(handler) = handlers.get_mut(event.get_key()) {
-                    use std::ops::DerefMut;
-                    let mut handler = handler.as_ref().borrow_mut();
-                    (handler.deref_mut())(obj, additional, event.clone());
+                    (*handler)(obj, additional, event.clone());
                 }
             }
         });
