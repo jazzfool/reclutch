@@ -9,5 +9,6 @@ homepage = "http://github.com/jazzfool/reclutch/tree/master/verbtree"
 repository = "http://github.com/jazzfool/reclutch"
 
 [dependencies]
-reclutch_core = { path = "../core" }
+as-any = "0.2"
 paste = "0.1"
+reclutch_core = { path = "../core" }

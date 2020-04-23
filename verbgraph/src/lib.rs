@@ -1,4 +1,5 @@
 use {
+    as_any::{AsAny, Downcast},
     reclutch_core::event::prelude::*,
     std::{collections::HashMap, ops::Deref},
 };
@@ -113,14 +114,22 @@ impl<T, A, E: Event, L: EventListen<Item = E>> QueueHandler<T, A, E, L> {
 }
 
 /// Implemented by queue handlers to execute the inner closures regardless of surrounding types.
-pub trait DynQueueHandler<T, A> {
+pub trait DynQueueHandler<T, A>: AsAny {
     /// Invokes the queue handler to peek events and match them.
     fn update(&mut self, obj: &mut T, additional: &mut A);
     /// Almost identical to `update`, however only the first `n` events are handled.
     fn update_n(&mut self, n: usize, obj: &mut T, additional: &mut A);
 }
 
-impl<T, A, E: Event, L: EventListen<Item = E>> DynQueueHandler<T, A> for QueueHandler<T, A, E, L> {
+impl<T: 'static, A: 'static> Downcast for dyn DynQueueHandler<T, A> {}
+
+impl<T, A, E, L> DynQueueHandler<T, A> for QueueHandler<T, A, E, L>
+where
+    T: 'static,
+    A: 'static,
+    E: Event + 'static,
+    L: EventListen<Item = E> + 'static,
+{
     fn update(&mut self, obj: &mut T, additional: &mut A) {
         let handlers = &mut self.handlers;
         self.listener.with(|events| {
