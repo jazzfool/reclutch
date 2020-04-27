@@ -5,6 +5,7 @@ use {
 };
 
 pub use paste;
+pub use as_any;
 
 /// An object which contains an `OptionVerbGraph` that can be accessed mutably.
 pub trait HasVerbGraph: reclutch_core::widget::Widget + Sized + 'static {
