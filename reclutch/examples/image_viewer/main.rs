@@ -45,7 +45,6 @@ enum GlobalEvent {
 }
 
 struct Globals {
-    hidpi_factor: f64,
     cursor: Point,
     size: Size,
 }
@@ -399,17 +398,11 @@ fn main() {
 
     let wb = glutin::window::WindowBuilder::new()
         .with_title("Image Viewer with Reclutch")
-        .with_inner_size(
-            glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
-                .to_logical(event_loop.primary_monitor().hidpi_factor()),
-        )
-        .with_min_inner_size(
-            glutin::dpi::PhysicalSize::new(400.0, 200.0)
-                .to_logical(event_loop.primary_monitor().hidpi_factor()),
-        );
+        .with_inner_size(glutin::dpi::PhysicalSize::new(window_size.0 as f64, window_size.1 as f64))
+        .with_min_inner_size(glutin::dpi::PhysicalSize::new(400.0, 200.0));
 
     let context = glutin::ContextBuilder::new()
-        //.with_vsync(true) // fast dragging motion at the cost of high GPU usage
+        .with_vsync(true) // fast dragging motion at the cost of high GPU usage
         .build_windowed(wb, &event_loop)
         .unwrap();
 
@@ -436,7 +429,6 @@ fn main() {
     let mut global_q = RcEventQueue::default();
 
     let mut globals = Globals {
-        hidpi_factor: context.window().hidpi_factor(),
         cursor: Point::default(),
         size: Size::new(window_size.0 as _, window_size.1 as _),
     };
@@ -463,7 +455,7 @@ fn main() {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+            Event::RedrawRequested { .. } => {
                 if display.size().0 != latest_window_size.0 as _
                     || display.size().1 != latest_window_size.1 as _
                 {
@@ -475,7 +467,6 @@ fn main() {
                 context.swap_buffers().unwrap();
             }
             Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
-                let position = position.to_physical(globals.hidpi_factor);
                 globals.cursor = Point::new(position.x as _, position.y as _);
                 global_q.emit_owned(GlobalEvent::MouseMove(globals.cursor.clone()));
             }
@@ -497,7 +488,6 @@ fn main() {
                 *control_flow = ControlFlow::Exit;
             }
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                let size = size.to_physical(context.window().hidpi_factor());
                 latest_window_size = (size.width as _, size.height as _);
                 globals.size.width = size.width as _;
                 globals.size.height = size.height as _;

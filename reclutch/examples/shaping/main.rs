@@ -38,8 +38,7 @@ fn shape_with_harfbuzz(text: &str, size: i32) -> Vec<ShapedGlyph> {
 fn shape_with_rusttype(text: &str, size: i32) -> Vec<ShapedGlyph> {
     use rusttype::Font;
 
-    let font =
-        Font::from_bytes(rusttype::SharedBytes::ByRef(include_bytes!("NotoSans.ttf"))).unwrap();
+    let font = Font::try_from_bytes(include_bytes!("NotoSans.ttf")).unwrap();
 
     font.layout(
         text,
@@ -47,7 +46,7 @@ fn shape_with_rusttype(text: &str, size: i32) -> Vec<ShapedGlyph> {
         rusttype::Point { x: 0.0, y: 0.0 },
     )
     .map(|glyph| ShapedGlyph {
-        codepoint: glyph.id().0,
+        codepoint: glyph.id().0 as _,
         offset: Vector::new(0.0, glyph.position().y),
         advance: Vector::new(glyph.unpositioned().h_metrics().advance_width, 0.0),
     })
@@ -61,10 +60,10 @@ fn main() {
 
     let wb = glutin::window::WindowBuilder::new()
         .with_title("Text shaping with Reclutch")
-        .with_inner_size(
-            glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
-                .to_logical(event_loop.primary_monitor().hidpi_factor()),
-        );
+        .with_inner_size(glutin::dpi::PhysicalSize::new(
+            window_size.0 as f64,
+            window_size.1 as f64,
+        ));
 
     let context =
         glutin::ContextBuilder::new().with_vsync(true).build_windowed(wb, &event_loop).unwrap();
@@ -148,7 +147,7 @@ fn main() {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            WinitEvent::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+            WinitEvent::RedrawRequested { .. } => {
                 if display.size().0 != latest_window_size.0 as _
                     || display.size().1 != latest_window_size.1 as _
                 {
@@ -162,7 +161,6 @@ fn main() {
                 *control_flow = ControlFlow::Exit;
             }
             WinitEvent::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                let size = size.to_physical(context.window().hidpi_factor());
                 latest_window_size = (size.width as _, size.height as _);
             }
             _ => return,

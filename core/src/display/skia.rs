@@ -464,11 +464,10 @@ fn apply_filter_to_paint(paint: &mut sk::Paint, filter: Option<Filter>) {
                 ));
             }
             Filter::Invert => {
-                let mut color_matrix = sk::ColorMatrix::default();
-                color_matrix.set_20(&[
+                let color_matrix = sk::ColorMatrix::new(
                     -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0, 1.0, 0.0,
                     1.0, 1.0, 1.0, 1.0, 0.0,
-                ]);
+                );
 
                 paint.set_color_filter(sk::ColorFilters::matrix(&color_matrix));
             }
@@ -554,7 +553,7 @@ fn convert_display_text(
         }
         DisplayText::Shaped(ref glyphs) => {
             let mut builder = sk::TextBlobBuilder::new();
-            let blob_glyphs = builder.alloc_run_pos(font, glyphs.len(), None);
+            let blob_glyphs = builder.alloc_run_pos(&font, glyphs.len(), None);
 
             let mut xy = Point::new(0.0, 0.0);
             for (i, glyph) in glyphs.iter().enumerate() {
@@ -762,11 +761,10 @@ fn draw_command_group(
                     Filter::Invert => {
                         let mut paint = sk::Paint::default();
 
-                        let mut color_matrix = sk::ColorMatrix::default();
-                        color_matrix.set_20(&[
+                        let color_matrix = sk::ColorMatrix::new(
                             -1.0, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 1.0, 0.0, 0.0, 0.0, -1.0,
                             1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0,
-                        ]);
+                        );
 
                         paint.set_color_filter(sk::ColorFilters::matrix(&color_matrix));
 

@@ -34,7 +34,7 @@ name = "shaping"
 required-features = ["skia"]
 
 [dev-dependencies]
-glium = "0.26.0-alpha5"
-nalgebra = "0.19"
-harfbuzz_rs = "1.0"
-rusttype = "0.8"
+glium = "0.27"
+nalgebra = "0.21"
+harfbuzz_rs = "1.1"
+rusttype = "0.9"

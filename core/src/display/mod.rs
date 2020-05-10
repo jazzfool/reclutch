@@ -721,7 +721,7 @@ impl TextDisplayItem {
                                         .glyph_for_char(character as char)
                                         .ok_or(error::FontError::CodepointError)?,
                                 )?
-                                .x)
+                                .x())
                     },
                 )? / units_per_em
                     * self.size

@@ -94,10 +94,7 @@ fn main() {
 
     let wb = glutin::window::WindowBuilder::new()
         .with_title("OpenGL 3D with Reclutch")
-        .with_inner_size(
-            glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
-                .to_logical(event_loop.primary_monitor().hidpi_factor()),
-        )
+        .with_inner_size(glutin::dpi::PhysicalSize::new(window_size.0 as f64, window_size.1 as f64))
         .with_resizable(false);
 
     let cb = glutin::ContextBuilder::new().with_vsync(true).with_srgb(true);
@@ -255,7 +252,7 @@ fn main() {
         );
 
         match event {
-            Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+            Event::RedrawRequested { .. } => {
                 roll += 0.001;
                 pitch += 0.002;
                 yaw += 0.003;
@@ -316,14 +313,13 @@ fn main() {
                     .unwrap();
                 frame_target.finish().unwrap();
             }
-            Event::EventsCleared => {
+            Event::MainEventsCleared => {
                 gl_display.gl_window().window().request_redraw();
             }
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 *control_flow = ControlFlow::Exit;
             }
             Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                let size = size.to_physical(gl_display.gl_window().window().hidpi_factor());
                 latest_window_size = (size.width as _, size.height as _);
             }
             _ => return,

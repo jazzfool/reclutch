@@ -236,8 +236,7 @@ fn main() {
 
     let wb =
         glutin::window::WindowBuilder::new().with_title("Counter with Reclutch").with_inner_size(
-            glutin::dpi::PhysicalSize::new(window_size.0 as _, window_size.1 as _)
-                .to_logical(event_loop.primary_monitor().hidpi_factor()),
+            glutin::dpi::PhysicalSize::new(window_size.0 as f64, window_size.1 as f64),
         );
 
     let context =
@@ -264,7 +263,7 @@ fn main() {
         *control_flow = ControlFlow::Wait;
 
         match event {
-            WinitEvent::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+            WinitEvent::RedrawRequested { .. } => {
                 if display.size().0 != latest_window_size.0 as _
                     || display.size().1 != latest_window_size.1 as _
                 {
@@ -278,7 +277,6 @@ fn main() {
             WinitEvent::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. }, ..
             } => {
-                let position = position.to_physical(context.window().hidpi_factor());
                 cursor = Point::new(position.x as _, position.y as _);
 
                 window_q.emit_owned(GlobalEvent::MouseMove(cursor));
@@ -298,7 +296,6 @@ fn main() {
                 *control_flow = ControlFlow::Exit;
             }
             WinitEvent::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                let size = size.to_physical(context.window().hidpi_factor());
                 latest_window_size = (size.width as _, size.height as _);
             }
             _ => return,
