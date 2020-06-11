@@ -21,6 +21,7 @@ pub type Angle = euclid::Angle<f32>;
 ///
 /// [`GraphicsDisplay`]: GraphicsDisplay
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
 pub struct ZOrder(pub i32);
 
 /// A trait to process display commands.
@@ -181,6 +182,7 @@ pub fn ok_or_push<D: Sized>(
 
 /// Handle to a command group within a [`GraphicsDisplay`](GraphicsDisplay).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct CommandGroupHandle(u64);
 
 impl CommandGroupHandle {
@@ -207,6 +209,7 @@ impl Default for CommandGroup {
 
 impl CommandGroup {
     /// Creates a new, empty command group.
+    #[inline]
     pub fn new() -> Self {
         CommandGroup(None, true)
     }
@@ -256,20 +259,26 @@ impl CommandGroup {
     }
 
     /// Sets the repaint flag so that next time [`push`](CommandGroup::push) is called the commands will be pushed.
-    #[inline(always)]
+    #[inline]
     pub fn repaint(&mut self) {
         self.1 = true;
     }
 
     /// Returns flag indicating whether next [`push`](CommandGroup::push) will skip or not.
-    #[inline(always)]
+    #[inline]
     pub fn will_repaint(&self) -> bool {
         self.1
+    }
+
+    pub fn remove<D: Sized>(&mut self, display: &mut dyn GraphicsDisplay<D>) {
+        if let Some(handle) = self.0.take() {
+            display.remove_command_group(handle);
+        }
     }
 }
 
 /// Stroke cap (stroke start/end) appearance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LineCap {
     /// The cap of the stroke will appear as expected.
     Flat,
@@ -286,7 +295,7 @@ impl Default for LineCap {
 }
 
 /// Path corner appearance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LineJoin {
     /// The corner will appear as expected.
     Miter,
