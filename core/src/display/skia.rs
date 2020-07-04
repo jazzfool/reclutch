@@ -32,16 +32,91 @@ enum Resource {
     Font(sk::Typeface),
 }
 
-/// Converts [`DisplayCommand`](crate::display::DisplayCommand) to immediate-mode Skia commands.
-pub struct SkiaGraphicsDisplay {
-    surface: sk::Surface,
-    surface_type: SurfaceType,
-    context: sk::gpu::Context,
+#[derive(Default)]
+struct CommandList {
     command_groups: BTreeMap<
         ZOrder,
         linked_hash_map::LinkedHashMap<u64, (Vec<DisplayCommand>, Rect, bool, Option<bool>)>,
     >,
     z_lookup: HashMap<CommandGroupHandle, ZOrder>,
+}
+
+impl CommandList {
+    fn push(
+        &mut self,
+        commands: &[DisplayCommand],
+        z_order: ZOrder,
+        protected: Option<bool>,
+        always_alive: Option<bool>,
+        handle: CommandGroupHandle,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.command_groups.entry(z_order).or_default().insert(
+            handle.id(),
+            (
+                commands.to_owned(),
+                display_list_bounds(commands)?,
+                protected.unwrap_or(true),
+                if always_alive.unwrap_or(true) { Some(true) } else { None },
+            ),
+        );
+        self.z_lookup.insert(handle, z_order);
+        Ok(())
+    }
+
+    fn get(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]> {
+        self.command_groups.get(self.z_lookup.get(&handle)?)?.get(&handle.id()).map(|cg| &cg.0[..])
+    }
+
+    fn modify(
+        &mut self,
+        handle: CommandGroupHandle,
+        commands: &[DisplayCommand],
+        z_order: ZOrder,
+        protected: Option<bool>,
+        always_alive: Option<bool>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.remove(handle);
+        self.push(commands, z_order, protected, always_alive, handle)
+    }
+
+    fn maintain(&mut self, handle: CommandGroupHandle) {
+        if let Some(z) = self.z_lookup.get(&handle) {
+            if let Some(z_list) = self.command_groups.get_mut(z) {
+                if let Some(cmd_group) = z_list.get_refresh(&handle.id()) {
+                    cmd_group.3 = cmd_group.3.map(|_| true);
+                }
+            }
+        }
+    }
+
+    fn remove(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>> {
+        if let Some(&z) = self.z_lookup.get(&handle) {
+            self.z_lookup.remove(&handle);
+            Some(self.command_groups.get_mut(&z)?.remove(&handle.id())?.0)
+        } else {
+            None
+        }
+    }
+
+    fn flattened(&self) -> Vec<(u64, &(Vec<DisplayCommand>, Rect, bool, Option<bool>))> {
+        self.command_groups
+            .iter()
+            .fold(Vec::new(), |mut list, (_, z_list)| {
+                list.extend(z_list.iter());
+                list
+            })
+            .into_iter()
+            .map(|(id, cmds)| (*id, cmds))
+            .collect()
+    }
+}
+
+/// Converts [`DisplayCommand`](crate::display::DisplayCommand) to immediate-mode Skia commands.
+pub struct SkiaGraphicsDisplay {
+    surface: sk::Surface,
+    surface_type: SurfaceType,
+    context: sk::gpu::Context,
+    list: CommandList,
     next_command_group_id: u64,
     resources: HashMap<u64, Resource>,
     next_resource_id: u64,
@@ -57,8 +132,7 @@ impl SkiaGraphicsDisplay {
             surface,
             surface_type: SurfaceType::OpenGlFramebuffer(*target),
             context,
-            command_groups: Default::default(),
-            z_lookup: HashMap::new(),
+            list: Default::default(),
             next_command_group_id: 0,
             resources: HashMap::new(),
             next_resource_id: 0,
@@ -74,8 +148,7 @@ impl SkiaGraphicsDisplay {
             surface,
             surface_type: SurfaceType::OpenGlTexture(*target),
             context,
-            command_groups: Default::default(),
-            z_lookup: HashMap::new(),
+            list: Default::default(),
             next_command_group_id: 0,
             resources: HashMap::new(),
             next_resource_id: 0,
@@ -240,6 +313,7 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         Ok(rid)
     }
 
+    #[inline]
     fn remove_resource(&mut self, reference: ResourceReference) {
         self.resources.remove(&reference.id());
     }
@@ -251,31 +325,21 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         protected: Option<bool>,
         always_alive: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>> {
-        let id = self.next_command_group_id;
+        let handle = CommandGroupHandle::new(self.next_command_group_id);
 
-        self.command_groups.entry(z_order).or_default().insert(
-            id,
-            (
-                commands.to_owned(),
-                display_list_bounds(commands)?,
-                protected.unwrap_or(true),
-                if always_alive.unwrap_or(true) { Some(true) } else { None },
-            ),
-        );
+        self.list.push(commands, z_order, protected, always_alive, handle)?;
 
         self.next_command_group_id += 1;
 
-        Ok(CommandGroupHandle::new(id))
+        Ok(handle)
     }
 
     #[inline]
     fn get_command_group(&self, handle: CommandGroupHandle) -> Option<&[DisplayCommand]> {
-        self.command_groups
-            .get(self.z_lookup.get(&handle)?)?
-            .get(&handle.id())
-            .map(|cmdgroup| &cmdgroup.0[..])
+        self.list.get(handle)
     }
 
+    #[inline]
     fn modify_command_group(
         &mut self,
         handle: CommandGroupHandle,
@@ -283,36 +347,18 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         z_order: ZOrder,
         protected: Option<bool>,
         always_alive: Option<bool>,
-    ) {
-        if let Some(z_list) = self.command_groups.get_mut(&z_order) {
-            if z_list.contains_key(&handle.id()) {
-                if let Ok(bounds) = display_list_bounds(commands) {
-                    z_list.insert(
-                        handle.id(),
-                        (
-                            commands.to_owned(),
-                            bounds,
-                            protected.unwrap_or(true),
-                            if always_alive.unwrap_or(true) { Some(true) } else { None },
-                        ),
-                    );
-                }
-            }
-        }
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.list.modify(handle, commands, z_order, protected, always_alive)
     }
 
+    #[inline]
     fn maintain_command_group(&mut self, handle: CommandGroupHandle) {
-        if let Some(z) = self.z_lookup.get(&handle) {
-            if let Some(z_list) = self.command_groups.get_mut(z) {
-                if let Some(cmd_group) = z_list.get_refresh(&handle.id()) {
-                    cmd_group.3 = cmd_group.3.map(|_| true);
-                }
-            }
-        }
+        self.list.maintain(handle);
     }
 
+    #[inline]
     fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>> {
-        Some(self.command_groups.get_mut(self.z_lookup.get(&handle)?)?.remove(&handle.id())?.0)
+        self.list.remove(handle)
     }
 
     #[inline]
@@ -325,14 +371,10 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
 
         {
             let cmds = self
-                .command_groups
-                .iter()
-                .fold(Vec::new(), |mut list, (_, z_list)| {
-                    list.extend(z_list.iter());
-                    list
-                })
+                .list
+                .flattened()
                 .into_iter()
-                .map(|(id, cmds)| (&cmds.0, &cmds.1, &cmds.2, &cmds.3, *id))
+                .map(|(id, cmds)| (&cmds.0, &cmds.1, &cmds.2, &cmds.3, id))
                 .filter_map(|(cmd_group, bounds, protected, maintained, id)| {
                     if cull.map(|cull| cull.intersects(bounds)).unwrap_or(true) {
                         if let Some(maintained) = *maintained {
@@ -366,8 +408,8 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         }
 
         for (ok, id) in processed {
-            if let Some(z) = self.z_lookup.get(&CommandGroupHandle(id)) {
-                if let Some(z_list) = self.command_groups.get_mut(z) {
+            if let Some(z) = self.list.z_lookup.get(&CommandGroupHandle(id)) {
+                if let Some(z_list) = self.list.command_groups.get_mut(z) {
                     if ok {
                         z_list.get_mut(&id).unwrap().3 = Some(false);
                     } else {
@@ -805,4 +847,30 @@ fn draw_command_group(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_command_ordering() {
+        let mut list = CommandList::default();
+
+        let a = CommandGroupHandle::new(0);
+        let b = CommandGroupHandle::new(1);
+        let c = CommandGroupHandle::new(2);
+
+        list.push(&[], ZOrder::default(), None, None, a).unwrap();
+        list.push(&[], ZOrder::default(), None, None, b).unwrap();
+        list.push(&[], ZOrder::default(), None, None, c).unwrap();
+
+        assert_eq!(list.flattened().into_iter().map(|(id, _)| id).collect::<Vec<_>>(), &[0, 1, 2]);
+
+        list.maintain(b);
+        list.maintain(a);
+        list.maintain(c);
+
+        assert_eq!(list.flattened().into_iter().map(|(id, _)| id).collect::<Vec<_>>(), &[1, 0, 2]);
+    }
 }

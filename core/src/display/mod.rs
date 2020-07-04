@@ -72,7 +72,7 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
         z_order: ZOrder,
         protected: Option<bool>,
         always_alive: Option<bool>,
-    );
+    ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Removes an existing command group.
     fn remove_command_group(&mut self, handle: CommandGroupHandle) -> Option<Vec<DisplayCommand>>;
@@ -161,27 +161,37 @@ pub fn ok_or_push<D: Sized>(
     z_order: ZOrder,
     protected: impl Into<Option<bool>>,
     always_alive: impl Into<Option<bool>>,
-) {
+) -> Result<(), Box<dyn std::error::Error>> {
     match handle {
-        Some(ref handle) => {
-            display.modify_command_group(
-                *handle,
+        Some(ref handle) => display.modify_command_group(
+            *handle,
+            commands,
+            z_order,
+            protected.into(),
+            always_alive.into(),
+        ),
+        None => {
+            match display.push_command_group(
                 commands,
                 z_order,
                 protected.into(),
                 always_alive.into(),
-            );
-        }
-        None => {
-            *handle = display
-                .push_command_group(commands, z_order, protected.into(), always_alive.into())
-                .ok();
+            ) {
+                Err(e) => {
+                    *handle = None;
+                    Err(e)
+                }
+                Ok(h) => {
+                    *handle = Some(h);
+                    Ok(())
+                }
+            }
         }
     }
 }
 
 /// Handle to a command group within a [`GraphicsDisplay`](GraphicsDisplay).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct CommandGroupHandle(u64);
 
@@ -225,12 +235,13 @@ impl CommandGroup {
         z_order: ZOrder,
         protected: impl Into<Option<bool>>,
         always_alive: impl Into<Option<bool>>,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, commands, z_order, protected, always_alive);
+            ok_or_push(&mut self.0, display, commands, z_order, protected, always_alive)
         } else {
             display.maintain_command_group(self.0.unwrap());
+            Ok(())
         }
     }
 
@@ -247,14 +258,16 @@ impl CommandGroup {
         z_order: ZOrder,
         protected: impl Into<Option<bool>>,
         always_alive: impl Into<Option<bool>>,
-    ) where
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
         F: FnOnce() -> Vec<D>,
     {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, &f(), z_order, protected, always_alive);
+            ok_or_push(&mut self.0, display, &f(), z_order, protected, always_alive)
         } else {
             display.maintain_command_group(self.0.unwrap());
+            Ok(())
         }
     }
 
