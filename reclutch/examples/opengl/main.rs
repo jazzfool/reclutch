@@ -237,10 +237,8 @@ fn main() {
             None,
         );
 
-        display.push_command_group(&builder.build(), Default::default(), None, None).unwrap();
-    }
-
-    let mut latest_window_size = window_size;
+        display.push_command_group(&builder.build(), Default::default(), None, Some(false)).unwrap()
+    };
 
     let mut roll = 0.0;
     let mut pitch = 0.0;
@@ -294,12 +292,6 @@ fn main() {
                 skia_context =
                     Some(unsafe { skia_context.take().unwrap().make_current().unwrap() });
 
-                if display.size().0 != latest_window_size.0 as _
-                    || display.size().1 != latest_window_size.1 as _
-                {
-                    display.resize((latest_window_size.0 as _, latest_window_size.1 as _)).unwrap();
-                }
-
                 display.present(None).unwrap();
 
                 frame_target
@@ -318,9 +310,6 @@ fn main() {
             }
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 *control_flow = ControlFlow::Exit;
-            }
-            Event::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                latest_window_size = (size.width as _, size.height as _);
             }
             _ => return,
         }

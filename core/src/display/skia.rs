@@ -47,7 +47,7 @@ impl CommandList {
         commands: &[DisplayCommand],
         z_order: ZOrder,
         protected: Option<bool>,
-        always_alive: Option<bool>,
+        needs_maintain: Option<bool>,
         handle: CommandGroupHandle,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.command_groups.entry(z_order).or_default().insert(
@@ -56,7 +56,7 @@ impl CommandList {
                 commands.to_owned(),
                 display_list_bounds(commands)?,
                 protected.unwrap_or(true),
-                if always_alive.unwrap_or(true) { Some(true) } else { None },
+                if needs_maintain.unwrap_or(true) { Some(true) } else { None },
             ),
         );
         self.z_lookup.insert(handle, z_order);
@@ -73,10 +73,10 @@ impl CommandList {
         commands: &[DisplayCommand],
         z_order: ZOrder,
         protected: Option<bool>,
-        always_alive: Option<bool>,
+        needs_maintain: Option<bool>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.remove(handle);
-        self.push(commands, z_order, protected, always_alive, handle)
+        self.push(commands, z_order, protected, needs_maintain, handle)
     }
 
     fn maintain(&mut self, handle: CommandGroupHandle) {
@@ -323,11 +323,11 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         commands: &[DisplayCommand],
         z_order: ZOrder,
         protected: Option<bool>,
-        always_alive: Option<bool>,
+        needs_maintain: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>> {
         let handle = CommandGroupHandle::new(self.next_command_group_id);
 
-        self.list.push(commands, z_order, protected, always_alive, handle)?;
+        self.list.push(commands, z_order, protected, needs_maintain, handle)?;
 
         self.next_command_group_id += 1;
 
@@ -346,9 +346,9 @@ impl GraphicsDisplay for SkiaGraphicsDisplay {
         commands: &[DisplayCommand],
         z_order: ZOrder,
         protected: Option<bool>,
-        always_alive: Option<bool>,
+        needs_maintain: Option<bool>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.list.modify(handle, commands, z_order, protected, always_alive)
+        self.list.modify(handle, commands, z_order, protected, needs_maintain)
     }
 
     #[inline]

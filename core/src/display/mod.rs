@@ -52,13 +52,13 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
     /// Normally [`Save`](DisplayCommand::Save) and [`Restore`](DisplayCommand::Restore) (more specifically an internal `RestoreToCount`) is invoked between command group execution to prevent any leaking
     /// of clips/transforms, however this can be explicitly disabled by letting `protected` be `false`.
     ///
-    /// `always_alive` means that the command group is not subjective to maintenance. This means the only way to make it go away is to remove it directly.
+    /// `needs_maintain` being `false` means that the command group is not subjective to maintenance. This means the only way to make it go away is to remove it directly.
     fn push_command_group(
         &mut self,
         commands: &[D],
         z_order: ZOrder,
         protected: Option<bool>,
-        always_alive: Option<bool>,
+        needs_maintain: Option<bool>,
     ) -> Result<CommandGroupHandle, Box<dyn std::error::Error>>;
 
     /// Returns an existing command group by the handle returned from [`push_command_group`](GraphicsDisplay::push_command_group).
@@ -71,7 +71,7 @@ pub trait GraphicsDisplay<D: Sized = DisplayCommand> {
         commands: &[D],
         z_order: ZOrder,
         protected: Option<bool>,
-        always_alive: Option<bool>,
+        needs_maintain: Option<bool>,
     ) -> Result<(), Box<dyn std::error::Error>>;
 
     /// Removes an existing command group.
@@ -160,7 +160,7 @@ pub fn ok_or_push<D: Sized>(
     commands: &[D],
     z_order: ZOrder,
     protected: impl Into<Option<bool>>,
-    always_alive: impl Into<Option<bool>>,
+    needs_maintain: impl Into<Option<bool>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match handle {
         Some(ref handle) => display.modify_command_group(
@@ -168,14 +168,14 @@ pub fn ok_or_push<D: Sized>(
             commands,
             z_order,
             protected.into(),
-            always_alive.into(),
+            needs_maintain.into(),
         ),
         None => {
             match display.push_command_group(
                 commands,
                 z_order,
                 protected.into(),
-                always_alive.into(),
+                needs_maintain.into(),
             ) {
                 Err(e) => {
                     *handle = None;
@@ -234,11 +234,11 @@ impl CommandGroup {
         commands: &[D],
         z_order: ZOrder,
         protected: impl Into<Option<bool>>,
-        always_alive: impl Into<Option<bool>>,
+        needs_maintain: impl Into<Option<bool>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, commands, z_order, protected, always_alive)
+            ok_or_push(&mut self.0, display, commands, z_order, protected, needs_maintain)
         } else {
             display.maintain_command_group(self.0.unwrap());
             Ok(())
@@ -257,14 +257,14 @@ impl CommandGroup {
         f: F,
         z_order: ZOrder,
         protected: impl Into<Option<bool>>,
-        always_alive: impl Into<Option<bool>>,
+        needs_maintain: impl Into<Option<bool>>,
     ) -> Result<(), Box<dyn std::error::Error>>
     where
         F: FnOnce() -> Vec<D>,
     {
         if self.1 {
             self.1 = false;
-            ok_or_push(&mut self.0, display, &f(), z_order, protected, always_alive)
+            ok_or_push(&mut self.0, display, &f(), z_order, protected, needs_maintain)
         } else {
             display.maintain_command_group(self.0.unwrap());
             Ok(())

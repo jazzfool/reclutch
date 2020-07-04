@@ -171,7 +171,7 @@ impl Widget for Titlebar {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), Default::default(), None, None);
+        self.command_group.push(display, &builder.build(), Default::default(), None, None).unwrap();
     }
 }
 
@@ -329,7 +329,7 @@ impl Widget for Panel {
             None,
         );
 
-        self.command_group.push(display, &builder.build(), Default::default(), None, None);
+        self.command_group.push(display, &builder.build(), Default::default(), None, None).unwrap();
 
         for child in self.children_mut() {
             child.draw(display, aux);
