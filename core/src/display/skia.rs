@@ -246,6 +246,14 @@ impl SkiaGraphicsDisplay {
         Ok(handle)
     }
 
+    /// Immediately executes a closure which has direct access to the Skia canvas and stored resources.
+    pub fn perform_draw_closure(
+        &mut self,
+        closure: impl Fn(&mut sk::Canvas, ResourceView) + 'static,
+    ) {
+        closure(self.surface.canvas(), ResourceView { resources: &self.resources })
+    }
+
     fn new_gl_framebuffer_surface(
         target: &SkiaOpenGlFramebuffer,
     ) -> Result<(sk::Surface, sk::gpu::Context), error::SkiaError> {
