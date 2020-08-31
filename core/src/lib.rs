@@ -6,6 +6,7 @@ pub mod error;
 pub use euclid;
 pub use font_kit;
 pub use palette;
+pub use skia_safe as skia;
 
 /// Intricate event queues.
 pub use reclutch_event as event;
