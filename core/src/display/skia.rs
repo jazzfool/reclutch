@@ -249,7 +249,7 @@ impl SkiaGraphicsDisplay {
     /// Immediately executes a closure which has direct access to the Skia canvas and stored resources.
     pub fn perform_draw_closure(
         &mut self,
-        closure: impl Fn(&mut sk::Canvas, ResourceView) + 'static,
+        closure: impl FnOnce(&mut sk::Canvas, ResourceView),
     ) {
         closure(self.surface.canvas(), ResourceView { resources: &self.resources })
     }
