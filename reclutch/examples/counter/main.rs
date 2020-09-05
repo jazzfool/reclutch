@@ -253,6 +253,7 @@ fn main() {
     unsafe { gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
 
     let mut display = display::skia::SkiaGraphicsDisplay::new_gl_framebuffer(
+        |s| context.get_proc_address(s),
         &display::skia::SkiaOpenGlFramebuffer {
             framebuffer_id: fboid as _,
             size: (window_size.0 as _, window_size.1 as _),

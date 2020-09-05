@@ -189,8 +189,11 @@ impl SkiaGraphicsDisplay {
     /// Creates a new [`SkiaGraphicsDisplay`](SkiaGraphicsDisplay) with the Skia OpenGL backend, drawing into an existing framebuffer.
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components.
-    pub fn new_gl_framebuffer(target: &SkiaOpenGlFramebuffer) -> Result<Self, error::SkiaError> {
-        let (surface, context) = Self::new_gl_framebuffer_surface(target)?;
+    pub fn new_gl_framebuffer(
+        loader: impl FnMut(&str) -> *const std::ffi::c_void,
+        target: &SkiaOpenGlFramebuffer,
+    ) -> Result<Self, error::SkiaError> {
+        let (surface, context) = Self::new_gl_framebuffer_surface(loader, target)?;
         Ok(Self {
             surface,
             surface_type: SurfaceType::OpenGlFramebuffer(*target),
@@ -205,8 +208,11 @@ impl SkiaGraphicsDisplay {
     /// Creates a new [`SkiaGraphicsDisplay`](SkiaGraphicsDisplay) with the Skia OpenGL backend, drawing into an existing texture.
     /// This assumes that an OpenGL context has already been set up.
     /// This also assumes that the color format is RGBA with 8-bit components
-    pub fn new_gl_texture(target: &SkiaOpenGlTexture) -> Result<Self, error::SkiaError> {
-        let (surface, context) = Self::new_gl_texture_surface(target)?;
+    pub fn new_gl_texture(
+        loader: impl FnMut(&str) -> *const std::ffi::c_void,
+        target: &SkiaOpenGlTexture,
+    ) -> Result<Self, error::SkiaError> {
+        let (surface, context) = Self::new_gl_texture_surface(loader, target)?;
         Ok(Self {
             surface,
             surface_type: SurfaceType::OpenGlTexture(*target),
@@ -247,17 +253,15 @@ impl SkiaGraphicsDisplay {
     }
 
     /// Immediately executes a closure which has direct access to the Skia canvas and stored resources.
-    pub fn perform_draw_closure(
-        &mut self,
-        closure: impl FnOnce(&mut sk::Canvas, ResourceView),
-    ) {
+    pub fn perform_draw_closure(&mut self, closure: impl FnOnce(&mut sk::Canvas, ResourceView)) {
         closure(self.surface.canvas(), ResourceView { resources: &self.resources })
     }
 
     fn new_gl_framebuffer_surface(
+        loader: impl FnMut(&str) -> *const std::ffi::c_void,
         target: &SkiaOpenGlFramebuffer,
     ) -> Result<(sk::Surface, sk::gpu::Context), error::SkiaError> {
-        let mut context = Self::new_gl_context()?;
+        let mut context = Self::new_gl_context(loader)?;
 
         Ok((SkiaGraphicsDisplay::new_gl_framebuffer_from_context(target, &mut context)?, context))
     }
@@ -285,9 +289,10 @@ impl SkiaGraphicsDisplay {
     }
 
     fn new_gl_texture_surface(
+        loader: impl FnMut(&str) -> *const std::ffi::c_void,
         target: &SkiaOpenGlTexture,
     ) -> Result<(sk::Surface, sk::gpu::Context), error::SkiaError> {
-        let mut context = Self::new_gl_context()?;
+        let mut context = Self::new_gl_context(loader)?;
 
         Ok((SkiaGraphicsDisplay::new_gl_texture_from_context(target, &mut context)?, context))
     }
@@ -320,8 +325,10 @@ impl SkiaGraphicsDisplay {
         .ok_or_else(|| error::SkiaError::InvalidTarget(String::from("texture")))?)
     }
 
-    fn new_gl_context() -> Result<sk::gpu::Context, error::SkiaError> {
-        sk::gpu::Context::new_gl(sk::gpu::gl::Interface::new_native())
+    fn new_gl_context(
+        loader: impl FnMut(&str) -> *const std::ffi::c_void,
+    ) -> Result<sk::gpu::Context, error::SkiaError> {
+        sk::gpu::Context::new_gl(sk::gpu::gl::Interface::new_load_with(loader))
             .ok_or(error::SkiaError::InvalidContext)
     }
 }

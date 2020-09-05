@@ -8,7 +8,7 @@ use {
             event::{Event, WindowEvent},
             event_loop::{ControlFlow, EventLoop},
         },
-        Surface,
+        GlObject, Surface,
     },
     reclutch::display::{
         self, Color, DisplayListBuilder, Filter, GraphicsDisplay, GraphicsDisplayPaint, Point,
@@ -199,7 +199,7 @@ fn main() {
     let out_texture_depth =
         glium::texture::DepthTexture2d::empty(&gl_display, window_size.0, window_size.1).unwrap();
 
-    let mut skia_context = Some(unsafe {
+    let skia_context = unsafe {
         glutin::ContextBuilder::new()
             .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 3)))
             .with_shared_lists(&gl_display.gl_window())
@@ -211,17 +211,19 @@ fn main() {
             .unwrap()
             .make_current()
             .unwrap()
-    });
+    };
 
-    use glium::GlObject as _;
-
-    let mut display =
-        display::skia::SkiaGraphicsDisplay::new_gl_texture(&display::skia::SkiaOpenGlTexture {
+    let mut display = display::skia::SkiaGraphicsDisplay::new_gl_texture(
+        |s| skia_context.get_proc_address(s),
+        &display::skia::SkiaOpenGlTexture {
             size: (window_size.0 as _, window_size.1 as _),
             texture_id: out_texture.get_id(),
             mip_mapped: false,
-        })
-        .unwrap();
+        },
+    )
+    .unwrap();
+
+    let mut skia_context = Some(unsafe { skia_context.make_not_current().unwrap() });
 
     {
         let rect = Rect::new(Point::new(150.0, 150.0), Size::new(100.0, 150.0));
@@ -289,10 +291,10 @@ fn main() {
                     )
                     .unwrap();
 
-                skia_context =
-                    Some(unsafe { skia_context.take().unwrap().make_current().unwrap() });
-
+                let skia_context_c =
+                    unsafe { skia_context.take().unwrap().make_current().unwrap() };
                 display.present(None).unwrap();
+                skia_context = Some(unsafe { skia_context_c.make_not_current().unwrap() });
 
                 frame_target
                     .draw(
