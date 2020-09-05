@@ -20,6 +20,10 @@ Reclutch implements the well-known retained-mode widget ownership design within 
     <img src=".media/showcase.png" width="90%"/>
 </p>
 
+### Note for MacOS
+
+There appears to be a bug with shared OpenGL textures on MacOS. As a result, the `opengl` example won't work correctly. For applications that require rendering from multiple contexts into a single texture, consider using Vulkan or similar.
+
 ### _Also see:_
 
 - [Events and event queues](event/README.md)
