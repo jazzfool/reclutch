@@ -4,9 +4,12 @@ use {
         event::{Event as WinitEvent, WindowEvent},
         event_loop::{ControlFlow, EventLoop},
     },
-    reclutch::display::{
-        self, Color, DisplayListBuilder, DisplayText, FontInfo, GraphicsDisplay as _, Point,
-        ResourceData, ResourceDescriptor, ShapedGlyph, SharedData, TextDisplayItem, Vector,
+    reclutch::{
+        display::{
+            self, Color, DisplayListBuilder, DisplayText, FontInfo, GraphicsDisplay as _, Point,
+            ResourceData, ResourceDescriptor, ShapedGlyph, SharedData, TextDisplayItem, Vector,
+        },
+        gl,
     },
 };
 
@@ -70,15 +73,18 @@ fn main() {
 
     let context = unsafe { context.make_current().unwrap() };
 
+    gl::load_with(|s| context.get_proc_address(s));
+
+    let mut fboid = 0;
+    unsafe { gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
+
     let mut display = display::skia::SkiaGraphicsDisplay::new_gl_framebuffer(
         &display::skia::SkiaOpenGlFramebuffer {
-            framebuffer_id: 0,
+            framebuffer_id: fboid as _,
             size: (window_size.0 as _, window_size.1 as _),
         },
     )
     .unwrap();
-
-    let mut latest_window_size = window_size;
 
     {
         let font_data = std::sync::Arc::new(include_bytes!("NotoSans.ttf").to_vec());
@@ -140,7 +146,9 @@ fn main() {
             builder.push_text(text_blob, None);
         }
 
-        display.push_command_group(&builder.build(), Default::default(), None, None).unwrap();
+        display
+            .push_command_group(&builder.build(), Default::default(), None, Some(false))
+            .unwrap();
     }
 
     event_loop.run(move |event, _, control_flow| {
@@ -148,12 +156,6 @@ fn main() {
 
         match event {
             WinitEvent::RedrawRequested { .. } => {
-                if display.size().0 != latest_window_size.0 as _
-                    || display.size().1 != latest_window_size.1 as _
-                {
-                    display.resize((latest_window_size.0 as _, latest_window_size.1 as _)).unwrap();
-                }
-
                 display.present(None).unwrap();
                 context.swap_buffers().unwrap();
             }
@@ -161,7 +163,8 @@ fn main() {
                 *control_flow = ControlFlow::Exit;
             }
             WinitEvent::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                latest_window_size = (size.width as _, size.height as _);
+                display.resize((size.width as _, size.height as _)).unwrap();
+                context.resize(size);
             }
             _ => return,
         }
