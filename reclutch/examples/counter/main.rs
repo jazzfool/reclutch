@@ -13,6 +13,7 @@ use {
             ResourceReference, SharedData, Size, TextDisplayItem,
         },
         event::{RcEventListener, RcEventQueue},
+        gl,
         prelude::*,
         WidgetChildren,
     },
@@ -246,9 +247,14 @@ fn main() {
 
     let context = unsafe { context.make_current().unwrap() };
 
+    gl::load_with(|s| context.get_proc_address(s));
+
+    let mut fboid = 0;
+    unsafe { gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut fboid) };
+
     let mut display = display::skia::SkiaGraphicsDisplay::new_gl_framebuffer(
         &display::skia::SkiaOpenGlFramebuffer {
-            framebuffer_id: 0,
+            framebuffer_id: fboid as _,
             size: (window_size.0 as _, window_size.1 as _),
         },
     )
@@ -259,19 +265,11 @@ fn main() {
     let mut counter = Counter::new(&mut window_q);
     let mut cursor = Point::default();
 
-    let mut latest_window_size = window_size;
-
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
         match event {
             WinitEvent::RedrawRequested { .. } => {
-                if display.size().0 != latest_window_size.0 as _
-                    || display.size().1 != latest_window_size.1 as _
-                {
-                    display.resize((latest_window_size.0 as _, latest_window_size.1 as _)).unwrap();
-                }
-
                 counter.draw(&mut display, &mut ());
                 display.present(None).unwrap();
                 context.swap_buffers().unwrap();
@@ -298,7 +296,8 @@ fn main() {
                 *control_flow = ControlFlow::Exit;
             }
             WinitEvent::WindowEvent { event: WindowEvent::Resized(size), .. } => {
-                latest_window_size = (size.width as _, size.height as _);
+                display.resize((size.width as _, size.height as _)).unwrap();
+                context.resize(size);
             }
             _ => return,
         }

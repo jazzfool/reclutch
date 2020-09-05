@@ -10,6 +10,9 @@ pub use palette;
 #[cfg(feature = "skia")]
 pub use skia_safe as skia;
 
+#[cfg(feature = "skia")]
+pub use gl;
+
 /// Intricate event queues.
 pub use reclutch_event as event;
 
